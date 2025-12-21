@@ -73,10 +73,10 @@ def cargar_sistema_completo():
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 5. Conectar a Gemini
+            # 5. Conectar a Gemini (CON MODELO CORREGIDO: gemini-1.5-flash-001)
             st.info("🔌 Conectando con IA Gemini...")
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-1.5-flash-001",  # MODELO CORREGIDO - ¡ESTA ES LA CLAVE!
                 google_api_key=GEMINI_API_KEY,
                 temperature=0.3,
                 max_tokens=2000
@@ -147,16 +147,46 @@ if sistema:
         with st.chat_message("assistant"):
             with st.spinner("🔍 Buscando en biblioteca especializada..."):
                 try:
-                    # Prompt profesional simplificado
-                    prompt = f"Eres MINDGEEKCLINIC. Responde de manera técnica y profesional basándote en la biblioteca disponible. Consulta: {pregunta}"
-                    respuesta = sistema.invoke({"query": prompt})
-                    st.markdown(respuesta['result'])
+                    # Prompt profesional mejorado
+                    prompt_clinico = f"""Eres MINDGEEKCLINIC, el sistema de asistencia clínica del Dr. Luis Ernesto González.
+
+INSTRUCCIONES:
+1. Basa tu respuesta ÚNICA Y EXCLUSIVAMENTE en la biblioteca completa de 70 libros.
+2. El tono debe ser TÉCNICO, PROFESIONAL y PRECISO.
+3. Si la información no está en la biblioteca, indica claramente: "No hay información suficiente en la biblioteca para esta consulta específica."
+4. Enfatiza la fundamentación clínica.
+
+CONSULTA PROFESIONAL: {pregunta}
+
+ANÁLISIS Y RESPUESTA CLÍNICA:"""
+                    
+                    respuesta = sistema.invoke({"query": prompt_clinico})
+                    texto_respuesta = respuesta['result']
+                    
+                    # Mostrar respuesta
+                    st.markdown(texto_respuesta)
+                    
+                    # Mostrar fuentes si están disponibles
+                    if respuesta.get('source_documents'):
+                        fuentes = []
+                        for doc in respuesta['source_documents'][:3]:
+                            fuente = doc.metadata.get('source', 'Documento')
+                            if fuente not in fuentes:
+                                fuentes.append(fuente)
+                        
+                        if fuentes:
+                            st.markdown("---")
+                            st.caption(f"**📖 Referencias consultadas:** {', '.join(fuentes)}")
+                    
+                    # Guardar en historial
                     st.session_state.messages.append({
                         "role": "assistant", 
-                        "content": respuesta['result']
+                        "content": texto_respuesta
                     })
+                    
                 except Exception as e:
-                    st.error(f"Error al procesar: {e}")
+                    error_msg = f"Error al procesar la consulta: {str(e)[:100]}"
+                    st.error(error_msg)
 
 else:
     # Mensaje de error genérico (los errores específicos ya se mostraron arriba)
