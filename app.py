@@ -62,10 +62,10 @@ def cargar_sistema_completo():
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 6. CONECTAR GEMINI (OPCIÓN 2: models/gemini-1.5-flash)
+            # 6. CONECTAR GEMINI (OPCIÓN 3: gemini-1.5-pro)
             st.info("🔌 Conectando con IA Gemini...")
             llm = ChatGoogleGenerativeAI(
-                model="models/gemini-1.5-flash",  # OPCIÓN 2 CON PREFIJO
+                model="gemini-1.5-pro",  # OPCIÓN 3: MODELO PRO
                 google_api_key=GEMINI_API_KEY,
                 temperature=0.3,
                 max_tokens=2000
