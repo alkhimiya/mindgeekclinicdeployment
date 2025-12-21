@@ -6,14 +6,11 @@ from pathlib import Path
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import RetrievalQA
+from langchain_classic.chains import RetrievalQA
 import requests
 
 # ================= CONFIGURACIÓN =================
-# Tu API Key actual (la que me pasaste)
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
-
-# URL de la base de conocimiento
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
 
 # ================= SISTEMA PRINCIPAL =================
@@ -65,7 +62,7 @@ def cargar_sistema_completo():
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 6. CONECTAR GEMINI - ¡¡ESTA ES LA LÍNEA IMPORTANTE!!
+            # 6. CONECTAR GEMINI - MODELO CORREGIDO
             st.info("🔌 Conectando con IA Gemini...")
             llm = ChatGoogleGenerativeAI(
                 model="gemini-1.5-flash-latest",  # ✅ CAMBIADO AQUÍ - MODELO GRATUITO
