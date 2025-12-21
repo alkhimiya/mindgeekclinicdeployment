@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 import zipfile
@@ -217,4 +216,37 @@ ANÁLISIS Y RESPUESTA CLÍNICA:"""
                     
                     # Guardar en historial
                     st.session_state.messages.append({
-                        "role": "
+                        "role": "assistant", 
+                        "content": texto_respuesta
+                    })
+                    
+                except Exception as e:
+                    error_msg = f"Error al procesar la consulta: {str(e)[:100]}"
+                    st.error(error_msg)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # PIE DE PÁGINA
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.caption("© 2024 MINDGEEKCLINIC - Sistema de asistencia clínica especializada")
+
+else:
+    st.error("""
+    ❌ **Sistema no disponible**
+    
+    **Causas probables:**
+    1. No se configuró `GEMINI_API_KEY` en Streamlit Cloud Secrets
+    2. El archivo `mindgeekclinic_db.zip` no está en el repositorio GitHub de 'alkhimiya'
+    3. El archivo ZIP está vacío o dañado
+    4. Problemas de conexión para descargar el ZIP
+    
+    **Solución:**
+    1. En Streamlit Cloud > Settings > Secrets, asegúrate de tener SOLO:
+       ```
+       GEMINI_API_KEY = "tu_clave_de_gemini"
+       ```
+    2. Verifica que `mindgeekclinic_db.zip` esté en https://github.com/alkhimiya/mindgeekclinic
+    3. Reinicia la aplicación desde "Manage app" > "Reboot app"
+    """)
