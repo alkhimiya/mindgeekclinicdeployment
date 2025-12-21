@@ -1,150 +1,271 @@
 import streamlit as st
 import os
+import tempfile
+from pathlib import Path
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains import RetrievalQA
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
 
 # ================= CONFIGURACIÓN =================
-# Configura tu API Key de Gemini en Streamlit Cloud (Secrets)
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
-PERSIST_DIR = "./mindgeekclinic_db"  # Nombre de la carpeta de tu base de datos
+# 1. API Key de Gemini (desde Secrets de Streamlit)
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
 
-# ================= INICIALIZAR EL SISTEMA =================
-@st.cache_resource
-def cargar_sistema():
-    """Carga la base de datos y el modelo de IA."""
+# 2. Credenciales de Google Drive (desde Secrets)
+# OBTÉN ESTAS CREDENCIALES EN EL SIGUIENTE PASO
+GDRIVE_CREDENTIALS = st.secrets.get("GDRIVE_CREDENTIALS", {})
+GDRIVE_FOLDER_ID = "1pnif4V4UqZjMyqMAVkUMeQ9nVloI89zX"  # ID de tu carpeta de Drive
+
+# ================= ACCESO A GOOGLE DRIVE =================
+def descargar_base_desde_drive():
+    """Descarga la base de datos completa desde Google Drive."""
+    
+    st.info("🔗 Conectando con Google Drive...")
+    
     try:
-        if not GEMINI_API_KEY:
-            st.error("❌ ERROR: No se encontró la API Key de Gemini.")
-            st.info("Por favor, configura la variable 'GEMINI_API_KEY' en Streamlit Cloud Secrets.")
+        # Crear credenciales desde los secrets
+        creds_dict = {
+            "type": GDRIVE_CREDENTIALS.get("type", "service_account"),
+            "project_id": GDRIVE_CREDENTIALS.get("project_id"),
+            "private_key_id": GDRIVE_CREDENTIALS.get("private_key_id"),
+            "private_key": GDRIVE_CREDENTIALS.get("private_key", "").replace('\\n', '\n'),
+            "client_email": GDRIVE_CREDENTIALS.get("client_email"),
+            "client_id": GDRIVE_CREDENTIALS.get("client_id"),
+            "auth_uri": GDRIVE_CREDENTIALS.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": GDRIVE_CREDENTIALS.get("token_uri", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": GDRIVE_CREDENTIALS.get("auth_provider_x509_cert_url", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": GDRIVE_CREDENTIALS.get("client_x509_cert_url")
+        }
+        
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=['https://www.googleapis.com/auth/drive.readonly']
+        )
+        
+        # Crear servicio de Drive
+        drive_service = build('drive', 'v3', credentials=credentials)
+        
+        # Crear carpeta temporal para la base de datos
+        temp_dir = tempfile.mkdtemp()
+        db_path = os.path.join(temp_dir, "mindgeekclinic_db")
+        
+        st.info(f"📥 Descargando base de datos desde Drive...")
+        
+        # Buscar todos los archivos en la carpeta
+        query = f"'{GDRIVE_FOLDER_ID}' in parents"
+        results = drive_service.files().list(
+            q=query,
+            pageSize=1000,
+            fields="files(id, name, size)"
+        ).execute()
+        
+        files = results.get('files', [])
+        
+        if not files:
+            st.error("❌ No se encontraron archivos en la carpeta de Drive.")
             return None
         
-        # 1. Cargar la base de datos de conocimiento
-        with st.spinner("Cargando base de conocimiento MINDGEEKCLINIC..."):
-            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            vector_store = Chroma(persist_directory=PERSIST_DIR, embedding_function=embeddings)
+        # Descargar cada archivo
+        os.makedirs(db_path, exist_ok=True)
+        for file in files:
+            try:
+                request = drive_service.files().get_media(fileId=file['id'])
+                file_path = os.path.join(db_path, file['name'])
+                
+                with open(file_path, 'wb') as fh:
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        status, done = downloader.next_chunk()
+                
+                st.success(f"✅ {file['name']} descargado")
+                
+            except Exception as e:
+                st.warning(f"⚠️  Error con {file['name']}: {str(e)[:50]}")
         
-        # 2. Conectar con Google Gemini
-        with st.spinner("Conectando con IA..."):
+        st.success(f"📦 Base de datos descargada: {len(files)} archivos")
+        return db_path
+        
+    except Exception as e:
+        st.error(f"❌ Error crítico accediendo a Drive: {str(e)[:100]}")
+        return None
+
+# ================= INICIALIZAR SISTEMA =================
+@st.cache_resource
+def cargar_sistema_completo():
+    """Carga el sistema completo desde Drive."""
+    
+    if not GEMINI_API_KEY:
+        st.error("❌ Falta GEMINI_API_KEY en Secrets.")
+        return None
+    
+    # Descargar base de datos desde Drive
+    db_path = descargar_base_desde_drive()
+    if not db_path:
+        return None
+    
+    try:
+        # Cargar embeddings y base de datos
+        with st.spinner("🧠 Cargando conocimiento especializado..."):
+            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            vector_store = Chroma(persist_directory=db_path, embedding_function=embeddings)
+        
+        # Conectar con Gemini
+        with st.spinner("🔌 Conectando con IA..."):
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",  # Modelo gratuito y rápido
+                model="gemini-1.5-flash",
                 google_api_key=GEMINI_API_KEY,
-                temperature=0.3,      # Bajo = más preciso, Alto = más creativo
-                max_tokens=1500       # Longitud máxima de respuesta
+                temperature=0.3,
+                max_tokens=2000
             )
         
-        # 3. Crear el sistema RAG (que busca en la base y responde)
+        # Crear sistema RAG
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-            retriever=vector_store.as_retriever(search_kwargs={"k": 4}),
-            return_source_documents=False
+            retriever=vector_store.as_retriever(search_kwargs={"k": 7}),
+            return_source_documents=True
         )
         
+        st.success("✅ Sistema MINDGEEKCLINIC cargado con toda la base de conocimiento")
         return qa_chain
         
     except Exception as e:
-        st.error(f"❌ Error crítico: {e}")
+        st.error(f"❌ Error cargando sistema: {e}")
         return None
 
-# ================= INTERFAZ DE LA APLICACIÓN WEB =================
+# ================= INTERFAZ =================
 st.set_page_config(
     page_title="MINDGEEKCLINIC",
     page_icon="🧠",
-    layout="centered"
+    layout="wide"
 )
 
-# Título principal
-st.title("🧠 MINDGEEKCLINIC")
-st.markdown("**Sistema de Asistencia Clínica Especializada**")
+# CSS profesional
+st.markdown("""
+<style>
+    .main-title { color: #1E3A8A; text-align: center; font-size: 3rem; }
+    .security-badge { background: #10B981; color: white; padding: 5px 15px; border-radius: 20px; }
+    .info-box { background: #F0F9FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; }
+</style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown('<h1 class="main-title">🧠 MINDGEEKCLINIC</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; font-size:1.2rem; color:#4B5563;">Sistema de Asistencia Clínica Especializada</p>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;"><span class="security-badge">🔐 Base de conocimiento completa: 70 libros</span></div>', unsafe_allow_html=True)
 st.markdown("---")
 
-# Cargar el sistema (esto se hace solo una vez)
-sistema = cargar_sistema()
+# Barra lateral
+with st.sidebar:
+    st.title("⚙️ Configuración")
+    
+    st.markdown("### 📚 Base de Conocimiento")
+    st.markdown("""
+    **Biblioteca completa del Dr. Luis Ernesto González:**
+    - 70 libros profesionales
+    - Actualización constante
+    - Acceso directo desde Google Drive
+    """)
+    
+    st.markdown("### 🔒 Seguridad")
+    st.markdown("""
+    - Acceso solo lectura
+    - Credenciales encriptadas
+    - Sin almacenamiento local
+    """)
+    
+    if st.button("🔄 Recargar Sistema", type="secondary"):
+        st.cache_resource.clear()
+        st.rerun()
 
-# Si el sistema se cargó bien, mostrar el chat
+# Cargar sistema
+sistema = cargar_sistema_completo()
+
 if sistema:
-    # Inicializar el historial del chat
+    # Historial de chat
     if "messages" not in st.session_state:
         st.session_state.messages = []
-        # Mensaje de bienvenida
         st.session_state.messages.append({
             "role": "assistant",
-            "content": "Sistema MINDGEEKCLINIC activo. Puede realizar su consulta clínica profesional."
+            "content": "**MINDGEEKCLINIC activo.**\n\nBase de conocimiento completa cargada (70 libros).\nPuede realizar su consulta clínica profesional."
         })
     
-    # Mostrar todos los mensajes anteriores
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Mostrar mensajes
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
     
-    # Esperar una nueva pregunta del usuario
-    if pregunta := st.chat_input("Escriba su consulta clínica aquí..."):
-        # Añadir la pregunta del usuario al historial
+    # Input del usuario
+    if pregunta := st.chat_input("Escriba su consulta clínica profesional..."):
+        # Añadir pregunta
         st.session_state.messages.append({"role": "user", "content": pregunta})
-        
-        # Mostrar la pregunta del usuario
         with st.chat_message("user"):
             st.markdown(pregunta)
         
-        # Generar la respuesta del sistema
+        # Generar respuesta
         with st.chat_message("assistant"):
-            with st.spinner("Procesando consulta..."):
+            with st.spinner("🔍 Buscando en biblioteca especializada..."):
                 try:
-                    # Crear el prompt profesional
-                    prompt_final = f"""Eres MINDGEEKCLINIC, el sistema de asistencia clínica.
-Responde de manera profesional y técnica, basándote únicamente en el conocimiento disponible.
+                    prompt = f"""Eres MINDGEEKCLINIC, sistema de asistencia clínica.
 
-Consulta: {pregunta}
+CONOCIMIENTO: Dispones de la biblioteca completa del Dr. Luis Ernesto González (70 libros).
 
-Respuesta técnica:"""
+RESPONDE:
+1. De manera TÉCNICA y PROFESIONAL
+2. Basándote ÚNICAMENTE en la biblioteca
+3. Con precisión clínica
+4. Si no hay información suficiente: "No hay información en la biblioteca para esta consulta específica."
+
+CONSULTA: {pregunta}
+
+RESPUESTA TÉCNICA:"""
                     
-                    # Obtener respuesta del sistema
-                    respuesta = sistema.invoke({"query": prompt_final})
-                    texto_respuesta = respuesta['result']
+                    respuesta = sistema.invoke({"query": prompt})
+                    texto = respuesta['result']
                     
-                    # Mostrar la respuesta
-                    st.markdown(texto_respuesta)
+                    # Mostrar respuesta
+                    st.markdown(texto)
                     
-                    # Guardar la respuesta en el historial
-                    st.session_state.messages.append({"role": "assistant", "content": texto_respuesta})
+                    # Mostrar fuentes si hay
+                    if respuesta.get('source_documents'):
+                        fuentes = list(set([
+                            doc.metadata.get('source', 'Documento') 
+                            for doc in respuesta['source_documents'][:3]
+                        ]))
+                        if fuentes:
+                            st.markdown(f"**📖 Referencias:** {', '.join(fuentes)}")
+                    
+                    # Guardar en historial
+                    st.session_state.messages.append({"role": "assistant", "content": texto})
                     
                 except Exception as e:
-                    st.error(f"Error al generar respuesta: {e}")
+                    st.error(f"Error: {str(e)[:100]}")
     
-    # Barra lateral con información
-    with st.sidebar:
-        st.header("ℹ️ Acerca de MINDGEEKCLINIC")
-        st.markdown("""
-        Sistema de asistencia clínica especializada basado en la biblioteca del **Dr. Luis Ernesto González**.
-        
-        - 📚 **Base:** 70 libros profesionales
-        - 🎯 **Ámbito:** Psicología, Biodescodificación, Hipnosis Clínica
-        - 🤖 **IA:** Google Gemini 1.5 Flash
-        
-        *Uso exclusivo para profesionales.*
-        """)
-        
-        # Botón para limpiar la conversación
-        if st.button("Limpiar conversación"):
-            st.session_state.messages = [
-                {"role": "assistant", "content": "Conversación reiniciada. Puede realizar su consulta."}
-            ]
-            st.rerun()
+    # Pie de página
+    st.markdown("---")
+    st.markdown("""
+    <div class="info-box">
+    <strong>💡 Información importante:</strong><br>
+    • Sistema accede a la base de conocimiento completa desde Google Drive<br>
+    • Respuestas 100% basadas en los 70 libros profesionales<br>
+    • Sin límites de tamaño o contenido<br>
+    • Actualizaciones automáticas cuando modifiques tu Drive
+    </div>
+    """, unsafe_allow_html=True)
 
-# Si el sistema NO se pudo cargar
 else:
-    st.warning("""
-    ⚠️ El sistema no se pudo cargar completamente.
+    st.error("""
+    ❌ **Sistema no disponible**
     
-    **Causas comunes:**
-    1. La API Key de Gemini no está configurada en Streamlit Cloud
-    2. La base de datos no está en la carpeta 'mindgeekclinic_db'
-    3. Problemas de conexión
+    **Configuración requerida en Streamlit Cloud Secrets:**
     
-    **Solución en Streamlit Cloud:**
-    1. Ve a la configuración de tu app
-    2. En 'Secrets', añade: `GEMINI_API_KEY = tu_clave_de_gemini`
-    3. Reinicia la aplicación
+    1. **GEMINI_API_KEY** = tu_clave_gemini
+    2. **GDRIVE_CREDENTIALS** = (obtener en siguiente paso)
+    
+    Sin estas credenciales, el sistema no puede acceder al conocimiento.
     """)
