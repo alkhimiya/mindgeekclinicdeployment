@@ -9,15 +9,42 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains import RetrievalQA
 import requests
 
-# ================= CONFIGURACIÓN =================
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
-# URL CORREGIDA CON TU USUARIO 'alkhimiya'
+# ================= CONFIGURACIÓN INFALIBLE =================
+# Intenta obtener la API Key de TRES maneras diferentes, en orden de prioridad
+GEMINI_API_KEY = None
+
+# 1. Primero, de los Secrets de Streamlit Cloud (LA FORMA CORRECTA)
+if st.secrets.has_key("GEMINI_API_KEY"):
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    st.success("✅ API Key detectada desde Streamlit Secrets")
+# 2. Si no, de una variable de entorno (para desarrollo local)
+elif "GEMINI_API_KEY" in os.environ:
+    GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+    st.info("ℹ️ API Key detectada desde variable de entorno")
+# 3. Si no hay nada, MUESTRA ERROR CLARO
+else:
+    st.error("""
+    ❌ ERROR CRÍTICO: No se encontró la API Key de Gemini.
+    
+    Por favor, configura tu clave en Streamlit Cloud:
+    1. Ve a 'Settings' > 'Secrets'
+    2. Añade esta línea:
+       GEMINI_API_KEY = "AIzaSyTuClaveRealAqui123"
+    3. Reinicia la aplicación.
+    """)
+
+# URL de tu base de datos (CORRECTA con tu usuario)
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinic/raw/main/mindgeekclinic_db.zip"
 
-# ================= DESCARGAR Y PREPARAR BASE =================
+# ================= FUNCIÓN PRINCIPAL (SOLO si hay API Key) =================
 @st.cache_resource
 def cargar_sistema_completo():
     """Descarga la base completa y carga el sistema."""
+    
+    # VERIFICACIÓN INMEDIATA: Si no hay API Key, detener todo aquí
+    if not GEMINI_API_KEY:
+        st.error("❌ El sistema no puede iniciar sin la API Key de Gemini.")
+        return None
     
     with st.spinner("🚀 Iniciando MINDGEEKCLINIC..."):
         try:
@@ -26,7 +53,8 @@ def cargar_sistema_completo():
             response = requests.get(ZIP_URL, stream=True)
             
             if response.status_code != 200:
-                st.error("❌ No se pudo descargar la base de datos. Verifica que el archivo ZIP exista en tu repositorio.")
+                st.error(f"❌ Error al descargar. Código: {response.status_code}")
+                st.info(f"Verifica que este enlace funcione: {ZIP_URL}")
                 return None
             
             # 2. Crear directorio temporal
@@ -49,20 +77,21 @@ def cargar_sistema_completo():
             archivos = [f for f in archivos if f.is_file()]
             
             if len(archivos) == 0:
-                st.error("❌ El archivo ZIP está vacío o no se descomprimió correctamente.")
+                st.error("❌ El ZIP está vacío o no se descomprimió.")
                 return None
             
-            st.success(f"✅ Base cargada: {len(archivos)} archivos de conocimiento")
+            st.success(f"✅ Base cargada: {len(archivos)} archivos")
             
             # 4. Cargar en LangChain/Chroma
             st.info("🧠 Inicializando sistema experto...")
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 5. Conectar a Gemini
+            # 5. Conectar a Gemini (¡CON LA API Key VERIFICADA!)
+            st.info("🔌 Conectando con Gemini...")
             llm = ChatGoogleGenerativeAI(
                 model="gemini-1.5-flash",
-                google_api_key=GEMINI_API_KEY,
+                google_api_key=GEMINI_API_KEY,  # ¡Aquí se usa la clave verificada!
                 temperature=0.3,
                 max_tokens=2000
             )
@@ -76,7 +105,6 @@ def cargar_sistema_completo():
             )
             
             st.success("🎯 SISTEMA MINDGEEKCLINIC ACTIVO")
-            st.caption(f"Base de conocimiento: {len(archivos)} archivos | Modelo: Gemini 1.5 Flash")
             return qa_chain
             
         except Exception as e:
@@ -87,65 +115,17 @@ def cargar_sistema_completo():
 st.set_page_config(
     page_title="MINDGEEKCLINIC",
     page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# CSS profesional
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 3rem;
-        color: #1E3A8A;
-        text-align: center;
-        margin-bottom: 0;
-    }
-    .subtitle {
-        text-align: center;
-        color: #4B5563;
-        font-size: 1.2rem;
-        margin-top: 0;
-    }
-    .info-box {
-        background: #F0F9FF;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 4px solid #3B82F6;
-        margin: 10px 0;
-    }
-    .chat-container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# HEADER
-st.markdown('<h1 class="main-header">🧠 MINDGEEKCLINIC</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Sistema de Asistencia Clínica Especializada | Para uso profesional</p>', unsafe_allow_html=True)
+st.title("🧠 MINDGEEKCLINIC")
+st.markdown("**Sistema de Asistencia Clínica Especializada**")
 st.markdown("---")
 
 # SIDEBAR
 with st.sidebar:
-    st.title("⚙️ Configuración")
-    
-    st.markdown("### 📚 Base de Conocimiento")
-    st.markdown("""
-    **Biblioteca completa del Dr. González:**
-    - 70 libros profesionales
-    - Biodescodificación
-    - Hipnosis Clínica
-    - Psicología
-    """)
-    
-    st.markdown("### 🔍 Sistema")
-    st.markdown("""
-    - 🤖 **IA:** Google Gemini 1.5 Flash
-    - 🔗 **Arquitectura:** RAG especializado
-    - 📊 **Búsqueda:** 6 fragmentos más relevantes
-    """)
-    
-    if st.button("🔄 Reiniciar Sistema", type="secondary", use_container_width=True):
+    st.markdown("### 🔧 Configuración")
+    if st.button("🔄 Reiniciar Sistema", use_container_width=True):
         st.cache_resource.clear()
         st.rerun()
 
@@ -154,18 +134,15 @@ sistema = cargar_sistema_completo()
 
 # ÁREA DE CHAT
 if sistema:
-    st.markdown('<div class="info-box">✅ <strong>Sistema activo con toda la base de conocimiento.</strong> Puede realizar su consulta clínica profesional.</div>', unsafe_allow_html=True)
+    st.success("✅ **Sistema activo.** Puede realizar su consulta clínica.")
     
     # Inicializar historial
     if "messages" not in st.session_state:
         st.session_state.messages = []
         st.session_state.messages.append({
             "role": "assistant",
-            "content": "**MINDGEEKCLINIC activo.**\n\nHe cargado toda la biblioteca especializada del Dr. González. Estoy listo para analizar su consulta clínica con el conocimiento completo disponible."
+            "content": "MINDGEEKCLINIC listo. ¿En qué puedo asistirle?"
         })
-    
-    # Contenedor de chat
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
     # Mostrar historial
     for msg in st.session_state.messages:
@@ -173,80 +150,22 @@ if sistema:
             st.markdown(msg["content"])
     
     # Input del usuario
-    if pregunta := st.chat_input("Escriba su consulta clínica profesional aquí..."):
-        # Añadir pregunta
+    if pregunta := st.chat_input("Escriba su consulta aquí..."):
         st.session_state.messages.append({"role": "user", "content": pregunta})
         with st.chat_message("user"):
-            st.markdown(f"**Consulta:** {pregunta}")
+            st.markdown(pregunta)
         
-        # Generar respuesta
         with st.chat_message("assistant"):
-            with st.spinner("🔍 Buscando en biblioteca especializada..."):
+            with st.spinner("Procesando..."):
                 try:
-                    # Prompt clínico profesional
-                    prompt_clinico = f"""Eres MINDGEEKCLINIC, el sistema de asistencia clínica del Dr. Luis Ernesto González.
-
-INSTRUCCIONES:
-1. Basa tu respuesta ÚNICA Y EXCLUSIVAMENTE en la biblioteca completa de 70 libros.
-2. El tono debe ser TÉCNICO, PROFESIONAL y PRECISO.
-3. Si la información no está en la biblioteca, indica claramente: "No hay información suficiente en la biblioteca para esta consulta específica."
-4. Enfatiza la fundamentación clínica.
-
-CONSULTA PROFESIONAL: {pregunta}
-
-ANÁLISIS Y RESPUESTA CLÍNICA:"""
-                    
-                    respuesta = sistema.invoke({"query": prompt_clinico})
-                    texto_respuesta = respuesta['result']
-                    
-                    # Mostrar respuesta
-                    st.markdown(texto_respuesta)
-                    
-                    # Mostrar fuentes si están disponibles
-                    if respuesta.get('source_documents'):
-                        fuentes = []
-                        for doc in respuesta['source_documents'][:3]:
-                            fuente = doc.metadata.get('source', 'Documento')
-                            if fuente not in fuentes:
-                                fuentes.append(fuente)
-                        
-                        if fuentes:
-                            st.markdown("---")
-                            st.caption(f"**📖 Referencias consultadas:** {', '.join(fuentes)}")
-                    
-                    # Guardar en historial
+                    respuesta = sistema.invoke({"query": pregunta})
+                    st.markdown(respuesta['result'])
                     st.session_state.messages.append({
                         "role": "assistant", 
-                        "content": texto_respuesta
+                        "content": respuesta['result']
                     })
-                    
                 except Exception as e:
-                    error_msg = f"Error al procesar la consulta: {str(e)[:100]}"
-                    st.error(error_msg)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # PIE DE PÁGINA
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.caption("© 2024 MINDGEEKCLINIC - Sistema de asistencia clínica especializada")
+                    st.error(f"Error: {e}")
 
 else:
-    st.error("""
-    ❌ **Sistema no disponible**
-    
-    **Causas probables:**
-    1. No se configuró `GEMINI_API_KEY` en Streamlit Cloud Secrets
-    2. El archivo `mindgeekclinic_db.zip` no está en el repositorio GitHub de 'alkhimiya'
-    3. El archivo ZIP está vacío o dañado
-    4. Problemas de conexión para descargar el ZIP
-    
-    **Solución:**
-    1. En Streamlit Cloud > Settings > Secrets, asegúrate de tener SOLO:
-       ```
-       GEMINI_API_KEY = "tu_clave_de_gemini"
-       ```
-    2. Verifica que `mindgeekclinic_db.zip` esté en https://github.com/alkhimiya/mindgeekclinic
-    3. Reinicia la aplicación desde "Manage app" > "Reboot app"
-    """)
+    st.warning("⚠️ El sistema no está disponible. Revisa los mensajes de error arriba.")
