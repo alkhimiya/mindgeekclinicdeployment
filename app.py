@@ -9,52 +9,38 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains import RetrievalQA
 import requests
 
-# ================= CONFIGURACIÓN INFALIBLE =================
-# Intenta obtener la API Key de TRES maneras diferentes, en orden de prioridad
-GEMINI_API_KEY = None
+# ================= CONFIGURACIÓN CORREGIDA =================
+# 1. API Key (SOLO desde Secrets de Streamlit Cloud)
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
 
-# 1. Primero, de los Secrets de Streamlit Cloud (LA FORMA CORRECTA)
-if st.secrets.has_key("GEMINI_API_KEY"):
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    st.success("✅ API Key detectada desde Streamlit Secrets")
-# 2. Si no, de una variable de entorno (para desarrollo local)
-elif "GEMINI_API_KEY" in os.environ:
-    GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-    st.info("ℹ️ API Key detectada desde variable de entorno")
-# 3. Si no hay nada, MUESTRA ERROR CLARO
-else:
-    st.error("""
-    ❌ ERROR CRÍTICO: No se encontró la API Key de Gemini.
-    
-    Por favor, configura tu clave en Streamlit Cloud:
-    1. Ve a 'Settings' > 'Secrets'
-    2. Añade esta línea:
-       GEMINI_API_KEY = "AIzaSyTuClaveRealAqui123"
-    3. Reinicia la aplicación.
-    """)
+# 2. URL EXACTA y CORREGIDA de tu archivo ZIP (¡CONFIRMADA POR TI!)
+ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
 
-# URL de tu base de datos (CORRECTA con tu usuario)
-ZIP_URL = "https://github.com/alkhimiya/mindgeekclinic/raw/main/mindgeekclinic_db.zip"
-
-# ================= FUNCIÓN PRINCIPAL (SOLO si hay API Key) =================
+# ================= FUNCIÓN PRINCIPAL =================
 @st.cache_resource
 def cargar_sistema_completo():
-    """Descarga la base completa y carga el sistema."""
+    """Descarga la base desde GitHub y carga el sistema."""
     
-    # VERIFICACIÓN INMEDIATA: Si no hay API Key, detener todo aquí
+    # VERIFICACIÓN INMEDIATA: Si no hay API Key, detener todo.
     if not GEMINI_API_KEY:
-        st.error("❌ El sistema no puede iniciar sin la API Key de Gemini.")
+        st.error("❌ ERROR: La API Key de Gemini (GEMINI_API_KEY) no está configurada en Streamlit Cloud Secrets.")
+        st.info("Ve a Settings > Secrets y añade: GEMINI_API_KEY = 'tu_clave_aqui'")
         return None
     
     with st.spinner("🚀 Iniciando MINDGEEKCLINIC..."):
         try:
-            # 1. Descargar el ZIP desde GitHub
-            st.info("📥 Descargando base de conocimiento completa...")
-            response = requests.get(ZIP_URL, stream=True)
+            # 1. Descargar el ZIP desde la URL CORRECTA
+            st.info(f"📥 Descargando base de conocimiento desde GitHub...")
+            response = requests.get(ZIP_URL, stream=True, timeout=60)
             
-            if response.status_code != 200:
-                st.error(f"❌ Error al descargar. Código: {response.status_code}")
-                st.info(f"Verifica que este enlace funcione: {ZIP_URL}")
+            # VERIFICACIÓN CRÍTICA DEL ERROR 404
+            if response.status_code == 404:
+                st.error(f"❌ ERROR 404: No se encuentra el archivo en la URL.")
+                st.info(f"URL usada: {ZIP_URL}")
+                st.info("Verifica que el archivo 'mindgeekclinic_db.zip' esté en tu repositorio 'mindgeekclinicdeployment'.")
+                return None
+            elif response.status_code != 200:
+                st.error(f"❌ Error HTTP {response.status_code} al descargar.")
                 return None
             
             # 2. Crear directorio temporal
@@ -77,21 +63,21 @@ def cargar_sistema_completo():
             archivos = [f for f in archivos if f.is_file()]
             
             if len(archivos) == 0:
-                st.error("❌ El ZIP está vacío o no se descomprimió.")
+                st.error("❌ El archivo ZIP se descargó pero está vacío o no se pudo descomprimir.")
                 return None
             
-            st.success(f"✅ Base cargada: {len(archivos)} archivos")
+            st.success(f"✅ Base de conocimiento cargada: {len(archivos)} archivos procesados.")
             
             # 4. Cargar en LangChain/Chroma
-            st.info("🧠 Inicializando sistema experto...")
+            st.info("🧠 Inicializando motor de búsqueda especializado...")
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 5. Conectar a Gemini (¡CON LA API Key VERIFICADA!)
-            st.info("🔌 Conectando con Gemini...")
+            # 5. Conectar a Gemini
+            st.info("🔌 Conectando con IA Gemini...")
             llm = ChatGoogleGenerativeAI(
                 model="gemini-1.5-flash",
-                google_api_key=GEMINI_API_KEY,  # ¡Aquí se usa la clave verificada!
+                google_api_key=GEMINI_API_KEY,
                 temperature=0.3,
                 max_tokens=2000
             )
@@ -104,11 +90,14 @@ def cargar_sistema_completo():
                 return_source_documents=True
             )
             
-            st.success("🎯 SISTEMA MINDGEEKCLINIC ACTIVO")
+            st.success("🎯 ¡SISTEMA MINDGEEKCLINIC ACTIVO Y LISTO!")
             return qa_chain
             
+        except requests.exceptions.Timeout:
+            st.error("❌ Tiempo de espera agotado. El archivo ZIP es muy grande o hay problemas de red.")
+            return None
         except Exception as e:
-            st.error(f"❌ Error crítico: {str(e)[:200]}")
+            st.error(f"❌ Error inesperado: {str(e)[:150]}")
             return None
 
 # ================= INTERFAZ PRINCIPAL =================
@@ -124,7 +113,7 @@ st.markdown("---")
 
 # SIDEBAR
 with st.sidebar:
-    st.markdown("### 🔧 Configuración")
+    st.markdown("### ⚙️ Configuración")
     if st.button("🔄 Reiniciar Sistema", use_container_width=True):
         st.cache_resource.clear()
         st.rerun()
@@ -134,14 +123,14 @@ sistema = cargar_sistema_completo()
 
 # ÁREA DE CHAT
 if sistema:
-    st.success("✅ **Sistema activo.** Puede realizar su consulta clínica.")
+    st.success("✅ **Sistema activo.** Puede realizar su consulta clínica profesional.")
     
     # Inicializar historial
     if "messages" not in st.session_state:
         st.session_state.messages = []
         st.session_state.messages.append({
             "role": "assistant",
-            "content": "MINDGEEKCLINIC listo. ¿En qué puedo asistirle?"
+            "content": "MINDGEEKCLINIC listo. Soy su asistente especializado. ¿En qué puedo asistirle?"
         })
     
     # Mostrar historial
@@ -150,22 +139,25 @@ if sistema:
             st.markdown(msg["content"])
     
     # Input del usuario
-    if pregunta := st.chat_input("Escriba su consulta aquí..."):
+    if pregunta := st.chat_input("Escriba su consulta clínica aquí..."):
         st.session_state.messages.append({"role": "user", "content": pregunta})
         with st.chat_message("user"):
             st.markdown(pregunta)
         
         with st.chat_message("assistant"):
-            with st.spinner("Procesando..."):
+            with st.spinner("🔍 Buscando en biblioteca especializada..."):
                 try:
-                    respuesta = sistema.invoke({"query": pregunta})
+                    # Prompt profesional simplificado
+                    prompt = f"Eres MINDGEEKCLINIC. Responde de manera técnica y profesional basándote en la biblioteca disponible. Consulta: {pregunta}"
+                    respuesta = sistema.invoke({"query": prompt})
                     st.markdown(respuesta['result'])
                     st.session_state.messages.append({
                         "role": "assistant", 
                         "content": respuesta['result']
                     })
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error al procesar: {e}")
 
 else:
-    st.warning("⚠️ El sistema no está disponible. Revisa los mensajes de error arriba.")
+    # Mensaje de error genérico (los errores específicos ya se mostraron arriba)
+    st.warning("⚠️ El sistema no está disponible. Revisa los mensajes de error en la parte superior de la página.")
