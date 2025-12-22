@@ -171,7 +171,6 @@ Problemas musculares = Conflictos de desvalorización en la acción, impotencia 
 3. ¿Se siente desvalorizado en sus capacidades?
 4. ¿Hay algo que quiere hacer pero no puede?"""
     }
-    # Puedes añadir más sistemas aquí según tu conocimiento
 }
 
 def buscar_conocimiento_especializado(dolencia):
@@ -194,12 +193,10 @@ def buscar_conocimiento_especializado(dolencia):
                     "contenido": info["contenido"],
                     "prioridad": info["prioridad"]
                 })
-                break  # Solo una vez por sistema
+                break
     
-    # Ordenar por prioridad (menor número = mayor prioridad)
     conocimientos_encontrados.sort(key=lambda x: x["prioridad"])
     
-    # Combinar todos los conocimientos encontrados
     if conocimientos_encontrados:
         resultado = "="*60 + "\n"
         resultado += "🎯 **CONOCIMIENTO ESPECIALIZADO APLICABLE**\n"
@@ -212,19 +209,16 @@ def buscar_conocimiento_especializado(dolencia):
         
         return resultado
     
-    return ""  # No se encontró conocimiento especializado
+    return ""
 
-# ================= FUNCIÓN PARA GENERAR PDF CORREGIDA =================
+# ================= FUNCIÓN PARA GENERAR PDF =================
 def generar_pdf_diagnostico(datos_paciente, diagnostico):
     """
     Genera un PDF profesional con el diagnóstico completo.
     Retorna el PDF como bytes para descarga.
     """
     try:
-        # Crear buffer para el PDF
         buffer = BytesIO()
-        
-        # Configurar documento
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
@@ -234,10 +228,8 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
             bottomMargin=72
         )
         
-        # Estilos
         styles = getSampleStyleSheet()
         
-        # Estilos personalizados
         estilo_titulo = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
@@ -288,46 +280,12 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         # ===== PORTADA =====
         story.append(Spacer(1, 2*inch))
-        
-        # Logo/Icono
-        story.append(Paragraph(
-            "🧠",
-            ParagraphStyle(
-                'Logo',
-                parent=styles['Heading1'],
-                fontSize=48,
-                alignment=TA_CENTER
-            )
-        ))
-        
+        story.append(Paragraph("🧠", ParagraphStyle('Logo', parent=styles['Heading1'], fontSize=48, alignment=TA_CENTER)))
         story.append(Spacer(1, 0.5*inch))
-        
-        # Título principal
-        story.append(Paragraph(
-            "MINDGEEKCLINIC",
-            ParagraphStyle(
-                'MainTitle',
-                parent=styles['Heading1'],
-                fontSize=24,
-                textColor=colors.HexColor('#1E3A8A'),
-                alignment=TA_CENTER
-            )
-        ))
-        
-        story.append(Paragraph(
-            "Sistema Profesional de Biodescodificación",
-            ParagraphStyle(
-                'Subtitle',
-                parent=styles['Heading2'],
-                fontSize=14,
-                textColor=colors.HexColor('#6B7280'),
-                alignment=TA_CENTER
-            )
-        ))
-        
+        story.append(Paragraph("MINDGEEKCLINIC", ParagraphStyle('MainTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#1E3A8A'), alignment=TA_CENTER)))
+        story.append(Paragraph("Sistema Profesional de Biodescodificación", ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#6B7280'), alignment=TA_CENTER)))
         story.append(Spacer(1, inch))
         
-        # Información del paciente en portada
         info_paciente = [
             ["<b>PACIENTE:</b>", datos_paciente['iniciales']],
             ["<b>EDAD:</b>", f"{datos_paciente['edad']} años"],
@@ -335,7 +293,6 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
             ["<b>ID:</b>", f"MG-{datos_paciente['iniciales']}-{datetime.now().strftime('%Y%m%d')}"]
         ]
         
-        # Crear tabla para información
         paciente_table = Table(info_paciente, colWidths=[2*inch, 3*inch])
         paciente_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F3F4F6')),
@@ -355,7 +312,6 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(Paragraph("INFORMACIÓN DEL PACIENTE", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
-        # Datos básicos en tabla
         datos_basicos = [
             ["<b>Estado Civil:</b>", datos_paciente['estado_civil']],
             ["<b>Situación Laboral:</b>", datos_paciente['situacion_laboral']],
@@ -364,6 +320,9 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
             ["<b>Frecuencia:</b>", datos_paciente['frecuencia']],
             ["<b>Intensidad:</b>", f"{datos_paciente['intensidad']}/10"]
         ]
+        
+        if datos_paciente.get('diagnostico_medico') and datos_paciente['diagnostico_medico'].strip():
+            datos_basicos.append(["<b>Diagnóstico Médico:</b>", datos_paciente['diagnostico_medico']])
         
         tabla_datos = Table(datos_basicos, colWidths=[2.5*inch, 4*inch])
         tabla_datos.setStyle(TableStyle([
@@ -382,23 +341,19 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(tabla_datos)
         story.append(Spacer(1, 0.3*inch))
         
-        # Dolencia principal
         story.append(Paragraph("DOLENCIA PRINCIPAL", estilo_subtitulo))
         story.append(Paragraph(datos_paciente['dolencia'], estilo_cuerpo))
         story.append(Spacer(1, 0.2*inch))
         
-        # Factores desencadenantes
         if datos_paciente.get('factores_desencadenantes'):
             story.append(Paragraph("FACTORES DESENCADENANTES", estilo_subtitulo))
             story.append(Paragraph(datos_paciente['factores_desencadenantes'], estilo_cuerpo))
             story.append(Spacer(1, 0.2*inch))
         
-        # Eventos emocionales
         story.append(Paragraph("EVENTOS EMOCIONALES ASOCIADOS", estilo_subtitulo))
         story.append(Paragraph(datos_paciente['eventos_emocionales'], estilo_cuerpo))
         story.append(Spacer(1, 0.2*inch))
         
-        # Entorno social
         story.append(Paragraph("ENTORNO SOCIAL", estilo_subtitulo))
         story.append(Paragraph(datos_paciente['entorno_social'], estilo_cuerpo))
         
@@ -408,52 +363,35 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(Paragraph("DIAGNÓSTICO DE BIODESCODIFICACIÓN", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
-        # ===== LIMPIAR Y FORMATEAR EL DIAGNÓSTICO =====
         def limpiar_texto_para_pdf(texto):
-            """Limpia el texto del diagnóstico para que sea compatible con PDF."""
             if not texto:
                 return ""
             
-            # 1. Reemplazar espacios no rompibles por espacios normales
             texto = texto.replace(' ', ' ').replace('\xa0', ' ')
-            
-            # 2. Eliminar todas las etiquetas HTML y Markdown problemáticas
-            # Primero, convertir markdown simple a texto
             texto = texto.replace('**', '').replace('__', '')
-            
-            # 3. Eliminar etiquetas HTML pero mantener el texto
             texto = re.sub(r'<[^>]*>', '', texto)
-            
-            # 4. Manejar caracteres especiales
             texto = texto.replace('&nbsp;', ' ')
             texto = texto.replace('&amp;', '&')
             texto = texto.replace('&lt;', '<')
             texto = texto.replace('&gt;', '>')
             texto = texto.replace('&quot;', '"')
-            
-            # 5. Limpiar múltiples espacios y saltos de línea
             texto = re.sub(r'\s+', ' ', texto)
             
-            # 6. Preservar estructura básica de párrafos
             lineas = texto.split('\n')
             lineas_limpias = []
             
             for linea in lineas:
                 linea = linea.strip()
                 if linea:
-                    # Capitalizar primera letra de cada oración
                     if linea and len(linea) > 1:
                         linea = linea[0].upper() + linea[1:]
                     lineas_limpias.append(linea)
             
             return '<br/>'.join(lineas_limpias)
         
-        # Limpiar el diagnóstico
         diagnostico_limpio = limpiar_texto_para_pdf(diagnostico)
         
-        # Procesar el diagnóstico limpio
         if diagnostico_limpio:
-            # Dividir en secciones basadas en encabezados
             secciones = diagnostico_limpio.split('<br/>')
             
             for seccion in secciones:
@@ -461,11 +399,9 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
                 if not seccion:
                     continue
                 
-                # Detectar si es un encabezado (empieza con número o tiene ":")
                 if (seccion.startswith('### ') or seccion.startswith('## ') or 
                     seccion.startswith('# ') or seccion.endswith(':')):
                     
-                    # Es un encabezado
                     if seccion.startswith('###'):
                         estilo = ParagraphStyle(
                             'SubSubHeader',
@@ -500,15 +436,13 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
                         seccion = seccion.replace('#', '').strip()
                         story.append(Paragraph(f"<b>{seccion}</b>", estilo))
                     else:
-                        # Encabezado sin markdown (termina con ":")
                         story.append(Paragraph(f"<b>{seccion}</b>", estilo_subtitulo))
                 else:
-                    # Es texto normal
                     story.append(Paragraph(seccion, estilo_diagnostico))
         
         story.append(Spacer(1, 0.3*inch))
         
-        # ===== SECCIÓN 3: INFORMACIÓN DE CONTACTO Y LEGAL =====
+        # ===== SECCIÓN 3: INFORMACIÓN LEGAL =====
         story.append(Paragraph("INFORMACIÓN IMPORTANTE", estilo_subtitulo))
         
         legal_text = """
@@ -529,8 +463,6 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         # ===== GENERAR PDF =====
         doc.build(story)
-        
-        # Obtener bytes del PDF
         pdf_bytes = buffer.getvalue()
         buffer.close()
         
@@ -551,9 +483,9 @@ def guardar_paciente(datos):
     st.session_state.pacientes.append(datos)
     return datos["id"]
 
-# ================= FORMULARIO DIAGNÓSTICO MEJORADO =================
+# ================= FORMULARIO DIAGNÓSTICO CON DIAGNÓSTICO MÉDICO OPCIONAL =================
 def formulario_diagnostico():
-    """Muestra formulario clínico estructurado CON PREGUNTAS ESPECÍFICAS."""
+    """Muestra formulario clínico estructurado con diagnóstico médico opcional."""
     st.markdown("### 📋 FORMULARIO DE EVALUACIÓN CLÍNICA ESPECIALIZADA")
     
     with st.form("formulario_clinico"):
@@ -578,7 +510,6 @@ def formulario_diagnostico():
             tension_baja = st.number_input("🩺 **Tensión arterial baja (diastólica)**",
                                           min_value=30, max_value=150, value=80)
         
-        # ==== PREGUNTAS ESPECÍFICAS NUEVAS ====
         st.markdown("---")
         st.markdown("#### ⏳ **TIEMPO DEL PADECIMIENTO**")
         
@@ -597,7 +528,23 @@ def formulario_diagnostico():
                  "Semanalmente", "Mensualmente", "Ocasionalmente", "Solo en ciertas situaciones"]
             )
         
-        # ==== EVENTOS EMOCIONALES DETALLADOS ====
+        # ===== DIAGNÓSTICO MÉDICO OPCIONAL =====
+        st.markdown("---")
+        st.markdown("#### 🏥 **INFORMACIÓN MÉDICA (OPCIONAL)**")
+        
+        diagnostico_medico = st.text_area(
+            "**Diagnóstico médico recibido (si aplica):**",
+            height=80,
+            placeholder="""Ejemplo: 
+- Diagnóstico: Gastritis crónica tipo B
+- Tratamiento: Omeprazol 40mg/día
+- Estudios realizados: Endoscopia digestiva alta
+- Especialista: Dr. González, Gastroenterólogo
+
+O déjelo en blanco si no tiene diagnóstico médico formal.""",
+            help="Este campo es completamente opcional. Si tiene diagnóstico médico previo, inclúyalo para enriquecer el análisis."
+        )
+        
         st.markdown("---")
         st.markdown("#### 🎯 **EVENTOS EMOCIONALES ASOCIADOS (TRIANGULACIÓN)**")
         
@@ -616,7 +563,6 @@ def formulario_diagnostico():
 Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
         )
         
-        # ==== SÍNTOMAS Y CONTEXTO ====
         st.markdown("---")
         st.markdown("#### 🤒 **DOLENCIA / SÍNTOMA PRINCIPAL**")
         
@@ -636,7 +582,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
                 placeholder="Ej: Estrés laboral, discusiones, clima frío, ciertos alimentos..."
             )
         
-        # ==== ENTORNO SOCIAL ====
         st.markdown("---")
         st.markdown("#### 👥 **ENTORNO SOCIAL ACTUAL**")
         entorno_social = st.text_area(
@@ -645,7 +590,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
             placeholder="Ej: Vivo solo después de divorcio, tengo 2 hijos que veo fines de semana, pocos amigos cercanos, relación conflictiva con jefe..."
         )
         
-        # Submit
         st.markdown("---")
         submitted = st.form_submit_button(
             "🚀 **ANALIZAR CON BIODESCODIFICACIÓN Y TRIANGULACIÓN**", 
@@ -662,6 +606,7 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
                 "tension": f"{tension_alta}/{tension_baja}",
                 "tiempo_padecimiento": tiempo_padecimiento,
                 "frecuencia": frecuencia,
+                "diagnostico_medico": diagnostico_medico.strip() if diagnostico_medico else "",
                 "eventos_emocionales": eventos_emocionales,
                 "dolencia": dolencia,
                 "intensidad": intensidad,
@@ -674,12 +619,21 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
             st.session_state.mostrar_diagnostico = True
             st.rerun()
 
-# ================= GENERAR DIAGNÓSTICO CON TRIANGULACIÓN Y CONOCIMIENTO ESPECIALIZADO =================
+# ================= GENERAR DIAGNÓSTICO COMPLETO =================
 def generar_diagnostico_triangulacion(sistema, datos_paciente):
-    """Genera diagnóstico completo con triangulación de eventos emocionales y conocimiento especializado."""
+    """Genera diagnóstico completo con triangulación, conocimiento especializado y diagnóstico médico."""
     
-    # Buscar conocimiento especializado relevante
     conocimiento_especializado = buscar_conocimiento_especializado(datos_paciente['dolencia'])
+    
+    diagnostico_medico_texto = ""
+    if datos_paciente.get('diagnostico_medico') and datos_paciente['diagnostico_medico'].strip():
+        diagnostico_medico_texto = f"""
+        **DIAGNÓSTICO MÉDICO PREVIO:**
+        {datos_paciente['diagnostico_medico']}
+        
+        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación, 
+        considerándolo como información valiosa pero analizando desde la perspectiva emocional/simbólica.
+        """
     
     prompt = f"""
     ## 🧠 DIAGNÓSTICO DE BIODESCODIFICACIÓN CON TRIANGULACIÓN - MINDGEEKCLINIC
@@ -693,6 +647,8 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     - Tiempo del padecimiento: {datos_paciente['tiempo_padecimiento']}
     - Frecuencia: {datos_paciente['frecuencia']}
     - Intensidad: {datos_paciente['intensidad']}/10
+    
+    {diagnostico_medico_texto}
     
     **SÍNTOMA PRINCIPAL:**
     {datos_paciente['dolencia']}
@@ -713,33 +669,38 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     
     1. **TRIANGULACIÓN DIAGNÓSTICA:**
        - Analizar la relación TEMPORAL entre eventos emocionales y síntomas
-       - Identificar PATRONES específicos en "{datos_paciente['eventos_emocionales']}"
+       - Identificar PATRONES específicos en los eventos emocionales
        - Determinar si hay eventos DESENCADENANTES, MANTENEDORES o AGRAVANTES
-       - Relacionar tiempo "{datos_paciente['tiempo_padecimiento']}" con eventos de vida
+       - Relacionar tiempo del padecimiento con eventos de vida
     
-    2. **INTEGRAR CONOCIMIENTO ESPECIALIZADO (si aplica):**
+    2. **INTEGRAR DIAGNÓSTICO MÉDICO (si aplica):**
+       - Considerar el diagnóstico médico como información contextual valiosa
+       - Analizar cómo los aspectos emocionales pueden relacionarse con el diagnóstico clínico
+       - Proporcionar una perspectiva complementaria (no contradictoria)
+    
+    3. **INTEGRAR CONOCIMIENTO ESPECIALIZADO (si aplica):**
        - Incorporar el conocimiento especializado relevante al diagnóstico
        - Relacionar síntomas específicos con sistemas corporales identificados
        - Aplicar las preguntas clave sugeridas por el conocimiento especializado
     
-    3. **DIAGNÓSTICO DE BIODESCODIFICACIÓN ESPECÍFICO:**
-       - Interpretar "{datos_paciente['dolencia']}" según biodescodificación
+    4. **DIAGNÓSTICO DE BIODESCODIFICACIÓN ESPECÍFICO:**
+       - Interpretar la dolencia según biodescodificación
        - Identificar el CONFLICTO EMOCIONAL PRECISO basado en triangulación
        - Explicar SIGNIFICADO BIOLÓGICO del síntoma
        - Relacionar con eventos específicos mencionados
     
-    4. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
+    5. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
        - SESIÓN 1: Enfoque en [conflicto específico identificado por triangulación]
        - SESIÓN 2: Trabajo en [eventos emocionales clave identificados]
        - SESIÓN 3: Integración y [estrategias específicas basadas en factores desencadenantes]
     
-    5. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
+    6. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
        - Frecuencia: 3 veces por semana (como indica biblioteca)
        - Duración: 15-20 minutos por sesión
        - Técnicas ESPECÍFICAS de la biblioteca de modelos de hipnosis
        - INSTRUCCIONES DETALLADAS para grabación o aplicación
     
-    6. **RECOMENDACIONES PERSONALIZADAS:**
+    7. **RECOMENDACIONES PERSONALIZADAS:**
        - Actividades de autohipnosis DIARIAS basadas en triangulación
        - Ejercicios emocionales ESPECÍFICOS para eventos identificados
        - Estrategias para manejar factores desencadenantes
@@ -751,6 +712,7 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     4. DEBE mencionar técnicas CONCRETAS de la biblioteca
     5. DEBE ser ESTRUCTURADO y PROFESIONAL
     6. DEBE integrar el conocimiento especializado cuando sea relevante
+    7. DEBE considerar el diagnóstico médico (si existe) como contexto valioso
     
     **FORMATO DE RESPUESTA:**
     
@@ -759,21 +721,24 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     ### 1. Análisis de Patrones Identificados
     [Explicar relación eventos-síntomas]
     
-    ### 2. Integración de Conocimiento Especializado
+    ### 2. Contexto Médico (si aplica)
+    [Integrar diagnóstico médico si existe]
+    
+    ### 3. Integración de Conocimiento Especializado
     [Incorporar conocimiento especializado relevante]
     
-    ### 3. Diagnóstico de Biodescodificación
+    ### 4. Diagnóstico de Biodescodificación
     [Conflicto emocional específico + significado biológico]
     
-    ### 4. Protocolo de 3 Sesiones Terapéuticas
+    ### 5. Protocolo de 3 Sesiones Terapéuticas
     Sesión 1: [Instrucciones específicas]
     Sesión 2: [Instrucciones específicas]
     Sesión 3: [Instrucciones específicas]
     
-    ### 5. Protocolo de Hipnosis/Autohipnosis
+    ### 6. Protocolo de Hipnosis/Autohipnosis
     [Instrucciones DETALLADAS para grabación o aplicación]
     
-    ### 6. Recomendaciones Específicas
+    ### 7. Recomendaciones Específicas
     [Basadas en triangulación de eventos]
     
     **RESPUESTA PROFESIONAL ESTRUCTURADA:**
@@ -785,7 +750,7 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     except Exception as e:
         return f"Error al generar diagnóstico: {str(e)}"
 
-# ================= GENERAR GUIÓN DE HIPNOSIS (CORREGIDO) =================
+# ================= GENERAR GUIÓN DE HIPNOSIS =================
 def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     """Genera guión específico de hipnosis basado en biblioteca."""
     
@@ -852,13 +817,11 @@ def cargar_sistema_completo():
     
     with st.spinner("🔄 Cargando sistema especializado..."):
         try:
-            # Descargar biblioteca
             response = requests.get(ZIP_URL, stream=True, timeout=60)
             if response.status_code != 200:
                 st.error(f"❌ Error al descargar biblioteca.")
                 return None
             
-            # Procesar
             temp_dir = tempfile.mkdtemp()
             zip_path = os.path.join(temp_dir, "biblioteca.zip")
             extract_path = os.path.join(temp_dir, "biodescodificacion_db")
@@ -870,11 +833,9 @@ def cargar_sistema_completo():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_path)
             
-            # Cargar embeddings
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # Conectar con IA
             llm = ChatGroq(
                 groq_api_key=GROQ_API_KEY,
                 model_name="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -882,7 +843,6 @@ def cargar_sistema_completo():
                 max_tokens=3500
             )
             
-            # Crear sistema RAG
             qa_chain = RetrievalQA.from_chain_type(
                 llm=llm,
                 chain_type="stuff",
@@ -930,7 +890,7 @@ with st.sidebar:
         st.rerun()
     
     st.markdown("---")
-    st.caption("🎯 Sistema con Triangulación de Eventos Emocionales y Conocimiento Especializado")
+    st.caption("🎯 Sistema con Triangulación y Conocimiento Especializado")
 
 # Título principal
 st.title("🧠 MINDGEEKCLINIC")
@@ -965,7 +925,7 @@ if not st.session_state.mostrar_diagnostico:
 else:
     paciente = st.session_state.paciente_actual
     
-    # Mostrar datos del paciente con nueva información
+    # Mostrar datos del paciente
     st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
     
     with st.expander("📋 Ver datos completos con triangulación"):
@@ -980,12 +940,14 @@ else:
         with col2:
             st.write(f"**Tensión arterial:** {paciente['tension']}")
             st.write(f"**Dolencia:** {paciente['dolencia']}")
+            if paciente.get('diagnostico_medico') and paciente['diagnostico_medico'].strip():
+                st.write(f"**Diagnóstico médico:** {paciente['diagnostico_medico']}")
             st.write(f"**Factores desencadenantes:** {paciente['factores_desencadenantes'][:150]}...")
         
         st.markdown("#### 🎯 **Eventos Emocionales para Triangulación:**")
         st.info(paciente['eventos_emocionales'])
     
-    # Mostrar conocimiento especializado aplicable (si existe)
+    # Mostrar conocimiento especializado aplicable
     conocimiento_especializado = buscar_conocimiento_especializado(paciente['dolencia'])
     if conocimiento_especializado:
         with st.expander("🔬 **Conocimiento Especializado Aplicable**", expanded=True):
@@ -1003,7 +965,7 @@ else:
     # Mostrar diagnóstico
     st.markdown(st.session_state.diagnostico_completo)
     
-    # ==== SECCIÓN DE HIPNOSIS MEJORADA ====
+    # ==== SECCIÓN DE HIPNOSIS ====
     st.markdown("---")
     st.markdown("### 🎧 **PROTOCOLOS DE HIPNOSIS ESPECÍFICOS**")
     
@@ -1057,7 +1019,6 @@ else:
             guion = generar_guion_hipnosis(sistema, paciente, "grabacion")
             st.markdown(guion)
             
-            # Instrucciones adicionales para grabación
             st.markdown("---")
             st.markdown("#### 📋 **INSTRUCCIONES PARA GRABACIÓN:**")
             st.success("""
@@ -1092,7 +1053,6 @@ else:
         if st.button("📄 Generar y Descargar PDF", use_container_width=True, type="secondary"):
             with st.spinner("🔄 Generando PDF profesional..."):
                 if st.session_state.paciente_actual and st.session_state.diagnostico_completo:
-                    # Generar PDF
                     pdf_bytes = generar_pdf_diagnostico(
                         st.session_state.paciente_actual,
                         st.session_state.diagnostico_completo
@@ -1102,12 +1062,10 @@ else:
                         st.session_state.pdf_generado = pdf_bytes
                         st.success("✅ PDF generado correctamente")
                         
-                        # Mostrar botón de descarga
                         nombre_archivo = f"Diagnostico_{paciente['iniciales']}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
                         st.markdown("---")
                         st.markdown("#### 📥 **Descargar PDF**")
                         
-                        # Crear botón de descarga
                         b64 = base64.b64encode(pdf_bytes).decode()
                         href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" target="_blank">'
                         href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF ahora</button>'
@@ -1115,7 +1073,6 @@ else:
                         
                         st.markdown(href, unsafe_allow_html=True)
                         
-                        # Información del archivo
                         st.info(f"""
                         **Archivo:** {nombre_archivo}
                         **Tamaño:** {len(pdf_bytes) / 1024:.1f} KB
@@ -1139,7 +1096,7 @@ else:
                 
                 **Formato del PDF:**
                 - Portada profesional
-                - Datos completos del paciente
+                - Datos completos del paciente (incluyendo diagnóstico médico si existe)
                 - Diagnóstico estructurado
                 - Información legal y de confidencialidad
                 """)
@@ -1150,7 +1107,7 @@ st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
     🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • 
-    Conocimiento Especializado Integrado • 
+    Conocimiento Especializado Integrado • Diagnóstico Médico Opcional • 
     Compatible con móvil y computador
     </div>
     """,
