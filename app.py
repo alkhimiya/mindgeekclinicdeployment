@@ -62,11 +62,11 @@ def cargar_sistema_completo():
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # 6. CONECTAR CON GROQ - MODELO CORREGIDO
+            # 6. CONECTAR CON GROQ
             st.info("🔌 Conectando con Groq Cloud...")
             llm = ChatGroq(
                 groq_api_key=GROQ_API_KEY,
-                model_name="llama-3.1-70b-versatile",  # ✅ MODELO CORREGIDO
+                model_name="llama-3.3-70b",
                 temperature=0.3,
                 max_tokens=2000
             )
