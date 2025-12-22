@@ -23,12 +23,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import base64
 from io import BytesIO
+import re  # Importación añadida para limpiar HTML
 
 # ================= CONFIGURACIÓN =================
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
 
-# ================= FUNCIÓN PARA GENERAR PDF =================
+# ================= FUNCIÓN PARA GENERAR PDF CORREGIDA =================
 def generar_pdf_diagnostico(datos_paciente, diagnostico):
     """
     Genera un PDF profesional con el diagnóstico completo.
@@ -222,58 +223,103 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(Paragraph("DIAGNÓSTICO DE BIODESCODIFICACIÓN", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
-        # Dividir el diagnóstico en secciones
-        diagnostico_texto = diagnostico
+        # ===== LIMPIAR Y FORMATEAR EL DIAGNÓSTICO =====
+        def limpiar_texto_para_pdf(texto):
+            """Limpia el texto del diagnóstico para que sea compatible con PDF."""
+            if not texto:
+                return ""
+            
+            # 1. Reemplazar espacios no rompibles por espacios normales
+            texto = texto.replace(' ', ' ').replace('\xa0', ' ')
+            
+            # 2. Eliminar todas las etiquetas HTML y Markdown problemáticas
+            # Primero, convertir markdown simple a texto
+            texto = texto.replace('**', '').replace('__', '')
+            
+            # 3. Eliminar etiquetas HTML pero mantener el texto
+            texto = re.sub(r'<[^>]*>', '', texto)
+            
+            # 4. Manejar caracteres especiales
+            texto = texto.replace('&nbsp;', ' ')
+            texto = texto.replace('&amp;', '&')
+            texto = texto.replace('&lt;', '<')
+            texto = texto.replace('&gt;', '>')
+            texto = texto.replace('&quot;', '"')
+            
+            # 5. Limpiar múltiples espacios y saltos de línea
+            texto = re.sub(r'\s+', ' ', texto)
+            
+            # 6. Preservar estructura básica de párrafos
+            lineas = texto.split('\n')
+            lineas_limpias = []
+            
+            for linea in lineas:
+                linea = linea.strip()
+                if linea:
+                    # Capitalizar primera letra de cada oración
+                    if linea and len(linea) > 1:
+                        linea = linea[0].upper() + linea[1:]
+                    lineas_limpias.append(linea)
+            
+            return '<br/>'.join(lineas_limpias)
         
-        # Limpiar y formatear el diagnóstico
-        lineas = diagnostico_texto.split('\n')
-        for linea in lineas:
-            linea = linea.strip()
-            if not linea:
-                continue
+        # Limpiar el diagnóstico
+        diagnostico_limpio = limpiar_texto_para_pdf(diagnostico)
+        
+        # Procesar el diagnóstico limpio
+        if diagnostico_limpio:
+            # Dividir en secciones basadas en encabezados
+            secciones = diagnostico_limpio.split('<br/>')
+            
+            for seccion in secciones:
+                seccion = seccion.strip()
+                if not seccion:
+                    continue
                 
-            # Detectar títulos
-            if linea.startswith('### ') or linea.startswith('## ') or linea.startswith('# '):
-                # Es un título
-                nivel = linea.count('#')
-                texto_titulo = linea.replace('#', '').strip()
-                
-                if nivel == 1:  # Título principal
-                    story.append(Paragraph(texto_titulo, estilo_subtitulo))
-                elif nivel == 2:  # Subtítulo
-                    story.append(Paragraph(
-                        f"<b>{texto_titulo}</b>",
-                        ParagraphStyle(
-                            'SubSection',
+                # Detectar si es un encabezado (empieza con número o tiene ":")
+                if (seccion.startswith('### ') or seccion.startswith('## ') or 
+                    seccion.startswith('# ') or seccion.endswith(':')):
+                    
+                    # Es un encabezado
+                    if seccion.startswith('###'):
+                        estilo = ParagraphStyle(
+                            'SubSubHeader',
                             parent=styles['Normal'],
                             fontSize=11,
+                            textColor=colors.HexColor('#1E3A8A'),
+                            spaceBefore=10,
+                            spaceAfter=4
+                        )
+                        seccion = seccion.replace('###', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    elif seccion.startswith('##'):
+                        estilo = ParagraphStyle(
+                            'SubHeader',
+                            parent=styles['Normal'],
+                            fontSize=12,
                             textColor=colors.HexColor('#1E3A8A'),
                             spaceBefore=12,
                             spaceAfter=6
                         )
-                    ))
-                elif nivel == 3:  # Sub-subtítulo
-                    story.append(Paragraph(
-                        f"<i>{texto_titulo}</i>",
-                        ParagraphStyle(
-                            'SubSubSection',
+                        seccion = seccion.replace('##', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    elif seccion.startswith('#'):
+                        estilo = ParagraphStyle(
+                            'MainHeader',
                             parent=styles['Normal'],
-                            fontSize=10,
-                            textColor=colors.HexColor('#4B5563'),
-                            spaceBefore=8,
-                            spaceAfter=4
+                            fontSize=14,
+                            textColor=colors.HexColor('#1E3A8A'),
+                            spaceBefore=14,
+                            spaceAfter=8
                         )
-                    ))
-            else:
-                # Es texto normal
-                if '**' in linea or '__' in linea:
-                    # Texto con negrita
-                    linea = linea.replace('**', '<b>').replace('__', '<b>')
-                    # Cerrar tags (simplificado)
-                    if linea.count('<b>') % 2 != 0:
-                        linea += '</b>'
-                
-                story.append(Paragraph(linea, estilo_diagnostico))
+                        seccion = seccion.replace('#', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    else:
+                        # Encabezado sin markdown (termina con ":")
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo_subtitulo))
+                else:
+                    # Es texto normal
+                    story.append(Paragraph(seccion, estilo_diagnostico))
         
         story.append(Spacer(1, 0.3*inch))
         
@@ -520,9 +566,9 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     [Conflicto emocional específico + significado biológico]
     
     ### 3. Protocolo de 3 Sesiones Terapéuticas
-    **Sesión 1:** [Instrucciones específicas]
-    **Sesión 2:** [Instrucciones específicas]  
-    **Sesión 3:** [Instrucciones específicas]
+    Sesión 1: [Instrucciones específicas]
+    Sesión 2: [Instrucciones específicas]
+    Sesión 3: [Instrucciones específicas]
     
     ### 4. Protocolo de Hipnosis/Autohipnosis
     [Instrucciones DETALLADAS para grabación o aplicación]
