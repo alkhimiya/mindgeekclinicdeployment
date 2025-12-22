@@ -6,7 +6,7 @@ from pathlib import Path
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-from langchain.chains import RetrievalQA  # ¡SOLO ESTA LÍNEA CAMBIADA! Era langchain_classic.chains
+from langchain_classic.chains import RetrievalQA
 import requests
 import json
 from datetime import datetime
