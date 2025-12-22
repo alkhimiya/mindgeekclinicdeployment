@@ -309,18 +309,6 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         st.error(f"Error al generar PDF: {str(e)}")
         return None
 
-def crear_boton_descarga_pdf(pdf_bytes, nombre_archivo):
-    """
-    Crea un botón de descarga para el PDF.
-    """
-    if pdf_bytes:
-        b64 = base64.b64encode(pdf_bytes).decode()
-        href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" style="text-decoration: none;">'
-        href += f'<button style="background-color: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%;">📥 Descargar PDF</button>'
-        href += '</a>'
-        return href
-    return None
-
 # ================= BASE DE DATOS DE PACIENTES =================
 def guardar_paciente(datos):
     """Guarda datos del paciente en session_state."""
@@ -496,4 +484,423 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
        - Interpretar "{datos_paciente['dolencia']}" según biodescodificación
        - Identificar el CONFLICTO EMOCIONAL PRECISO basado en triangulación
        - Explicar SIGNIFICADO BIOLÓGICO del síntoma
-       - Relacionar con e
+       - Relacionar con eventos específicos mencionados
+    
+    3. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
+       - SESIÓN 1: Enfoque en [conflicto específico identificado por triangulación]
+       - SESIÓN 2: Trabajo en [eventos emocionales clave identificados]
+       - SESIÓN 3: Integración y [estrategias específicas basadas en factores desencadenantes]
+    
+    4. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
+       - Frecuencia: 3 veces por semana (como indica biblioteca)
+       - Duración: 15-20 minutos por sesión
+       - Técnicas ESPECÍFICAS de la biblioteca de modelos de hipnosis
+       - INSTRUCCIONES DETALLADAS para grabación o aplicación
+    
+    5. **RECOMENDACIONES PERSONALIZADAS:**
+       - Actividades de autohipnosis DIARIAS basadas en triangulación
+       - Ejercicios emocionales ESPECÍFICOS para eventos identificados
+       - Estrategias para manejar factores desencadenantes
+    
+    **REQUISITOS ESTRICTOS DE RESPUESTA:**
+    1. DEBE basarse en la biblioteca de biodescodificación disponible
+    2. DEBE usar modelos de hipnosis de la biblioteca
+    3. DEBE incluir INSTRUCCIONES ESPECÍFICAS para terapia
+    4. DEBE mencionar técnicas CONCRETAS de la biblioteca
+    5. DEBE ser ESTRUCTURADO y PROFESIONAL
+    
+    **FORMATO DE RESPUESTA:**
+    
+    ## 🔍 DIAGNÓSTICO POR TRIANGULACIÓN
+    
+    ### 1. Análisis de Patrones Identificados
+    [Explicar relación eventos-síntomas]
+    
+    ### 2. Diagnóstico de Biodescodificación
+    [Conflicto emocional específico + significado biológico]
+    
+    ### 3. Protocolo de 3 Sesiones Terapéuticas
+    **Sesión 1:** [Instrucciones específicas]
+    **Sesión 2:** [Instrucciones específicas]  
+    **Sesión 3:** [Instrucciones específicas]
+    
+    ### 4. Protocolo de Hipnosis/Autohipnosis
+    [Instrucciones DETALLADAS para grabación o aplicación]
+    
+    ### 5. Recomendaciones Específicas
+    [Basadas en triangulación de eventos]
+    
+    **RESPUESTA PROFESIONAL ESTRUCTURADA:**
+    """
+    
+    try:
+        respuesta = sistema.invoke({"query": prompt})
+        return respuesta['result']
+    except Exception as e:
+        return f"Error al generar diagnóstico: {str(e)}"
+
+# ================= GENERAR GUIÓN DE HIPNOSIS (CORREGIDO) =================
+def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
+    """Genera guión específico de hipnosis basado en biblioteca."""
+    
+    tipo_texto = "para aplicación por terapeuta" if tipo == "terapeuta" else "para grabación de autohipnosis"
+    
+    prompt = f"""
+    ## 🎧 GUION DE HIPNOSIS ESPECÍFICO - MINDGEEKCLINIC
+    
+    **CONTEXTO DEL PACIENTE:**
+    - Síntoma: {datos_paciente['dolencia']}
+    - Conflicto identificado: [Basado en triangulación anterior]
+    - Eventos emocionales: {datos_paciente['eventos_emocionales'][:200]}
+    
+    **INSTRUCCIONES PARA EL ASISTENTE:**
+    
+    Generar un guión COMPLETO de hipnosis {tipo_texto} basado en la biblioteca de modelos de hipnosis.
+    
+    **REQUISITOS:**
+    1. Usar técnicas ESPECÍFICAS de la biblioteca de modelos
+    2. Incluir inducción, trabajo terapéutico y despertar
+    3. Duración: 15-20 minutos
+    4. Frecuencia: 3 veces por semana
+    5. Instrucciones PRECISAS para {'el terapeuta' if tipo == 'terapeuta' else 'grabación'}
+    
+    **ESTRUCTURA DEL GUIÓN:**
+    
+    ### 🎯 OBJETIVO TERAPÉUTICO
+    [Objetivo específico basado en triangulación]
+    
+    ### 📝 GUIÓN COMPLETO
+    
+    **INDUCCIÓN:**
+    [Texto completo de inducción hipnótica]
+    
+    **TRABAJO TERAPÉUTICO:**
+    [Instrucciones específicas para trabajar el conflicto]
+    
+    **SUGERENCIAS POSHIPNÓTICAS:**
+    [Sugerencias para después de la sesión]
+    
+    **DESPERTAR:**
+    [Instrucciones para finalizar]
+    
+    ### 🕒 INSTRUCCIONES DE APLICACIÓN
+    [Instrucciones específicas para {'terapeuta' if tipo == 'terapeuta' else 'paciente'}]
+    
+    **GUIÓN COMPLETO:**
+    """
+    
+    try:
+        respuesta = sistema.invoke({"query": prompt})
+        return respuesta['result']
+    except Exception as e:
+        return f"Error al generar guión: {str(e)}"
+
+# ================= SISTEMA PRINCIPAL =================
+@st.cache_resource
+def cargar_sistema_completo():
+    """Carga el sistema RAG con biblioteca especializada."""
+    
+    if not GROQ_API_KEY:
+        st.error("❌ Configura GROQ_API_KEY en Streamlit Secrets.")
+        return None
+    
+    with st.spinner("🔄 Cargando sistema especializado..."):
+        try:
+            # Descargar biblioteca
+            response = requests.get(ZIP_URL, stream=True, timeout=60)
+            if response.status_code != 200:
+                st.error(f"❌ Error al descargar biblioteca.")
+                return None
+            
+            # Procesar
+            temp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(temp_dir, "biblioteca.zip")
+            extract_path = os.path.join(temp_dir, "biodescodificacion_db")
+            
+            with open(zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_path)
+            
+            # Cargar embeddings
+            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
+            
+            # Conectar con IA
+            llm = ChatGroq(
+                groq_api_key=GROQ_API_KEY,
+                model_name="meta-llama/llama-4-scout-17b-16e-instruct",
+                temperature=0.3,
+                max_tokens=3500
+            )
+            
+            # Crear sistema RAG
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                chain_type="stuff",
+                retriever=vector_store.as_retriever(search_kwargs={"k": 10}),
+                return_source_documents=True,
+                verbose=False
+            )
+            
+            return qa_chain
+            
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)[:150]}")
+            return None
+
+# ================= INTERFAZ PRINCIPAL =================
+st.set_page_config(
+    page_title="MINDGEEKCLINIC - Biodescodificación con Triangulación",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Sidebar
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/271/271226.png", width=80)
+    st.markdown("### 🏥 MINDGEEKCLINIC")
+    st.markdown("**Sistema Profesional con Triangulación Diagnóstica**")
+    st.markdown("---")
+    
+    st.markdown("#### 📊 Estadísticas")
+    if "pacientes" in st.session_state:
+        st.metric("Pacientes atendidos", len(st.session_state.pacientes))
+    
+    st.markdown("---")
+    
+    if st.button("🆕 Nuevo Diagnóstico", use_container_width=True, type="primary"):
+        st.session_state.mostrar_diagnostico = False
+        st.session_state.generar_guion = False
+        st.session_state.generar_grabacion = False
+        st.session_state.pdf_generado = None
+        st.rerun()
+    
+    if st.button("🔄 Reiniciar Sistema", use_container_width=True):
+        st.cache_resource.clear()
+        st.rerun()
+    
+    st.markdown("---")
+    st.caption("🎯 Sistema con Triangulación de Eventos Emocionales")
+
+# Título principal
+st.title("🧠 MINDGEEKCLINIC")
+st.markdown("### **Sistema de Diagnóstico por Biodescodificación con Triangulación Emocional**")
+st.markdown("*Identificación precisa de relaciones evento-síntoma para protocolos personalizados*")
+st.markdown("---")
+
+# Inicializar estados
+if "mostrar_diagnostico" not in st.session_state:
+    st.session_state.mostrar_diagnostico = False
+if "paciente_actual" not in st.session_state:
+    st.session_state.paciente_actual = None
+if "generar_guion" not in st.session_state:
+    st.session_state.generar_guion = False
+if "generar_grabacion" not in st.session_state:
+    st.session_state.generar_grabacion = False
+if "diagnostico_completo" not in st.session_state:
+    st.session_state.diagnostico_completo = None
+if "pdf_generado" not in st.session_state:
+    st.session_state.pdf_generado = None
+
+# Cargar sistema
+sistema = cargar_sistema_completo()
+
+if not sistema:
+    st.error("⚠️ Sistema no disponible. Verifica configuración.")
+    st.stop()
+
+# Mostrar formulario o diagnóstico
+if not st.session_state.mostrar_diagnostico:
+    formulario_diagnostico()
+else:
+    paciente = st.session_state.paciente_actual
+    
+    # Mostrar datos del paciente con nueva información
+    st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
+    
+    with st.expander("📋 Ver datos completos con triangulación"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Estado civil:** {paciente['estado_civil']}")
+            st.write(f"**Situación laboral:** {paciente['situacion_laboral']}")
+            st.write(f"**Tiempo padecimiento:** {paciente['tiempo_padecimiento']}")
+            st.write(f"**Frecuencia:** {paciente['frecuencia']}")
+            st.write(f"**Intensidad:** {paciente['intensidad']}/10")
+        
+        with col2:
+            st.write(f"**Tensión arterial:** {paciente['tension']}")
+            st.write(f"**Dolencia:** {paciente['dolencia']}")
+            st.write(f"**Factores desencadenantes:** {paciente['factores_desencadenantes'][:150]}...")
+        
+        st.markdown("#### 🎯 **Eventos Emocionales para Triangulación:**")
+        st.info(paciente['eventos_emocionales'])
+    
+    # Generar diagnóstico con triangulación
+    st.markdown("---")
+    st.markdown("### 🔬 **DIAGNÓSTICO CON TRIANGULACIÓN EMOCIONAL**")
+    
+    if st.session_state.diagnostico_completo is None:
+        with st.spinner("🔄 Analizando patrones evento-síntoma..."):
+            diagnostico = generar_diagnostico_triangulacion(sistema, paciente)
+            st.session_state.diagnostico_completo = diagnostico
+    
+    # Mostrar diagnóstico
+    st.markdown(st.session_state.diagnostico_completo)
+    
+    # ==== SECCIÓN DE HIPNOSIS MEJORADA ====
+    st.markdown("---")
+    st.markdown("### 🎧 **PROTOCOLOS DE HIPNOSIS ESPECÍFICOS**")
+    
+    if not st.session_state.generar_guion and not st.session_state.generar_grabacion:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 👨‍⚕️ **Para aplicación por terapeuta:**")
+            st.info("""
+            **Basado en biblioteca de modelos de hipnosis:**
+            - Técnicas específicas de inducción
+            - Protocolos validados
+            - Duración: 15-20 minutos
+            - Frecuencia: 3 veces/semana
+            """)
+            
+            if st.button("📝 Generar guión COMPLETO para terapeuta", use_container_width=True):
+                st.session_state.generar_guion = True
+                st.rerun()
+        
+        with col2:
+            st.markdown("#### 🎵 **Para autohipnosis (grabación personal):**")
+            st.info("""
+            **Instrucciones específicas de la biblioteca:**
+            - Técnicas de autoinducción
+            - Sugerencias poshipnóticas
+            - Grabación en dispositivo de audio
+            - Escuchar 3 veces por semana
+            """)
+            
+            if st.button("🎤 Generar guión para GRABACIÓN", use_container_width=True):
+                st.session_state.generar_grabacion = True
+                st.rerun()
+    
+    # Generar guiones específicos
+    if st.session_state.generar_guion:
+        st.markdown("---")
+        st.markdown("### 👨‍⚕️ **GUIÓN COMPLETO PARA TERAPEUTA**")
+        with st.spinner("Generando guión basado en biblioteca de modelos..."):
+            guion = generar_guion_hipnosis(sistema, paciente, "terapeuta")
+            st.markdown(guion)
+            
+            if st.button("↩️ Volver a opciones", use_container_width=True):
+                st.session_state.generar_guion = False
+                st.rerun()
+    
+    if st.session_state.generar_grabacion:
+        st.markdown("---")
+        st.markdown("### 🎵 **GUIÓN PARA GRABACIÓN DE AUTOHIPNOSIS**")
+        with st.spinner("Generando guión para grabación..."):
+            guion = generar_guion_hipnosis(sistema, paciente, "grabacion")
+            st.markdown(guion)
+            
+            # Instrucciones adicionales para grabación
+            st.markdown("---")
+            st.markdown("#### 📋 **INSTRUCCIONES PARA GRABACIÓN:**")
+            st.success("""
+            1. **Preparación:** Ambiente tranquilo, sin interrupciones
+            2. **Equipo:** Usar micrófono de buena calidad o smartphone
+            3. **Voz:** Hablar lentamente, con tono calmado
+            4. **Pausas:** Dejar espacios para respiración
+            5. **Guardar:** Nombrar archivo claramente (ej: "Autohipnosis_[fecha]")
+            6. **Uso:** Escuchar con auriculares, posición cómoda
+            """)
+            
+            if st.button("↩️ Volver a opciones", use_container_width=True):
+                st.session_state.generar_grabacion = False
+                st.rerun()
+    
+    # ===== BOTÓN DE GUARDAR COMO PDF =====
+    st.markdown("---")
+    st.markdown("### 💾 **GUARDAR DIAGNÓSTICO COMPLETO**")
+    
+    col_n1, col_n2, col_n3 = st.columns([2, 1, 1])
+    
+    with col_n1:
+        if st.button("🆕 Realizar NUEVO diagnóstico", use_container_width=True, type="primary"):
+            st.session_state.mostrar_diagnostico = False
+            st.session_state.diagnostico_completo = None
+            st.session_state.generar_guion = False
+            st.session_state.generar_grabacion = False
+            st.session_state.pdf_generado = None
+            st.rerun()
+    
+    with col_n2:
+        if st.button("📄 Generar y Descargar PDF", use_container_width=True, type="secondary"):
+            with st.spinner("🔄 Generando PDF profesional..."):
+                if st.session_state.paciente_actual and st.session_state.diagnostico_completo:
+                    # Generar PDF
+                    pdf_bytes = generar_pdf_diagnostico(
+                        st.session_state.paciente_actual,
+                        st.session_state.diagnostico_completo
+                    )
+                    
+                    if pdf_bytes:
+                        st.session_state.pdf_generado = pdf_bytes
+                        st.success("✅ PDF generado correctamente")
+                        
+                        # Mostrar botón de descarga
+                        nombre_archivo = f"Diagnostico_{paciente['iniciales']}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                        st.markdown("---")
+                        st.markdown("#### 📥 **Descargar PDF**")
+                        
+                        # Crear botón de descarga
+                        b64 = base64.b64encode(pdf_bytes).decode()
+                        href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" target="_blank">'
+                        href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF ahora</button>'
+                        href += '</a>'
+                        
+                        st.markdown(href, unsafe_allow_html=True)
+                        
+                        # Información del archivo
+                        st.info(f"""
+                        **Archivo:** {nombre_archivo}
+                        **Tamaño:** {len(pdf_bytes) / 1024:.1f} KB
+                        **Compatible:** Teléfono, Tablet, Computador
+                        **Contenido:** Datos del paciente + Diagnóstico completo
+                        """)
+                    else:
+                        st.error("❌ Error al generar el PDF")
+                else:
+                    st.warning("⚠️ No hay diagnóstico para generar PDF")
+    
+    with col_n3:
+        if st.button("🖨️ Más opciones", use_container_width=True):
+            with st.expander("📋 Opciones adicionales"):
+                st.markdown("""
+                **Opciones de exportación:**
+                - **Imprimir directamente:** Usa Ctrl+P en la página
+                - **Compartir por email:** Adjunta el PDF descargado
+                - **Guardar en la nube:** Sube el PDF a Google Drive, Dropbox, etc.
+                - **Archivar:** Guarda en carpeta de pacientes
+                
+                **Formato del PDF:**
+                - Portada profesional
+                - Datos completos del paciente
+                - Diagnóstico estructurado
+                - Información legal y de confidencialidad
+                """)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: gray; font-size: 0.8em;'>
+    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • 
+    Incluye generación de PDF profesional para descarga • 
+    Compatible con móvil y computador
+    </div>
+    """,
+    unsafe_allow_html=True
+)
