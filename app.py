@@ -66,7 +66,7 @@ def cargar_sistema_completo():
             st.info("🔌 Conectando con Groq Cloud...")
             llm = ChatGroq(
                 groq_api_key=GROQ_API_KEY,
-                model_name="llama-3.3-70b",
+                model_name="gpt-oss-20b",
                 temperature=0.3,
                 max_tokens=2000
             )
