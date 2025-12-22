@@ -6,7 +6,7 @@ from pathlib import Path
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-from langchain_classic.chains import RetrievalQA
+from langchain.chains import RetrievalQA  # ¡CORREGIDO! Era langchain_classic
 import requests
 import json
 from datetime import datetime
@@ -15,6 +15,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
+import logging
 
 # ================= CONFIGURACIÓN SEGURA =================
 # ✅ TODAS LAS CLAVES VAN EN SECRETS, NO EN EL CÓDIGO
@@ -27,6 +28,13 @@ EMAIL_CONFIG = {
     "smtp_port": int(st.secrets.get("SMTP_PORT", 587)),
     "sender_email": st.secrets.get("SENDER_EMAIL", ""),
     "sender_password": st.secrets.get("SENDER_PASSWORD", "")
+}
+
+# Configuración de reintentos
+RETRY_CONFIG = {
+    "max_retries": 3,
+    "delay_seconds": 2,
+    "backoff_factor": 1.5
 }
 
 # ================= CONFIGURACIÓN DE IDIOMAS =================
@@ -71,7 +79,9 @@ TEXTOS = {
         "email_placeholder": "ejemplo@correo.com",
         "email_help": "Recibirá el diagnóstico y podremos enviarle información relevante",
         "idioma_titulo": "🌍 **Idioma de preferencia**",
-        "error_api_key": "❌ ERROR: Configura GROQ_API_KEY en Streamlit Cloud Secrets."
+        "error_api_key": "❌ ERROR: Configura GROQ_API_KEY en Streamlit Cloud Secrets.",
+        "sistema_cargando": "🔄 Cargando sistema especializado...",
+        "diagnostico_generando": "🔄 Generando diagnóstico en su idioma..."
     },
     "en": {
         "titulo": "🧠 MINDGEEKCLINIC",
@@ -103,9 +113,26 @@ TEXTOS = {
         "email_placeholder": "example@email.com",
         "email_help": "You will receive the diagnosis and we can send you relevant information",
         "idioma_titulo": "🌍 **Preferred language**",
-        "error_api_key": "❌ ERROR: Configure GROQ_API_KEY in Streamlit Cloud Secrets."
+        "error_api_key": "❌ ERROR: Configure GROQ_API_KEY in Streamlit Cloud Secrets.",
+        "sistema_cargando": "🔄 Loading specialized system...",
+        "diagnostico_generando": "🔄 Generating diagnosis in your language..."
     }
 }
+
+# ================= SETUP LOGGING =================
+def setup_logging():
+    """Configura logging para diagnóstico."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('mindgeekclinic.log')
+        ]
+    )
+    return logging.getLogger(__name__)
+
+logger = setup_logging()
 
 # ================= FUNCIONES DE SEGURIDAD =================
 def generar_id_seguro(datos):
@@ -122,21 +149,63 @@ def detectar_idioma_texto(texto):
     es_words = ['el', 'la', 'de', 'que', 'y', 'en', 'los', 'las']
     en_words = ['the', 'and', 'of', 'to', 'in', 'is', 'you', 'that']
     pt_words = ['o', 'a', 'de', 'que', 'e', 'em', 'os', 'as']
+    fr_words = ['le', 'la', 'de', 'et', 'à', 'dans', 'les', 'des']
+    de_words = ['der', 'die', 'das', 'und', 'in', 'den', 'von', 'zu']
+    it_words = ['il', 'la', 'di', 'e', 'a', 'in', 'per', 'con']
     
     texto_lower = texto.lower()
     
     es_count = sum(1 for word in es_words if word in texto_lower)
     en_count = sum(1 for word in en_words if word in texto_lower)
     pt_count = sum(1 for word in pt_words if word in texto_lower)
+    fr_count = sum(1 for word in fr_words if word in texto_lower)
+    de_count = sum(1 for word in de_words if word in texto_lower)
+    it_count = sum(1 for word in it_words if word in texto_lower)
     
-    if es_count > en_count and es_count > pt_count:
-        return "es"
-    elif en_count > es_count and en_count > pt_count:
-        return "en"
-    elif pt_count > es_count and pt_count > en_count:
-        return "pt"
-    else:
-        return "es"
+    counts = {
+        "es": es_count,
+        "en": en_count,
+        "pt": pt_count,
+        "fr": fr_count,
+        "de": de_count,
+        "it": it_count
+    }
+    
+    return max(counts, key=counts.get)
+
+# ================= VERIFICACIÓN DEL SISTEMA =================
+def verificar_sistema():
+    """Verifica que todos los componentes estén funcionando."""
+    checks = {
+        "api_key": bool(GROQ_API_KEY),
+        "zip_url_accesible": False,
+        "modelo_disponible": False
+    }
+    
+    try:
+        # Verificar URL del ZIP
+        response = requests.head(ZIP_URL, timeout=10)
+        checks["zip_url_accesible"] = response.status_code == 200
+        
+        # Si tenemos API key, verificar modelo
+        if GROQ_API_KEY:
+            try:
+                llm_test = ChatGroq(
+                    groq_api_key=GROQ_API_KEY,
+                    model_name="meta-llama/llama-4-scout-17b-16e-instruct",
+                    temperature=0.1,
+                    max_tokens=100
+                )
+                checks["modelo_disponible"] = True
+            except Exception as e:
+                logger.error(f"Error verificando modelo: {e}")
+                checks["modelo_disponible"] = False
+                
+    except Exception as e:
+        logger.error(f"Error verificación sistema: {e}")
+        st.session_state.error_message = f"Error de conexión: {str(e)[:100]}"
+    
+    return checks
 
 # ================= CONSENTIMIENTO INFORMADO =================
 def mostrar_consentimiento(idioma="es"):
@@ -275,6 +344,10 @@ def formulario_diagnostico(idioma="es"):
                 st.error("❌ Email válido requerido para el diagnóstico")
                 return
             
+            if not iniciales or len(iniciales.strip()) < 2:
+                st.error("❌ Iniciales requeridas (mínimo 2 caracteres)")
+                return
+            
             datos_paciente = {
                 "id_seguro": generar_id_seguro({"iniciales": iniciales, "edad": edad, "email": email}),
                 "iniciales": iniciales.upper(),
@@ -297,237 +370,107 @@ def formulario_diagnostico(idioma="es"):
             st.session_state.idioma_actual = idioma_detectado
             st.rerun()
 
-# ================= GENERAR DIAGNÓSTICO =================
+# ================= GENERAR DIAGNÓSTICO MEJORADO =================
 def generar_diagnostico_multi_idioma(sistema, datos_paciente):
     """Genera diagnóstico en el idioma del paciente."""
     
     idioma = datos_paciente.get("idioma_paciente", "es")
     
-    prompts = {
-        "es": f"""
-        Eres MINDGEEKCLINIC, especialista en BIODESCODIFICACIÓN.
-        
-        PACIENTE: {datos_paciente['iniciales']}, {datos_paciente['edad']} años
-        SÍNTOMA: {datos_paciente['descripcion']}
-        TIEMPO: {datos_paciente['tiempo_padecimiento']}
-        FRECUENCIA: {datos_paciente['frecuencia']}
-        
-        Genera un diagnóstico COMPLETO de biodescodificación en ESPAÑOL:
-        1. Análisis del conflicto emocional
-        2. Significado biológico del síntoma
-        3. Protocolo de 3 sesiones
-        4. Instrucciones para hipnosis/autohipnosis
-        
-        Respuesta profesional en español:
-        """,
-        
-        "en": f"""
-        You are MINDGEEKCLINIC, a BIODESCODIFICATION specialist.
-        
-        PATIENT: {datos_paciente['iniciales']}, {datos_paciente['edad']} years old
-        SYMPTOM: {datos_paciente['descripcion']}
-        DURATION: {datos_paciente['tiempo_padecimiento']}
-        FREQUENCY: {datos_paciente['frecuencia']}
-        
-        Generate a COMPLETE biodescodification diagnosis in ENGLISH:
-        1. Analysis of emotional conflict
-        2. Biological meaning of the symptom
-        3. 3-session protocol
-        4. Instructions for hypnosis/self-hypnosis
-        
-        Professional response in English:
-        """
+    # Mapeo de idiomas para prompts más precisos
+    mapeo_idiomas_prompts = {
+        "es": "ESPANOL",
+        "en": "ENGLISH", 
+        "pt": "PORTUGUESE",
+        "fr": "FRENCH",
+        "de": "GERMAN",
+        "it": "ITALIAN"
     }
     
-    prompt = prompts.get(idioma, prompts["es"])
+    idioma_prompt = mapeo_idiomas_prompts.get(idioma, "ESPANOL")
+    
+    prompt = f"""
+    Eres MINDGEEKCLINIC, especialista en BIODESCODIFICACIÓN con 20 años de experiencia.
+    
+    DATOS DEL PACIENTE:
+    - Iniciales: {datos_paciente['iniciales']}
+    - Edad: {datos_paciente['edad']} años
+    - Estado civil: {datos_paciente['estado_civil']}
+    - Situación laboral: {datos_paciente['situacion_laboral']}
+    - Tensión arterial: {datos_paciente['tension']}
+    
+    SÍNTOMA PRINCIPAL:
+    {datos_paciente['descripcion']}
+    
+    CARACTERÍSTICAS:
+    - Tiempo: {datos_paciente['tiempo_padecimiento']}
+    - Frecuencia: {datos_paciente['frecuencia']}
+    
+    Genera un diagnóstico COMPLETO de biodescodificación en {idioma_prompt} con esta estructura:
+    
+    1. 📊 **ANÁLISIS DEL CONFLICTO EMOCIONAL**
+       - Conflicto central identificado
+       - Emociones asociadas
+       - Posible evento desencadenante
+    
+    2. 🔬 **SIGNIFICADO BIOLÓGICO**
+       - Qué representa el síntoma biológicamente
+       - Órgano/sistema afectado
+       - Función biológica alterada
+    
+    3. 🎯 **PROTOCOLO DE 3 SESIONES**
+       - SESIÓN 1: Identificación y aceptación
+       - SESIÓN 2: Reprogramación emocional  
+       - SESIÓN 3: Integración y seguimiento
+    
+    4. 🧘 **TÉCNICAS COMPLEMENTARIAS**
+       - Hipnosis/autohipnosis (instrucciones específicas)
+       - Afirmaciones personalizadas
+       - Ejercicios de liberación emocional
+    
+    5. 📈 **PRONÓSTICO Y RECOMENDACIONES**
+       - Tiempo estimado de mejoría
+       - Recomendaciones específicas
+       - Señales de alarma
+    
+    Usa un tono profesional pero empático. Incluye ejemplos concretos basados en los datos del paciente.
+    """
     
     try:
-        respuesta = sistema.invoke({"query": prompt})
-        return respuesta['result']
+        logger.info(f"Generando diagnóstico para paciente {datos_paciente['iniciales']} en idioma {idioma}")
+        
+        # Asegurarnos de usar el método correcto
+        if hasattr(sistema, 'invoke'):
+            respuesta = sistema.invoke({"query": prompt})
+            resultado = respuesta.get('result', 'No se pudo generar diagnóstico')
+            
+            # Guardar en log para diagnóstico
+            logger.info(f"Diagnóstico generado exitosamente para {datos_paciente['iniciales']}")
+            return resultado
+            
+        else:
+            logger.error("Estructura del sistema no reconocida")
+            return f"Error: Estructura del sistema no reconocida. Contacta al soporte."
+            
     except Exception as e:
-        return f"Error generating diagnosis: {str(e)}"
+        logger.error(f"Error generando diagnóstico: {str(e)}")
+        return f"⚠️ Se produjo un error al generar el diagnóstico. Por favor, intenta nuevamente.\n\nError técnico: {str(e)[:200]}"
 
-# ================= SISTEMA PRINCIPAL =================
-@st.cache_resource
+# ================= SISTEMA PRINCIPAL MEJORADO =================
+@st.cache_resource(show_spinner="🔄 Inicializando sistema de biodescodificación...")
 def cargar_sistema_completo():
     """Carga el sistema RAG con biblioteca especializada."""
     
     if not GROQ_API_KEY:
-        textos = TEXTOS.get(st.session_state.get("idioma_actual", "es"), TEXTOS["es"])
-        st.error(textos["error_api_key"])
-        st.info("Settings > Secrets > Añade: GROQ_API_KEY = 'tu_clave_groq'")
+        logger.error("GROQ_API_KEY no configurada")
+        st.session_state.error_message = "API Key no configurada. Verifica los Secrets."
         return None
     
-    with st.spinner("🔄 Cargando sistema especializado..."):
+    textos = TEXTOS.get(st.session_state.get("idioma_actual", "es"), TEXTOS["es"])
+    
+    with st.spinner(textos.get("sistema_cargando", "🔄 Cargando sistema especializado...")):
         try:
-            response = requests.get(ZIP_URL, stream=True, timeout=60)
+            logger.info("Descargando base de conocimiento...")
+            response = requests.get(ZIP_URL, stream=True, timeout=60, headers={'Cache-Control': 'no-cache'})
+            
             if response.status_code != 200:
-                st.error(f"❌ Error al descargar biblioteca.")
-                return None
-            
-            temp_dir = tempfile.mkdtemp()
-            zip_path = os.path.join(temp_dir, "biblioteca.zip")
-            extract_path = os.path.join(temp_dir, "biodescodificacion_db")
-            
-            with open(zip_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_path)
-            
-            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
-            
-            llm = ChatGroq(
-                groq_api_key=GROQ_API_KEY,
-                model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-                temperature=0.3,
-                max_tokens=3500
-            )
-            
-            qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=vector_store.as_retriever(search_kwargs={"k": 10}),
-                return_source_documents=True,
-                verbose=False
-            )
-            
-            return qa_chain
-            
-        except Exception as e:
-            st.error(f"❌ Error: {str(e)[:150]}")
-            return None
-
-# ================= INTERFAZ PRINCIPAL =================
-st.set_page_config(
-    page_title="MINDGEEKCLINIC - Biodescodificación Multilingüe",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Sidebar
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/271/271226.png", width=80)
-    st.markdown("### 🏥 MINDGEEKCLINIC")
-    st.markdown("**Sistema Multilingüe con Protección de Datos**")
-    st.markdown("---")
-    
-    # Selector de idioma principal
-    idioma_sidebar = st.selectbox(
-        "🌍 Idioma de la interfaz",
-        options=list(IDIOMAS_DISPONIBLES.keys()),
-        format_func=lambda x: f"{IDIOMAS_DISPONIBLES[x]['emoji']} {IDIOMAS_DISPONIBLES[x]['nombre']}",
-        key="idioma_sidebar"
-    )
-    
-    st.markdown("---")
-    
-    if "pacientes" in st.session_state:
-        st.metric("📊 Pacientes atendidos", len(st.session_state.pacientes))
-    
-    st.markdown("---")
-    
-    if st.button("🆕 Nuevo Diagnóstico", use_container_width=True, type="primary"):
-        for key in ["mostrar_diagnostico", "paciente_actual", "diagnostico_completo"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
-    
-    if st.button("🔄 Reiniciar Sistema", use_container_width=True):
-        st.cache_resource.clear()
-        st.rerun()
-    
-    st.markdown("---")
-    st.caption("🔒 Datos protegidos | 🌍 Multilingüe | 🎯 Diagnóstico preciso")
-
-# Inicializar estados
-if "mostrar_diagnostico" not in st.session_state:
-    st.session_state.mostrar_diagnostico = False
-if "idioma_actual" not in st.session_state:
-    st.session_state.idioma_actual = idioma_sidebar
-
-# Cargar sistema
-sistema = cargar_sistema_completo()
-
-# Título principal
-titulos = {
-    "es": ("🧠 MINDGEEKCLINIC", "**Sistema Profesional de Biodescodificación con Protección de Datos**"),
-    "en": ("🧠 MINDGEEKCLINIC", "**Professional Biodescodification System with Data Protection**")
-}
-
-titulo, subtitulo = titulos.get(st.session_state.idioma_actual, titulos["es"])
-st.title(titulo)
-st.markdown(subtitulo)
-st.markdown("---")
-
-# Mostrar formulario o diagnóstico
-if not st.session_state.mostrar_diagnostico:
-    formulario_diagnostico(st.session_state.idioma_actual)
-elif sistema:
-    paciente = st.session_state.paciente_actual
-    
-    # Mostrar información del paciente
-    st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
-    st.markdown(f"**🌍 Idioma detectado:** {IDIOMAS_DISPONIBLES[paciente['idioma_paciente']]['emoji']} {IDIOMAS_DISPONIBLES[paciente['idioma_paciente']]['nombre']}")
-    st.markdown(f"**🔒 ID Seguro:** `{paciente['id_seguro']}`")
-    
-    with st.expander("📋 Ver datos completos (protegidos)"):
-        st.json({
-            "id_seguro": paciente['id_seguro'],
-            "iniciales": paciente['iniciales'],
-            "edad": paciente['edad'],
-            "idioma": paciente['idioma_paciente'],
-            "fecha_registro": paciente['fecha_registro']
-        })
-    
-    # Generar diagnóstico
-    st.markdown("---")
-    st.markdown("### 🔬 **DIAGNÓSTICO GENERADO**")
-    
-    if "diagnostico_completo" not in st.session_state:
-        with st.spinner("🔄 Generando diagnóstico en su idioma..."):
-            diagnostico = generar_diagnostico_multi_idioma(sistema, paciente)
-            st.session_state.diagnostico_completo = diagnostico
-    
-    st.markdown(st.session_state.diagnostico_completo)
-    
-    # Envío por email
-    st.markdown("---")
-    st.markdown("### 📧 **ENVÍO POR CORREO ELECTRÓNICO**")
-    
-    col_e1, col_e2 = st.columns([2, 1])
-    with col_e1:
-        if st.button("📤 Enviar diagnóstico completo por email", use_container_width=True, type="primary"):
-            st.success(f"✅ Diagnóstico enviado a: {paciente['email']}")
-            st.info("📧 El email incluye: Diagnóstico completo + Protocolo + Información de seguimiento")
-    
-    with col_e2:
-        if st.button("🖨️ Exportar PDF", use_container_width=True):
-            st.info("Funcionalidad de PDF en desarrollo")
-    
-    # Nuevo diagnóstico
-    st.markdown("---")
-    if st.button("🆕 Realizar NUEVO diagnóstico", use_container_width=True, type="primary"):
-        for key in ["mostrar_diagnostico", "paciente_actual", "diagnostico_completo"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
-
-# Footer
-footer_texts = {
-    "es": "🧠 <b>MINDGEEKCLINIC v8.0</b> • Sistema multilingüe • Protección de datos sensibles • Consentimiento informado",
-    "en": "🧠 <b>MINDGEEKCLINIC v8.0</b> • Multilingual system • Sensitive data protection • Informed consent"
-}
-
-st.markdown("---")
-st.markdown(
-    f"""
-    <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    {footer_texts.get(st.session_state.idioma_actual, footer_texts["es"])}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                logger.error(f"Error al descargar biblioteca. S
