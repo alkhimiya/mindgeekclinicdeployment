@@ -88,7 +88,8 @@ TEXTOS = {
         "protocolo_titulo": "🗓️ **PROTOCOLO TERAPÉUTICO DE 4 SESIONES**",
         "hipnosis_titulo": "🧘 **PROTOCOLO DE HIPNOSIS (3 veces por semana)**",
         "autohipnosis_titulo": "🎵 **PROTOCOLO DE AUTOHIPNOSIS**",
-        "archivo_exitoso": "📧 **Historia clínica archivada en el correo profesional**"
+        "archivo_exitoso": "📧 **Historia clínica archivada en el correo profesional**",
+        "error_bd": "❌ Error: Base de datos incompatible. Se requiere actualización."
     }
 }
 
@@ -169,7 +170,7 @@ def enviar_historia_clinica_email(datos_paciente, diagnostico, protocolo, hipnos
         🔒 ARCHIVO CLÍNICO
         {'-'*60}
         • Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
-        • Sistema: MINDGEEKCLINIC v9.0
+        • Sistema: MINDGEEKCLINIC v9.1
         • Profesional: promptandmente@gmail.com
         """
         
@@ -407,18 +408,25 @@ def generar_diagnostico_profesional(sistema, datos_paciente):
     except Exception as e:
         return f"Error al generar diagnóstico profesional: {str(e)}"
 
-# ================= SISTEMA RAG =================
+# ================= SISTEMA RAG CON MANEJO DE ERRORES =================
 @st.cache_resource
 def cargar_sistema_completo():
     if not GROQ_API_KEY:
         st.error(TEXTOS["es"]["error_api_key"])
+        st.info("""
+        **Configuración requerida en Streamlit Cloud:**
+        1. Ve a Settings > Secrets
+        2. Agrega: GROQ_API_KEY = "tu_clave_aquí"
+        """)
         return None
     
     with st.spinner("🔄 Cargando sistema especializado en biodescodificación..."):
         try:
+            # 1. Descargar biblioteca
             response = requests.get(ZIP_URL, stream=True, timeout=60)
             if response.status_code != 200:
                 st.error("❌ Error al descargar biblioteca especializada.")
+                st.info("Verifica que el archivo ZIP exista en tu repositorio GitHub")
                 return None
             
             temp_dir = tempfile.mkdtemp()
@@ -432,9 +440,56 @@ def cargar_sistema_completo():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_path)
             
+            # 2. Cargar embeddings
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
+            # 3. Intentar cargar ChromaDB con manejo de errores
+            try:
+                vector_store = Chroma(
+                    persist_directory=extract_path, 
+                    embedding_function=embeddings
+                )
+                
+                # Verificar que la base de datos tenga documentos
+                try:
+                    doc_count = vector_store._collection.count()
+                    if doc_count == 0:
+                        st.warning("⚠️ La base de datos está vacía")
+                except:
+                    st.warning("⚠️ No se pudo verificar el conteo de documentos")
+                
+            except Exception as chroma_error:
+                error_msg = str(chroma_error)
+                if "no such column: collections.topic" in error_msg:
+                    st.error(TEXTOS["es"]["error_bd"])
+                    st.info("""
+                    **SOLUCIÓN:**
+                    
+                    1. **Opción A (Recomendada):** Crear una nueva base de datos
+                       - Usa ChromaDB versión actual
+                       - Reimporta tus documentos PDF
+                    
+                    2. **Opción B:** Revertir a versión anterior de ChromaDB
+                       En requirements.txt cambia:
+                       ```txt
+                       chromadb==0.3.29  # Versión anterior
+                       ```
+                    
+                    3. **Opción C:** Usar diagnóstico sin base de datos
+                       - El sistema funcionará sin biblioteca especializada
+                       - Usará solo la IA para generar diagnósticos
+                    """)
+                    
+                    # Modo de emergencia: crear vector store vacío
+                    st.warning("🔄 Iniciando en modo de emergencia (sin base de datos)")
+                    from langchain.schema import Document
+                    documents = [Document(page_content="Sistema en modo básico")]
+                    vector_store = Chroma.from_documents(documents, embeddings)
+                else:
+                    st.error(f"❌ Error de ChromaDB: {error_msg[:200]}")
+                    return None
+            
+            # 4. Conectar con IA
             llm = ChatGroq(
                 groq_api_key=GROQ_API_KEY,
                 model_name="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -442,18 +497,20 @@ def cargar_sistema_completo():
                 max_tokens=4000
             )
             
+            # 5. Crear sistema RAG
             qa_chain = RetrievalQA.from_chain_type(
                 llm=llm,
                 chain_type="stuff",
-                retriever=vector_store.as_retriever(search_kwargs={"k": 12}),
-                return_source_documents=True,
+                retriever=vector_store.as_retriever(search_kwargs={"k": 5}),
+                return_source_documents=False,  # Desactivado temporalmente
                 verbose=False
             )
             
+            st.success("✅ Sistema cargado correctamente")
             return qa_chain
             
         except Exception as e:
-            st.error(f"❌ Error crítico: {str(e)[:150]}")
+            st.error(f"❌ Error crítico al cargar sistema: {str(e)[:200]}")
             return None
 
 # ================= INTERFAZ PRINCIPAL =================
@@ -499,10 +556,6 @@ st.markdown("---")
 # Cargar sistema
 sistema = cargar_sistema_completo()
 
-if not sistema:
-    st.error("⚠️ Sistema no disponible. Verifica la configuración de GROQ_API_KEY en Secrets.")
-    st.stop()
-
 # Mostrar formulario o diagnóstico
 if not st.session_state.mostrar_diagnostico:
     formulario_diagnostico_completo()
@@ -529,7 +582,31 @@ else:
     
     if "diagnostico_completo" not in st.session_state:
         with st.spinner("🔄 Generando diagnóstico profesional con protocolos clínicos..."):
-            diagnostico_completo = generar_diagnostico_profesional(sistema, paciente)
+            if sistema:
+                diagnostico_completo = generar_diagnostico_profesional(sistema, paciente)
+            else:
+                # Modo de emergencia si no hay sistema
+                diagnostico_completo = f"""
+                ## 🧠 DIAGNÓSTICO DE EMERGENCIA - MINDGEEKCLINIC
+                
+                **Paciente:** {paciente['iniciales']}, {paciente['edad']} años
+                **Síntoma:** {paciente['dolencia_principal'][:100]}...
+                
+                **Análisis de biodescodificación:**
+                Basado en los eventos reportados ({paciente['eventos_emocionales'][:50]}...), 
+                se identifica un conflicto emocional relacionado con {paciente['estado_civil'].lower()}.
+                
+                **Protocolo de 4 sesiones:**
+                1. Identificación del conflicto
+                2. Reprogramación emocional
+                3. Integración
+                4. Cierre y seguimiento
+                
+                **Hipnosis:** 3 veces por semana, 15-20 minutos
+                **Autohipnosis:** Grabación personal, 12-15 minutos
+                
+                *Nota: Sistema en modo básico. Recomendado: actualizar base de datos.*
+                """
             st.session_state.diagnostico_completo = diagnostico_completo
     
     # Mostrar diagnóstico completo
@@ -541,12 +618,9 @@ else:
     
     if st.button("📁 Archivar Historia Clínica Completa", use_container_width=True, type="primary"):
         with st.spinner("📨 Enviando al correo profesional..."):
-            # Separar las secciones del diagnóstico
-            diagnostico_texto = st.session_state.diagnostico_completo
-            
             exito, mensaje = enviar_historia_clinica_email(
                 paciente, 
-                diagnostico_texto,
+                st.session_state.diagnostico_completo,
                 "Protocolo de 4 sesiones incluido en el diagnóstico",
                 "Protocolos de hipnosis y autohipnosis incluidos"
             )
@@ -609,7 +683,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    🧠 <b>MINDGEEKCLINIC v9.0</b> • Sistema profesional completo • 
+    🧠 <b>MINDGEEKCLINIC v9.1</b> • Sistema profesional completo • 
     Protocolos de 4 sesiones • Hipnosis 3 veces/semana • Archivo en promptandmente@gmail.com
     </div>
     """,
