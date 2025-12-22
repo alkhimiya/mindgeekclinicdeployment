@@ -29,6 +29,191 @@ import re  # Importación añadida para limpiar HTML
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
 
+# ================= SISTEMA DE CONOCIMIENTO ESPECIALIZADO (NUEVO MÓDULO) =================
+
+CONOCIMIENTO_ESPECIALIZADO = {
+    # ===== SISTEMA 1: OCULAR (EJEMPLO COMPLETO) =====
+    "ojos": {
+        "categoria": "sensorial",
+        "palabras_clave": ["ojo", "ocular", "vista", "visión", "miopía", "astigmatismo", 
+                          "conjuntivitis", "glaucoma", "retina", "catarata", "blefaritis",
+                          "orzuelo", "perrilla", "queratitis", "irritación ocular", "sequedad ocular"],
+        "prioridad": 1,
+        "contenido": """## 🎯 BIODESCODIFICACIÓN ESPECIALIZADA - SISTEMA OCULAR
+
+**REPRESENTACIÓN SIMBÓLICA:**
+Los ojos representan mi capacidad de ver: pasado, presente y futuro.
+Problemas oculares = Algo que no quiero ver en mi vida.
+
+**ESPECIFICIDADES POR OJO:**
+• **OJO IZQUIERDO:** Defensa, amenazas, movimiento, peligros externos
+  - Conflictos relacionados con protección, enemigos, peligro inminente
+  - "¿De qué o de quién necesito defenderme?"
+
+• **OJO DERECHO:** Identidad, reconocimiento, relaciones cercanas
+  - Conflictos con familia, amigos, reconocimiento personal/profesional
+  - "¿Me siento reconocido? ¿Problemas con personas cercanas?"
+
+**SÍNTOMAS ESPECÍFICOS Y SUS SIGNIFICADOS:**
+- **IRRITACIÓN OCULAR:** "Algo de lo que veo me irrita. El mundo que veo a mi alrededor me irrita."
+- **QUERATITIS:** "Estoy muy molesto, tengo ira y coraje por algo que vi."
+- **SEQUEDAD OCULAR:** "Veo a todos con furia. Me niego rotundamente a ver con amor."
+- **ORZUELO/PERRILLA:** "He visto algo sucio. Tengo problemas en mi matrimonio o con mi pareja."
+
+**PREGUNTAS CLAVE PARA EL PACIENTE:**
+1. ¿Qué situación actual prefiere no ver o enfrentar?
+2. Si es ojo derecho: ¿Problemas recientes de reconocimiento o con familiares/amigos?
+3. Si es ojo izquierdo: ¿Amenazas o situaciones de defensa recientes?
+4. ¿Eventos visuales que generaron ira, coraje o rechazo?
+
+**PROTOCOLO SUGERIDO:**
+1. Identificar el evento detonante visual/emocional
+2. Trabajar el resentir específico según el síntoma
+3. Reestructurar la percepción del evento
+4. Ejercicios de "nueva mirada" hacia la situación"""
+    },
+    
+    # ===== SISTEMA 2: DERMATOLÓGICO (EJEMPLO BÁSICO) =====
+    "piel": {
+        "categoria": "dermatologico",
+        "palabras_clave": ["piel", "dermatitis", "eczema", "acné", "urticaria", "psoriasis", 
+                          "erupción", "prurito", "picazón", "roncha", "sarpullido"],
+        "prioridad": 1,
+        "contenido": """## 🎯 BIODESCODIFICACIÓN ESPECIALIZADA - PIEL
+
+**REPRESENTACIÓN SIMBÓLICA:**
+La piel representa el contacto, los límites, la protección.
+Problemas cutáneos = Conflictos de separación, contacto no deseado, límites violados.
+
+**SÍNTOMAS ESPECÍFICOS:**
+- **DERMATITIS:** Separación conflictiva, contacto doloroso o no deseado
+- **ACNÉ:** No aceptación de sí mismo, conflictos de identidad (especialmente en adolescencia)
+- **PSORIASIS:** Miedo a ser herido, necesidad de protección extrema
+- **URTICARIA:** "Algo o alguien me irrita profundamente"
+
+**PREGUNTAS CLAVE:**
+1. ¿Situaciones donde sus límites personales fueron violados?
+2. ¿Contactos físicos o emocionales no deseados recientes?
+3. ¿Conflictos de separación (física o emocional)?
+4. ¿Se siente "sin protección" en alguna área de su vida?"""
+    },
+    
+    # ===== SISTEMA 3: DIGESTIVO (EJEMPLO BÁSICO) =====
+    "sistema_digestivo": {
+        "categoria": "digestivo",
+        "palabras_clave": ["estómago", "gástrico", "digestión", "úlcera", "gastritis", "acidez",
+                          "reflujo", "colon", "intestino", "diarrea", "estreñimiento", "náusea"],
+        "prioridad": 1,
+        "contenido": """## 🎯 BIODESCODIFICACIÓN ESPECIALIZADA - SISTEMA DIGESTIVO
+
+**REPRESENTACIÓN SIMBÓLICA:**
+Capacidad de "digerir" situaciones, asimilar experiencias, procesar emociones.
+
+**ESPECIFICIDADES POR ÓRGANO:**
+- **ESTOMÁGO:** "No puedo digerir esta situación"
+- **HÍGADO:** Ira reprimida, frustración acumulada
+- **COLON:** Miedo a soltar, apego a lo viejo
+- **INTESTINO DELGADO:** Incapacidad de extraer el "nutriente emocional" de las experiencias
+
+**PREGUNTAS CLAVE:**
+1. ¿Qué situación actual no puede "digerir" o aceptar?
+2. ¿Hay ira o frustración que no ha podido expresar?
+3. ¿Miedo a soltar algo o a alguien?
+4. ¿Qué "no nutre" en su vida actualmente?"""
+    },
+    
+    # ===== SISTEMA 4: RESPIRATORIO =====
+    "sistema_respiratorio": {
+        "categoria": "respiratorio",
+        "palabras_clave": ["pulmón", "respiración", "asma", "bronquitis", "tos", "congestión",
+                          "nariz", "sinusitis", "alergia", "resfriado", "gripe", "falta de aire"],
+        "prioridad": 1,
+        "contenido": """## 🎯 BIODESCODIFICACIÓN ESPECIALIZADA - SISTEMA RESPIRATORIO
+
+**REPRESENTACIÓN SIMBÓLICA:**
+Vida, comunicación, libertad, espacio vital.
+Problemas respiratorios = Conflictos con el territorio, miedo a la muerte, falta de libertad.
+
+**ESPECIFICIDADES POR SÍNTOMA:**
+- **ASMA:** "Me siento ahogado en mi territorio (hogar, trabajo, familia)"
+- **BRONQUITIS:** Conflictos de territorio con peleas o gritos
+- **RINITIS/ALERGIA:** "El aire que respiro (ambiente) me molesta"
+- **SINUSITIS:** "Alguien cercano me irrita profundamente"
+
+**PREGUNTAS CLAVE:**
+1. ¿Se siente ahogado o limitado en algún aspecto de su vida?
+2. ¿Conflictos territoriales (hogar, trabajo, familia)?
+3. ¿Alguien o algo en su ambiente le "quita el aire"?
+4. ¿Miedo a morir o a perder algo vital?"""
+    },
+    
+    # ===== SISTEMA 5: MUSCULAR =====
+    "sistema_muscular": {
+        "categoria": "musculoesqueletico",
+        "palabras_clave": ["músculo", "dolor muscular", "contractura", "espasmo", "calambre",
+                          "tendón", "tendinitis", "fibromialgia", "rigidez", "tensión muscular"],
+        "prioridad": 1,
+        "contenido": """## 🎯 BIODESCODIFICACIÓN ESPECIALIZADA - SISTEMA MUSCULAR
+
+**REPRESENTACIÓN SIMBÓLICA:**
+Acción, movimiento, capacidad de actuar.
+Problemas musculares = Conflictos de desvalorización en la acción, impotencia para actuar.
+
+**ESPECIFICIDADES POR LOCALIZACIÓN:**
+- **CUELLO/HOMBROS:** "Llevo una carga demasiado pesada"
+- **ESPALDA BAJA:** Falta de apoyo, sobrecarga de responsabilidades
+- **PIERNAS:** "No puedo avanzar en la vida", miedo al futuro
+- **BRAZOS:** Conflictos en lo que hago o en lo que deseo abrazar/rechazar
+
+**PREGUNTAS CLAVE:**
+1. ¿En qué área de su vida se siente impotente para actuar?
+2. ¿Qué carga emocional está "llevando a cuestas"?
+3. ¿Se siente desvalorizado en sus capacidades?
+4. ¿Hay algo que quiere hacer pero no puede?"""
+    }
+    # Puedes añadir más sistemas aquí según tu conocimiento
+}
+
+def buscar_conocimiento_especializado(dolencia):
+    """
+    Busca conocimiento especializado relevante para la dolencia.
+    Retorna el conocimiento encontrado o string vacío si no hay coincidencia.
+    """
+    if not dolencia or not isinstance(dolencia, str):
+        return ""
+    
+    dolencia_lower = dolencia.lower()
+    conocimientos_encontrados = []
+    
+    for sistema, info in CONOCIMIENTO_ESPECIALIZADO.items():
+        # Verificar si alguna palabra clave aparece en la dolencia
+        for palabra_clave in info["palabras_clave"]:
+            if palabra_clave in dolencia_lower:
+                conocimientos_encontrados.append({
+                    "sistema": sistema,
+                    "contenido": info["contenido"],
+                    "prioridad": info["prioridad"]
+                })
+                break  # Solo una vez por sistema
+    
+    # Ordenar por prioridad (menor número = mayor prioridad)
+    conocimientos_encontrados.sort(key=lambda x: x["prioridad"])
+    
+    # Combinar todos los conocimientos encontrados
+    if conocimientos_encontrados:
+        resultado = "="*60 + "\n"
+        resultado += "🎯 **CONOCIMIENTO ESPECIALIZADO APLICABLE**\n"
+        resultado += "="*60 + "\n\n"
+        
+        for i, conocimiento in enumerate(conocimientos_encontrados, 1):
+            resultado += conocimiento["contenido"]
+            if i < len(conocimientos_encontrados):
+                resultado += "\n\n" + "-"*40 + "\n\n"
+        
+        return resultado
+    
+    return ""  # No se encontró conocimiento especializado
+
 # ================= FUNCIÓN PARA GENERAR PDF CORREGIDA =================
 def generar_pdf_diagnostico(datos_paciente, diagnostico):
     """
@@ -489,9 +674,12 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
             st.session_state.mostrar_diagnostico = True
             st.rerun()
 
-# ================= GENERAR DIAGNÓSTICO CON TRIANGULACIÓN =================
+# ================= GENERAR DIAGNÓSTICO CON TRIANGULACIÓN Y CONOCIMIENTO ESPECIALIZADO =================
 def generar_diagnostico_triangulacion(sistema, datos_paciente):
-    """Genera diagnóstico completo con triangulación de eventos emocionales."""
+    """Genera diagnóstico completo con triangulación de eventos emocionales y conocimiento especializado."""
+    
+    # Buscar conocimiento especializado relevante
+    conocimiento_especializado = buscar_conocimiento_especializado(datos_paciente['dolencia'])
     
     prompt = f"""
     ## 🧠 DIAGNÓSTICO DE BIODESCODIFICACIÓN CON TRIANGULACIÓN - MINDGEEKCLINIC
@@ -518,6 +706,9 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     **ENTORNO SOCIAL:**
     {datos_paciente['entorno_social']}
     
+    **CONOCIMIENTO ESPECIALIZADO RELEVANTE:**
+    {conocimiento_especializado if conocimiento_especializado else "No se encontró conocimiento especializado específico para esta dolencia."}
+    
     **INSTRUCCIONES ESPECÍFICAS PARA EL ASISTENTE ESPECIALIZADO:**
     
     1. **TRIANGULACIÓN DIAGNÓSTICA:**
@@ -526,24 +717,29 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
        - Determinar si hay eventos DESENCADENANTES, MANTENEDORES o AGRAVANTES
        - Relacionar tiempo "{datos_paciente['tiempo_padecimiento']}" con eventos de vida
     
-    2. **DIAGNÓSTICO DE BIODESCODIFICACIÓN ESPECÍFICO:**
+    2. **INTEGRAR CONOCIMIENTO ESPECIALIZADO (si aplica):**
+       - Incorporar el conocimiento especializado relevante al diagnóstico
+       - Relacionar síntomas específicos con sistemas corporales identificados
+       - Aplicar las preguntas clave sugeridas por el conocimiento especializado
+    
+    3. **DIAGNÓSTICO DE BIODESCODIFICACIÓN ESPECÍFICO:**
        - Interpretar "{datos_paciente['dolencia']}" según biodescodificación
        - Identificar el CONFLICTO EMOCIONAL PRECISO basado en triangulación
        - Explicar SIGNIFICADO BIOLÓGICO del síntoma
        - Relacionar con eventos específicos mencionados
     
-    3. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
+    4. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
        - SESIÓN 1: Enfoque en [conflicto específico identificado por triangulación]
        - SESIÓN 2: Trabajo en [eventos emocionales clave identificados]
        - SESIÓN 3: Integración y [estrategias específicas basadas en factores desencadenantes]
     
-    4. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
+    5. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
        - Frecuencia: 3 veces por semana (como indica biblioteca)
        - Duración: 15-20 minutos por sesión
        - Técnicas ESPECÍFICAS de la biblioteca de modelos de hipnosis
        - INSTRUCCIONES DETALLADAS para grabación o aplicación
     
-    5. **RECOMENDACIONES PERSONALIZADAS:**
+    6. **RECOMENDACIONES PERSONALIZADAS:**
        - Actividades de autohipnosis DIARIAS basadas en triangulación
        - Ejercicios emocionales ESPECÍFICOS para eventos identificados
        - Estrategias para manejar factores desencadenantes
@@ -554,6 +750,7 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     3. DEBE incluir INSTRUCCIONES ESPECÍFICAS para terapia
     4. DEBE mencionar técnicas CONCRETAS de la biblioteca
     5. DEBE ser ESTRUCTURADO y PROFESIONAL
+    6. DEBE integrar el conocimiento especializado cuando sea relevante
     
     **FORMATO DE RESPUESTA:**
     
@@ -562,18 +759,21 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     ### 1. Análisis de Patrones Identificados
     [Explicar relación eventos-síntomas]
     
-    ### 2. Diagnóstico de Biodescodificación
+    ### 2. Integración de Conocimiento Especializado
+    [Incorporar conocimiento especializado relevante]
+    
+    ### 3. Diagnóstico de Biodescodificación
     [Conflicto emocional específico + significado biológico]
     
-    ### 3. Protocolo de 3 Sesiones Terapéuticas
+    ### 4. Protocolo de 3 Sesiones Terapéuticas
     Sesión 1: [Instrucciones específicas]
     Sesión 2: [Instrucciones específicas]
     Sesión 3: [Instrucciones específicas]
     
-    ### 4. Protocolo de Hipnosis/Autohipnosis
+    ### 5. Protocolo de Hipnosis/Autohipnosis
     [Instrucciones DETALLADAS para grabación o aplicación]
     
-    ### 5. Recomendaciones Específicas
+    ### 6. Recomendaciones Específicas
     [Basadas en triangulación de eventos]
     
     **RESPUESTA PROFESIONAL ESTRUCTURADA:**
@@ -730,7 +930,7 @@ with st.sidebar:
         st.rerun()
     
     st.markdown("---")
-    st.caption("🎯 Sistema con Triangulación de Eventos Emocionales")
+    st.caption("🎯 Sistema con Triangulación de Eventos Emocionales y Conocimiento Especializado")
 
 # Título principal
 st.title("🧠 MINDGEEKCLINIC")
@@ -784,6 +984,12 @@ else:
         
         st.markdown("#### 🎯 **Eventos Emocionales para Triangulación:**")
         st.info(paciente['eventos_emocionales'])
+    
+    # Mostrar conocimiento especializado aplicable (si existe)
+    conocimiento_especializado = buscar_conocimiento_especializado(paciente['dolencia'])
+    if conocimiento_especializado:
+        with st.expander("🔬 **Conocimiento Especializado Aplicable**", expanded=True):
+            st.markdown(conocimiento_especializado)
     
     # Generar diagnóstico con triangulación
     st.markdown("---")
@@ -944,7 +1150,7 @@ st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
     🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • 
-    Incluye generación de PDF profesional para descarga • 
+    Conocimiento Especializado Integrado • 
     Compatible con móvil y computador
     </div>
     """,
