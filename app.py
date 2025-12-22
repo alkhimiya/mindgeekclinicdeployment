@@ -39,7 +39,7 @@ IDIOMAS_DISPONIBLES = {
     "it": {"nombre": "Italiano", "emoji": "🇮🇹"}
 }
 
-# Textos en español (completos como los tenías)
+# Textos en español (completos)
 TEXTOS = {
     "es": {
         "titulo": "🧠 MINDGEEKCLINIC",
