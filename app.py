@@ -477,4 +477,701 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
             texto = texto.replace('&gt;', '>')
             texto = texto.replace('&quot;', '"')
             texto = re.sub(r'\s+', ' ', texto)
-          
+            
+            lineas = texto.split('\n')
+            lineas_limpias = []
+            
+            for linea in lineas:
+                linea = linea.strip()
+                if linea:
+                    if linea and len(linea) > 1:
+                        linea = linea[0].upper() + linea[1:]
+                    lineas_limpias.append(linea)
+            
+            return '<br/>'.join(lineas_limpias)
+        
+        diagnostico_limpio = limpiar_texto_para_pdf(diagnostico)
+        
+        if diagnostico_limpio:
+            secciones = diagnostico_limpio.split('<br/>')
+            
+            for seccion in secciones:
+                seccion = seccion.strip()
+                if not seccion:
+                    continue
+                
+                if (seccion.startswith('### ') or seccion.startswith('## ') or 
+                    seccion.startswith('# ') or seccion.endswith(':')):
+                    
+                    if seccion.startswith('###'):
+                        estilo = ParagraphStyle(
+                            'SubSubHeader',
+                            parent=styles['Normal'],
+                            fontSize=11,
+                            textColor=colors.HexColor('#1E3A8A'),
+                            spaceBefore=10,
+                            spaceAfter=4
+                        )
+                        seccion = seccion.replace('###', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    elif seccion.startswith('##'):
+                        estilo = ParagraphStyle(
+                            'SubHeader',
+                            parent=styles['Normal'],
+                            fontSize=12,
+                            textColor=colors.HexColor('#1E3A8A'),
+                            spaceBefore=12,
+                            spaceAfter=6
+                        )
+                        seccion = seccion.replace('##', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    elif seccion.startswith('#'):
+                        estilo = ParagraphStyle(
+                            'MainHeader',
+                            parent=styles['Normal'],
+                            fontSize=14,
+                            textColor=colors.HexColor('#1E3A8A'),
+                            spaceBefore=14,
+                            spaceAfter=8
+                        )
+                        seccion = seccion.replace('#', '').strip()
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo))
+                    else:
+                        story.append(Paragraph(f"<b>{seccion}</b>", estilo_subtitulo))
+                else:
+                    story.append(Paragraph(seccion, estilo_diagnostico))
+        
+        story.append(Spacer(1, 0.3*inch))
+        
+        # SECCIÓN 3: INFORMACIÓN LEGAL
+        story.append(Paragraph("INFORMACIÓN IMPORTANTE", estilo_subtitulo))
+        
+        legal_text = """
+        <b>Confidencialidad:</b> Este documento contiene información confidencial del paciente. 
+        Su distribución está limitada al paciente y profesionales de la salud involucrados en su tratamiento.
+        
+        <b>Propósito:</b> Este diagnóstico es una herramienta de apoyo para profesionales de salud mental 
+        y no sustituye evaluación médica, diagnóstico clínico o tratamiento profesional.
+        
+        <b>Contacto:</b> Para consultas profesionales, contacte a través del sistema MINDGEEKCLINIC.
+        
+        <b>Fecha de generación:</b> {}
+        
+        <b>Sistema:</b> MINDGEEKCLINIC v6.0 - Triangulación Diagnóstica con Conocimiento Expandido
+        """.format(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        
+        story.append(Paragraph(legal_text, estilo_paciente))
+        
+        # GENERAR PDF
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_bytes
+        
+    except Exception as e:
+        st.error(f"Error al generar PDF: {str(e)}")
+        return None
+
+def guardar_paciente(datos):
+    """Guarda datos del paciente en session_state."""
+    if "pacientes" not in st.session_state:
+        st.session_state.pacientes = []
+    
+    datos["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    datos["id"] = f"{datos['iniciales']}_{len(st.session_state.pacientes)+1:03d}"
+    st.session_state.pacientes.append(datos)
+    return datos["id"]
+
+def formulario_diagnostico():
+    """Muestra formulario clínico estructurado."""
+    st.markdown("### 📋 FORMULARIO DE EVALUACIÓN CLÍNICA ESPECIALIZADA")
+    
+    with st.form("formulario_clinico"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            iniciales = st.text_input("📝 **Iniciales del nombre**", max_chars=3, 
+                                     help="Ej: JPG para Juan Pérez García")
+            edad = st.number_input("🎂 **Edad**", min_value=1, max_value=120, value=30)
+            estado_civil = st.selectbox(
+                "💍 **Estado civil**",
+                ["Soltero", "Casado", "Divorciado", "Viudo", "Unión libre", "Separado"]
+            )
+            
+        with col2:
+            situacion_laboral = st.selectbox(
+                "💼 **Situación laboral**",
+                ["Empleado", "Desempleado", "Independiente", "Estudiante", "Jubilado", "Incapacitado"]
+            )
+            tension_alta = st.number_input("🩺 **Tensión arterial alta (sistólica)**", 
+                                          min_value=50, max_value=250, value=120)
+            tension_baja = st.number_input("🩺 **Tensión arterial baja (diastólica)**",
+                                          min_value=30, max_value=150, value=80)
+        
+        st.markdown("---")
+        st.markdown("#### ⏳ **TIEMPO DEL PADECIMIENTO**")
+        
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            tiempo_padecimiento = st.selectbox(
+                "¿Desde hace cuánto tiempo siente este padecimiento?",
+                ["Menos de 1 mes", "1-3 meses", "3-6 meses", "6-12 meses", 
+                 "1-2 años", "2-5 años", "Más de 5 años", "Desde la infancia"]
+            )
+        
+        with col_t2:
+            frecuencia = st.selectbox(
+                "¿Con qué frecuencia se presenta?",
+                ["Constante", "Diariamente", "Varias veces por semana", 
+                 "Semanalmente", "Mensualmente", "Ocasionalmente", "Solo en ciertas situaciones"]
+            )
+        
+        # DIAGNÓSTICO MÉDICO OPCIONAL
+        st.markdown("---")
+        st.markdown("#### 🏥 **INFORMACIÓN MÉDICA (OPCIONAL)**")
+        
+        diagnostico_medico = st.text_area(
+            "**Diagnóstico médico recibido (si aplica):**",
+            height=80,
+            placeholder="""Ejemplo: 
+- Diagnóstico: Gastritis crónica tipo B
+- Tratamiento: Omeprazol 40mg/día
+- Estudios realizados: Endoscopia digestiva alta
+- Especialista: Dr. González, Gastroenterólogo
+
+O déjelo en blanco si no tiene diagnóstico médico formal.""",
+            help="Este campo es completamente opcional."
+        )
+        
+        st.markdown("---")
+        st.markdown("#### 🎯 **EVENTOS EMOCIONALES ASOCIADOS (TRIANGULACIÓN)**")
+        
+        st.markdown("**Pregunta clave:** ¿Qué eventos suceden en su vida que impactan emocionalmente CUANDO se presenta el cuadro?")
+        
+        eventos_emocionales = st.text_area(
+            "Describa los eventos específicos:",
+            height=150,
+            placeholder="""Ejemplo detallado:
+1. El síntoma empeora los lunes cuando voy a trabajar
+2. Aparece después de discusiones con mi pareja
+3. Se intensifica cuando visito a mis padres
+4. Mejora cuando estoy de vacaciones
+5. Comenzó después de la muerte de mi padre hace 2 años
+
+Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
+        )
+        
+        st.markdown("---")
+        st.markdown("#### 🤒 **DOLENCIA / SÍNTOMA PRINCIPAL**")
+        
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            dolencia = st.text_area(
+                "Describa su dolencia o síntoma principal:",
+                height=120,
+                placeholder="Ej: Dolor de cabeza tipo migraña, insomnio, ansiedad, labios quebradizos..."
+            )
+        
+        with col_s2:
+            intensidad = st.slider("Intensidad (1-10)", 1, 10, 5)
+            factores_desencadenantes = st.text_area(
+                "Factores que desencadenan o agravan los síntomas:",
+                height=120,
+                placeholder="Ej: Estrés laboral, discusiones, clima frío, ciertos alimentos..."
+            )
+        
+        st.markdown("---")
+        st.markdown("#### 👥 **ENTORNO SOCIAL ACTUAL**")
+        entorno_social = st.text_area(
+            "Describa su entorno social actual:",
+            height=100,
+            placeholder="Ej: Vivo solo después de divorcio, tengo 2 hijos, pocos amigos cercanos, relación conflictiva con jefe..."
+        )
+        
+        st.markdown("---")
+        submitted = st.form_submit_button(
+            "🚀 **ANALIZAR CON BIODESCODIFICACIÓN Y TRIANGULACIÓN**", 
+            type="primary", 
+            use_container_width=True
+        )
+        
+        if submitted:
+            datos_paciente = {
+                "iniciales": iniciales.upper(),
+                "edad": edad,
+                "estado_civil": estado_civil,
+                "situacion_laboral": situacion_laboral,
+                "tension": f"{tension_alta}/{tension_baja}",
+                "tiempo_padecimiento": tiempo_padecimiento,
+                "frecuencia": frecuencia,
+                "diagnostico_medico": diagnostico_medico.strip() if diagnostico_medico else "",
+                "eventos_emocionales": eventos_emocionales,
+                "dolencia": dolencia,
+                "intensidad": intensidad,
+                "factores_desencadenantes": factores_desencadenantes,
+                "entorno_social": entorno_social
+            }
+            
+            paciente_id = guardar_paciente(datos_paciente)
+            st.session_state.paciente_actual = datos_paciente
+            st.session_state.mostrar_diagnostico = True
+            st.rerun()
+
+def generar_diagnostico_triangulacion(sistema, datos_paciente):
+    """Genera diagnóstico completo con triangulación."""
+    
+    conocimiento_especializado = buscar_conocimiento_especializado(datos_paciente['dolencia'])
+    
+    diagnostico_medico_texto = ""
+    if datos_paciente.get('diagnostico_medico') and datos_paciente['diagnostico_medico'].strip():
+        diagnostico_medico_texto = f"""
+        **DIAGNÓSTICO MÉDICO PREVIO:**
+        {datos_paciente['diagnostico_medico']}
+        
+        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación.
+        """
+    
+    prompt = f"""
+    ## 🧠 DIAGNÓSTICO DE BIODESCODIFICACIÓN CON TRIANGULACIÓN - MINDGEEKCLINIC v6.0
+    
+    **DATOS COMPLETOS DEL PACIENTE:**
+    - Iniciales: {datos_paciente['iniciales']}
+    - Edad: {datos_paciente['edad']} años
+    - Estado civil: {datos_paciente['estado_civil']}
+    - Situación laboral: {datos_paciente['situacion_laboral']}
+    - Tensión arterial: {datos_paciente['tension']}
+    - Tiempo del padecimiento: {datos_paciente['tiempo_padecimiento']}
+    - Frecuencia: {datos_paciente['frecuencia']}
+    - Intensidad: {datos_paciente['intensidad']}/10
+    
+    {diagnostico_medico_texto}
+    
+    **SÍNTOMA PRINCIPAL:**
+    {datos_paciente['dolencia']}
+    
+    **EVENTOS EMOCIONALES ASOCIADOS (PARA TRIANGULACIÓN):**
+    {datos_paciente['eventos_emocionales']}
+    
+    **FACTORES DESENCADENANTES:**
+    {datos_paciente['factores_desencadenantes']}
+    
+    **ENTORNO SOCIAL:**
+    {datos_paciente['entorno_social']}
+    
+    **CONOCIMIENTO ESPECIALIZADO RELEVANTE:**
+    {conocimiento_especializado if conocimiento_especializado else "Basándose en la base de conocimientos completa."}
+    
+    **INSTRUCCIONES ESPECÍFICAS PARA EL ASISTENTE:**
+    
+    1. **CONSULTAR LA BASE DE CONOCIMIENTOS COMPLETA:**
+       - Base principal + Conocimiento especializado de Google Drive
+       - Incluir referencias de ambos sistemas de conocimiento
+       - Priorizar información más reciente y especializada
+    
+    2. **TRIANGULACIÓN DIAGNÓSTICA:**
+       - Analizar relación temporal eventos-síntomas
+       - Identificar patrones específicos
+       - Relacionar tiempo del padecimiento con eventos de vida
+    
+    3. **INTEGRAR DIAGNÓSTICO MÉDICO (si aplica):**
+       - Considerar diagnóstico médico como contexto valioso
+       - Proporcionar perspectiva complementaria
+    
+    4. **DIAGNÓSTICO ESPECÍFICO:**
+       - Interpretar la dolencia según biodescodificación
+       - Identificar CONFLICTO EMOCIONAL PRECISO
+       - Explicar SIGNIFICADO BIOLÓGICO
+    
+    5. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
+       - SESIÓN 1: Enfoque en [conflicto específico]
+       - SESIÓN 2: Trabajo en [eventos emocionales clave]
+       - SESIÓN 3: Integración y estrategias específicas
+    
+    6. **PROTOCOLO DE HIPNOSIS ESPECÍFICO:**
+       - Basado en biblioteca de modelos
+       - Frecuencia: 3 veces por semana
+       - Duración: 15-20 minutos
+       - Técnicas ESPECÍFICAS
+    
+    7. **RECOMENDACIONES PERSONALIZADAS:**
+       - Basadas en triangulación
+       - Ejercicios específicos
+       - Estrategias prácticas
+    
+    **FORMATO DE RESPUESTA:**
+    
+    ## 🔍 DIAGNÓSTICO POR TRIANGULACIÓN (CON BASE EXPANDIDA)
+    
+    ### 1. Análisis con Conocimiento Expandido
+    [Incluir referencias de base principal + Drive]
+    
+    ### 2. Patrones de Triangulación Identificados
+    [Relación eventos-síntomas]
+    
+    ### 3. Contexto Médico
+    [Si aplica]
+    
+    ### 4. Diagnóstico de Biodescodificación
+    [Conflicto emocional + significado biológico]
+    
+    ### 5. Protocolo de 3 Sesiones
+    Sesión 1: [Instrucciones]
+    Sesión 2: [Instrucciones]
+    Sesión 3: [Instrucciones]
+    
+    ### 6. Protocolo de Hipnosis
+    [Instrucciones DETALLADAS]
+    
+    ### 7. Recomendaciones Específicas
+    [Basadas en análisis completo]
+    
+    **RESPUESTA PROFESIONAL ESTRUCTURADA:**
+    """
+    
+    try:
+        respuesta = sistema.invoke({"query": prompt})
+        return respuesta['result']
+    except Exception as e:
+        return f"Error al generar diagnóstico: {str(e)}"
+
+def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
+    """Genera guión específico de hipnosis."""
+    
+    tipo_texto = "para aplicación por terapeuta" if tipo == "terapeuta" else "para grabación de autohipnosis"
+    
+    prompt = f"""
+    ## 🎧 GUION DE HIPNOSIS ESPECÍFICO - MINDGEEKCLINIC
+    
+    **CONTEXTO DEL PACIENTE:**
+    - Síntoma: {datos_paciente['dolencia']}
+    - Eventos emocionales: {datos_paciente['eventos_emocionales'][:200]}
+    
+    **INSTRUCCIONES:**
+    Generar guión COMPLETO de hipnosis {tipo_texto} basado en la biblioteca completa.
+    
+    **ESTRUCTURA:**
+    
+    ### 🎯 OBJETIVO TERAPÉUTICO
+    
+    ### 📝 GUIÓN COMPLETO
+    
+    **INDUCCIÓN:**
+    
+    **TRABAJO TERAPÉUTICO:**
+    
+    **SUGERENCIAS POSHIPNÓTICAS:**
+    
+    **DESPERTAR:**
+    
+    ### 🕒 INSTRUCCIONES DE APLICACIÓN
+    
+    **GUIÓN COMPLETO:**
+    """
+    
+    try:
+        respuesta = sistema.invoke({"query": prompt})
+        return respuesta['result']
+    except Exception as e:
+        return f"Error al generar guión: {str(e)}"
+
+@st.cache_resource
+def cargar_sistema_completo():
+    """Carga el sistema RAG con biblioteca especializada y contenido de Drive."""
+    
+    # Verificar que la API Key está configurada
+    if not GROQ_API_KEY:
+        st.error("❌ GROQ_API_KEY no configurada en secrets.toml")
+        st.info("""
+        **Cómo configurar:**
+        1. Crea/edita `.streamlit/secrets.toml`
+        2. Añade: GROQ_API_KEY = "tu_api_key_aqui"
+        3. Reinicia la aplicación
+        """)
+        return None
+    
+    with st.spinner("🔄 Cargando sistema especializado con conocimiento expandido..."):
+        try:
+            # ===== 1. CARGAR BASE PRINCIPAL =====
+            response = requests.get(ZIP_URL, stream=True, timeout=60)
+            if response.status_code != 200:
+                st.error(f"❌ Error al descargar biblioteca principal.")
+                return None
+            
+            temp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(temp_dir, "biblioteca.zip")
+            extract_path = os.path.join(temp_dir, "biodescodificacion_db")
+            
+            with open(zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_path)
+            
+            # ===== 2. CONFIGURAR EMBEDDINGS Y VECTOR STORE =====
+            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            vector_store = Chroma(
+                persist_directory=extract_path,
+                embedding_function=embeddings
+            )
+            
+            # ===== 3. CARGAR CONOCIMIENTO DE DRIVE =====
+            st.info("🌐 Conectando con Google Drive para conocimiento avanzado...")
+            documentos_drive = cargar_documentos_drive(GOOGLE_DRIVE_URL)
+            
+            if documentos_drive:
+                if enriquecer_base_conocimientos(vector_store, documentos_drive):
+                    st.success("✅ Sistema cargado con conocimiento expandido")
+                else:
+                    st.info("ℹ️ Usando solo base principal")
+            else:
+                st.info("ℹ️ No se cargó conocimiento adicional de Drive")
+            
+            # ===== 4. CONFIGURAR LLM Y CHAIN =====
+            llm = ChatGroq(
+                groq_api_key=GROQ_API_KEY,
+                model_name="meta-llama/llama-4-scout-17b-16e-instruct",
+                temperature=0.3,
+                max_tokens=3500
+            )
+            
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                chain_type="stuff",
+                retriever=vector_store.as_retriever(search_kwargs={"k": 12}),
+                return_source_documents=True,
+                verbose=False
+            )
+            
+            return qa_chain
+            
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)[:200]}")
+            return None
+
+# ================= INTERFAZ PRINCIPAL =================
+st.set_page_config(
+    page_title="MINDGEEKCLINIC - Biodescodificación con Conocimiento Expandido",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Sidebar
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/271/271226.png", width=80)
+    st.markdown("### 🏥 MINDGEEKCLINIC")
+    st.markdown("**v6.0 con Base de Conocimientos Expandida**")
+    st.markdown("---")
+    
+    st.markdown("#### 📊 Estadísticas")
+    if "pacientes" in st.session_state:
+        st.metric("Pacientes atendidos", len(st.session_state.pacientes))
+    
+    st.markdown("---")
+    
+    # Indicador de conocimiento
+    st.markdown("#### 🧠 Sistema de Conocimiento")
+    st.markdown("✅ **Base principal** (ZIP)")
+    st.markdown("✅ **Conocimiento Drive** (Actualizado)")
+    st.markdown("✅ **Conocimiento especializado** (Diccionario)")
+    
+    st.markdown("---")
+    
+    if st.button("🆕 Nuevo Diagnóstico", use_container_width=True, type="primary"):
+        st.session_state.mostrar_diagnostico = False
+        st.session_state.generar_guion = False
+        st.session_state.generar_grabacion = False
+        st.session_state.pdf_generado = None
+        st.session_state.diagnostico_completo = None
+        st.rerun()
+    
+    if st.button("🔄 Recargar Conocimiento", use_container_width=True):
+        st.cache_resource.clear()
+        st.success("Conocimiento recargado")
+        st.rerun()
+    
+    st.markdown("---")
+    st.caption("🎯 Sistema con Triangulación + Conocimiento Expandido")
+
+# Título principal
+st.title("🧠 MINDGEEKCLINIC v6.0")
+st.markdown("### **Sistema de Biodescodificación con Base de Conocimientos Expandida**")
+st.markdown("*Integración de conocimiento especializado desde Google Drive para diagnósticos más precisos*")
+st.markdown("---")
+
+# Inicializar estados
+if "mostrar_diagnostico" not in st.session_state:
+    st.session_state.mostrar_diagnostico = False
+if "paciente_actual" not in st.session_state:
+    st.session_state.paciente_actual = None
+if "generar_guion" not in st.session_state:
+    st.session_state.generar_guion = False
+if "generar_grabacion" not in st.session_state:
+    st.session_state.generar_grabacion = False
+if "diagnostico_completo" not in st.session_state:
+    st.session_state.diagnostico_completo = None
+if "pdf_generado" not in st.session_state:
+    st.session_state.pdf_generado = None
+
+# Cargar sistema
+sistema = cargar_sistema_completo()
+
+if not sistema:
+    st.error("⚠️ Sistema no disponible. Verifica configuración.")
+    st.stop()
+
+# Mostrar formulario o diagnóstico
+if not st.session_state.mostrar_diagnostico:
+    formulario_diagnostico()
+else:
+    paciente = st.session_state.paciente_actual
+    
+    # Mostrar datos del paciente
+    st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
+    
+    with st.expander("📋 Ver datos completos", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Estado civil:** {paciente['estado_civil']}")
+            st.write(f"**Situación laboral:** {paciente['situacion_laboral']}")
+            st.write(f"**Tiempo padecimiento:** {paciente['tiempo_padecimiento']}")
+            st.write(f"**Frecuencia:** {paciente['frecuencia']}")
+            st.write(f"**Intensidad:** {paciente['intensidad']}/10")
+        
+        with col2:
+            st.write(f"**Tensión arterial:** {paciente['tension']}")
+            st.write(f"**Dolencia:** {paciente['dolencia']}")
+            if paciente.get('diagnostico_medico') and paciente['diagnostico_medico'].strip():
+                st.write(f"**Diagnóstico médico:** {paciente['diagnostico_medico']}")
+            st.write(f"**Factores desencadenantes:** {paciente['factores_desencadenantes'][:150]}...")
+        
+        st.markdown("#### 🎯 **Eventos Emocionales para Triangulación:**")
+        st.info(paciente['eventos_emocionales'])
+    
+    # Mostrar conocimiento especializado aplicable
+    conocimiento_especializado = buscar_conocimiento_especializado(paciente['dolencia'])
+    if conocimiento_especializado:
+        with st.expander("🔬 **Conocimiento Especializado Aplicable**", expanded=True):
+            st.markdown(conocimiento_especializado)
+    
+    # Generar diagnóstico con triangulación
+    st.markdown("---")
+    st.markdown("### 🔬 **DIAGNÓSTICO CON CONOCIMIENTO EXPANDIDO**")
+    
+    if st.session_state.diagnostico_completo is None:
+        with st.spinner("🔄 Analizando con base de conocimientos completa..."):
+            diagnostico = generar_diagnostico_triangulacion(sistema, paciente)
+            st.session_state.diagnostico_completo = diagnostico
+    
+    # Mostrar diagnóstico
+    st.markdown(st.session_state.diagnostico_completo)
+    
+    # SECCIÓN DE HIPNOSIS
+    st.markdown("---")
+    st.markdown("### 🎧 **PROTOCOLOS DE HIPNOSIS**")
+    
+    if not st.session_state.generar_guion and not st.session_state.generar_grabacion:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📝 Generar guión para terapeuta", use_container_width=True):
+                st.session_state.generar_guion = True
+                st.rerun()
+        
+        with col2:
+            if st.button("🎤 Generar guión para GRABACIÓN", use_container_width=True):
+                st.session_state.generar_grabacion = True
+                st.rerun()
+    
+    # Generar guiones específicos
+    if st.session_state.generar_guion:
+        st.markdown("---")
+        st.markdown("### 👨‍⚕️ **GUIÓN PARA TERAPEUTA**")
+        with st.spinner("Generando guión..."):
+            guion = generar_guion_hipnosis(sistema, paciente, "terapeuta")
+            st.markdown(guion)
+            
+            if st.button("↩️ Volver", use_container_width=True):
+                st.session_state.generar_guion = False
+                st.rerun()
+    
+    if st.session_state.generar_grabacion:
+        st.markdown("---")
+        st.markdown("### 🎵 **GUIÓN PARA AUTOGRABACIÓN**")
+        with st.spinner("Generando guión para grabación..."):
+            guion = generar_guion_hipnosis(sistema, paciente, "grabacion")
+            st.markdown(guion)
+            
+            if st.button("↩️ Volver", use_container_width=True):
+                st.session_state.generar_grabacion = False
+                st.rerun()
+    
+    # BOTÓN DE GUARDAR COMO PDF
+    st.markdown("---")
+    st.markdown("### 💾 **EXPORTAR DIAGNÓSTICO**")
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        if st.button("🆕 NUEVO diagnóstico", use_container_width=True, type="primary"):
+            st.session_state.mostrar_diagnostico = False
+            st.session_state.diagnostico_completo = None
+            st.session_state.generar_guion = False
+            st.session_state.generar_grabacion = False
+            st.session_state.pdf_generado = None
+            st.rerun()
+    
+    with col2:
+        if st.button("📄 Generar PDF", use_container_width=True, type="secondary"):
+            with st.spinner("🔄 Generando PDF..."):
+                if st.session_state.paciente_actual and st.session_state.diagnostico_completo:
+                    pdf_bytes = generar_pdf_diagnostico(
+                        st.session_state.paciente_actual,
+                        st.session_state.diagnostico_completo
+                    )
+                    
+                    if pdf_bytes:
+                        st.session_state.pdf_generado = pdf_bytes
+                        st.success("✅ PDF generado")
+                        
+                        nombre_archivo = f"Diagnostico_{paciente['iniciales']}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                        
+                        b64 = base64.b64encode(pdf_bytes).decode()
+                        href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" target="_blank">'
+                        href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF</button>'
+                        href += '</a>'
+                        
+                        st.markdown(href, unsafe_allow_html=True)
+                    else:
+                        st.error("❌ Error al generar PDF")
+                else:
+                    st.warning("⚠️ No hay diagnóstico para generar PDF")
+    
+    with col3:
+        if st.button("ℹ️ Información", use_container_width=True):
+            st.info("""
+            **Sistema de Conocimiento:**
+            - Base principal ZIP: Fundamentos teóricos
+            - Google Drive: Conocimiento especializado actualizado
+            - Diccionario especializado: Sistemas corporales específicos
+            
+            **Actualización:**
+            - El sistema recarga conocimiento automáticamente
+            - Añade nuevos documentos de Drive al reiniciar
+            - Integra múltiples fuentes de conocimiento
+            """)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: gray; font-size: 0.8em;'>
+    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Conocimiento Expandido • 
+    Base ZIP + Google Drive + Conocimiento Especializado • 
+    Diagnósticos más precisos y profesionales
+    </div>
+    """,
+    unsafe_allow_html=True
+)
