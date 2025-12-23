@@ -1,4 +1,3 @@
-# app.py - MINDGEEKCLINIC v6.0 con Base de Conocimientos Expandida
 import streamlit as st
 import os
 import zipfile
@@ -12,7 +11,7 @@ import requests
 import json
 from datetime import datetime
 
-# ================ IMPORTACIONES PARA PDF ================
+# ================ NUEVAS IMPORTACIONES PARA PDF ================
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -24,27 +23,16 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import base64
 from io import BytesIO
-import re
-
-# ================ IMPORTACIONES PARA CARGA DE DOCUMENTOS ================
-from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    PyPDFLoader,
-    TextLoader,
-    UnstructuredWordDocumentLoader,
-    CSVLoader
-)
-import io
+import re  # Importación añadida para limpiar HTML
 
 # ================= CONFIGURACIÓN =================
-# API Keys deben estar SOLO en secrets.toml
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
-GOOGLE_DRIVE_URL = "https://drive.google.com/uc?export=download&id=1uePzkVSS8yHnTRwJYqoP0wL0rOGJ4TS9"
 
-# ================= SISTEMA DE CONOCIMIENTO ESPECIALIZADO =================
+# ================= SISTEMA DE CONOCIMIENTO ESPECIALIZADO (NUEVO MÓDULO) =================
+
 CONOCIMIENTO_ESPECIALIZADO = {
+    # ===== SISTEMA 1: OCULAR (EJEMPLO COMPLETO) =====
     "ojos": {
         "categoria": "sensorial",
         "palabras_clave": ["ojo", "ocular", "vista", "visión", "miopía", "astigmatismo", 
@@ -85,6 +73,7 @@ Problemas oculares = Algo que no quiero ver en mi vida.
 4. Ejercicios de "nueva mirada" hacia la situación"""
     },
     
+    # ===== SISTEMA 2: DERMATOLÓGICO (EJEMPLO BÁSICO) =====
     "piel": {
         "categoria": "dermatologico",
         "palabras_clave": ["piel", "dermatitis", "eczema", "acné", "urticaria", "psoriasis", 
@@ -109,6 +98,7 @@ Problemas cutáneos = Conflictos de separación, contacto no deseado, límites v
 4. ¿Se siente "sin protección" en alguna área de su vida?"""
     },
     
+    # ===== SISTEMA 3: DIGESTIVO (EJEMPLO BÁSICO) =====
     "sistema_digestivo": {
         "categoria": "digestivo",
         "palabras_clave": ["estómago", "gástrico", "digestión", "úlcera", "gastritis", "acidez",
@@ -132,6 +122,7 @@ Capacidad de "digerir" situaciones, asimilar experiencias, procesar emociones.
 4. ¿Qué "no nutre" en su vida actualmente?"""
     },
     
+    # ===== SISTEMA 4: RESPIRATORIO =====
     "sistema_respiratorio": {
         "categoria": "respiratorio",
         "palabras_clave": ["pulmón", "respiración", "asma", "bronquitis", "tos", "congestión",
@@ -144,7 +135,7 @@ Vida, comunicación, libertad, espacio vital.
 Problemas respiratorios = Conflictos con el territorio, miedo a la muerte, falta de libertad.
 
 **ESPECIFICIDADES POR SÍNTOMA:**
-- **ASMA:** "Me siente ahogado en mi territorio (hogar, trabajo, familia)"
+- **ASMA:** "Me siento ahogado en mi territorio (hogar, trabajo, familia)"
 - **BRONQUITIS:** Conflictos de territorio con peleas o gritos
 - **RINITIS/ALERGIA:** "El aire que respiro (ambiente) me molesta"
 - **SINUSITIS:** "Alguien cercano me irrita profundamente"
@@ -156,6 +147,7 @@ Problemas respiratorios = Conflictos con el territorio, miedo a la muerte, falta
 4. ¿Miedo a morir o a perder algo vital?"""
     },
     
+    # ===== SISTEMA 5: MUSCULAR =====
     "sistema_muscular": {
         "categoria": "musculoesqueletico",
         "palabras_clave": ["músculo", "dolor muscular", "contractura", "espasmo", "calambre",
@@ -181,109 +173,11 @@ Problemas musculares = Conflictos de desvalorización en la acción, impotencia 
     }
 }
 
-# ================= FUNCIONES PARA CARGA DE DOCUMENTOS DE DRIVE =================
-def cargar_documentos_drive(url_drive: str) -> list:
-    """Carga documentos desde Google Drive y los procesa."""
-    try:
-        st.info("📥 Conectando con Google Drive para cargar conocimiento especializado...")
-        response = requests.get(url_drive, timeout=30)
-        
-        if response.status_code != 200:
-            st.warning(f"⚠️ No se pudo conectar con Google Drive (código {response.status_code})")
-            return []
-        
-        # Determinar tipo de contenido
-        content_type = response.headers.get('content-type', '').lower()
-        
-        # Preparar archivo temporal
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-            tmp_file.write(response.content)
-            tmp_path = tmp_file.name
-        
-        documentos = []
-        
-        # Intentar cargar como PDF (formato más común)
-        try:
-            loader = PyPDFLoader(tmp_path)
-            docs = loader.load()
-            documentos.extend(docs)
-            st.success(f"✅ PDF cargado: {len(docs)} páginas procesadas")
-        except Exception as e:
-            st.warning(f"ℹ️ No es un PDF válido: {str(e)}")
-        
-        # Si no es PDF, intentar como texto
-        if not documentos:
-            try:
-                with open(tmp_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                if len(content) > 100:  # Contenido significativo
-                    doc = Document(
-                        page_content=content,
-                        metadata={"source": "Google Drive", "type": "conocimiento_especializado"}
-                    )
-                    documentos.append(doc)
-                    st.success(f"✅ Texto cargado: {len(content)} caracteres")
-            except:
-                st.warning("ℹ️ No se pudo procesar como texto")
-        
-        # Limpiar archivo temporal
-        os.unlink(tmp_path)
-        
-        if documentos:
-            # Dividir en fragmentos manejables
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=800,
-                chunk_overlap=150,
-                length_function=len,
-                separators=["\n\n", "\n", ". ", " ", ""]
-            )
-            
-            documentos_divididos = text_splitter.split_documents(documentos)
-            
-            # Añadir metadatos consistentes
-            for i, doc in enumerate(documentos_divididos):
-                doc.metadata.update({
-                    "source": "Google Drive - Conocimiento Avanzado",
-                    "tipo": "conocimiento_especializado",
-                    "id": f"drive_{i:04d}",
-                    "fecha_carga": datetime.now().strftime("%Y-%m-%d")
-                })
-            
-            st.success(f"📚 Base de conocimientos expandida: {len(documentos_divididos)} fragmentos especializados")
-            return documentos_divididos
-        
-        return []
-        
-    except Exception as e:
-        st.error(f"❌ Error al cargar desde Drive: {str(e)}")
-        return []
-
-def enriquecer_base_conocimientos(vector_store, documentos_drive: list):
-    """Añade documentos de Drive a la base vectorial existente."""
-    if not documentos_drive:
-        return False
-    
-    try:
-        # Verificar si ya existen documentos similares
-        existing_ids = vector_store.get()['ids'] if hasattr(vector_store, 'get') else []
-        
-        # Generar IDs únicos
-        start_id = len(existing_ids) if existing_ids else 0
-        nuevos_ids = [f"drive_{start_id + i:04d}" for i in range(len(documentos_drive))]
-        
-        # Añadir a la base
-        vector_store.add_documents(documents=documentos_drive, ids=nuevos_ids)
-        
-        st.success(f"🎯 Conocimiento de Drive integrado: {len(documentos_drive)} fragmentos")
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Error al integrar conocimiento: {str(e)}")
-        return False
-
-# ================= FUNCIONES EXISTENTES (MODIFICADAS) =================
 def buscar_conocimiento_especializado(dolencia):
-    """Busca conocimiento especializado relevante para la dolencia."""
+    """
+    Busca conocimiento especializado relevante para la dolencia.
+    Retorna el conocimiento encontrado o string vacío si no hay coincidencia.
+    """
     if not dolencia or not isinstance(dolencia, str):
         return ""
     
@@ -291,6 +185,7 @@ def buscar_conocimiento_especializado(dolencia):
     conocimientos_encontrados = []
     
     for sistema, info in CONOCIMIENTO_ESPECIALIZADO.items():
+        # Verificar si alguna palabra clave aparece en la dolencia
         for palabra_clave in info["palabras_clave"]:
             if palabra_clave in dolencia_lower:
                 conocimientos_encontrados.append({
@@ -316,8 +211,12 @@ def buscar_conocimiento_especializado(dolencia):
     
     return ""
 
+# ================= FUNCIÓN PARA GENERAR PDF =================
 def generar_pdf_diagnostico(datos_paciente, diagnostico):
-    """Genera un PDF profesional con el diagnóstico completo."""
+    """
+    Genera un PDF profesional con el diagnóstico completo.
+    Retorna el PDF como bytes para descarga.
+    """
     try:
         buffer = BytesIO()
         doc = SimpleDocTemplate(
@@ -379,7 +278,7 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         # Contenido del PDF
         story = []
         
-        # PORTADA
+        # ===== PORTADA =====
         story.append(Spacer(1, 2*inch))
         story.append(Paragraph("🧠", ParagraphStyle('Logo', parent=styles['Heading1'], fontSize=48, alignment=TA_CENTER)))
         story.append(Spacer(1, 0.5*inch))
@@ -409,7 +308,7 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(paciente_table)
         story.append(PageBreak())
         
-        # SECCIÓN 1: DATOS DEL PACIENTE
+        # ===== SECCIÓN 1: DATOS DEL PACIENTE =====
         story.append(Paragraph("INFORMACIÓN DEL PACIENTE", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
@@ -460,7 +359,7 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         story.append(PageBreak())
         
-        # SECCIÓN 2: DIAGNÓSTICO
+        # ===== SECCIÓN 2: DIAGNÓSTICO =====
         story.append(Paragraph("DIAGNÓSTICO DE BIODESCODIFICACIÓN", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
@@ -543,7 +442,7 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         story.append(Spacer(1, 0.3*inch))
         
-        # SECCIÓN 3: INFORMACIÓN LEGAL
+        # ===== SECCIÓN 3: INFORMACIÓN LEGAL =====
         story.append(Paragraph("INFORMACIÓN IMPORTANTE", estilo_subtitulo))
         
         legal_text = """
@@ -557,12 +456,12 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         <b>Fecha de generación:</b> {}
         
-        <b>Sistema:</b> MINDGEEKCLINIC v6.0 - Triangulación Diagnóstica con Conocimiento Expandido
+        <b>Sistema:</b> MINDGEEKCLINIC v6.0 - Triangulación Diagnóstica
         """.format(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         
         story.append(Paragraph(legal_text, estilo_paciente))
         
-        # GENERAR PDF
+        # ===== GENERAR PDF =====
         doc.build(story)
         pdf_bytes = buffer.getvalue()
         buffer.close()
@@ -573,6 +472,7 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         st.error(f"Error al generar PDF: {str(e)}")
         return None
 
+# ================= BASE DE DATOS DE PACIENTES =================
 def guardar_paciente(datos):
     """Guarda datos del paciente en session_state."""
     if "pacientes" not in st.session_state:
@@ -583,8 +483,9 @@ def guardar_paciente(datos):
     st.session_state.pacientes.append(datos)
     return datos["id"]
 
+# ================= FORMULARIO DIAGNÓSTICO CON DIAGNÓSTICO MÉDICO OPCIONAL =================
 def formulario_diagnostico():
-    """Muestra formulario clínico estructurado."""
+    """Muestra formulario clínico estructurado con diagnóstico médico opcional."""
     st.markdown("### 📋 FORMULARIO DE EVALUACIÓN CLÍNICA ESPECIALIZADA")
     
     with st.form("formulario_clinico"):
@@ -627,7 +528,7 @@ def formulario_diagnostico():
                  "Semanalmente", "Mensualmente", "Ocasionalmente", "Solo en ciertas situaciones"]
             )
         
-        # DIAGNÓSTICO MÉDICO OPCIONAL
+        # ===== DIAGNÓSTICO MÉDICO OPCIONAL =====
         st.markdown("---")
         st.markdown("#### 🏥 **INFORMACIÓN MÉDICA (OPCIONAL)**")
         
@@ -641,7 +542,7 @@ def formulario_diagnostico():
 - Especialista: Dr. González, Gastroenterólogo
 
 O déjelo en blanco si no tiene diagnóstico médico formal.""",
-            help="Este campo es completamente opcional."
+            help="Este campo es completamente opcional. Si tiene diagnóstico médico previo, inclúyalo para enriquecer el análisis."
         )
         
         st.markdown("---")
@@ -650,14 +551,14 @@ O déjelo en blanco si no tiene diagnóstico médico formal.""",
         st.markdown("**Pregunta clave:** ¿Qué eventos suceden en su vida que impactan emocionalmente CUANDO se presenta el cuadro?")
         
         eventos_emocionales = st.text_area(
-            "Describa los eventos específicos:",
+            "Describa los eventos específicos (pasados o presentes) que coinciden con la aparición/worsening de los síntomas:",
             height=150,
             placeholder="""Ejemplo detallado:
-1. El síntoma empeora los lunes cuando voy a trabajar
-2. Aparece después de discusiones con mi pareja
-3. Se intensifica cuando visito a mis padres
-4. Mejora cuando estoy de vacaciones
-5. Comenzó después de la muerte de mi padre hace 2 años
+1. El síntoma empeora los lunes cuando voy a trabajar (evento: regreso laboral)
+2. Aparece después de discusiones con mi pareja (evento: conflicto relacional)
+3. Se intensifica cuando visito a mis padres (evento: encuentro familiar)
+4. Mejora cuando estoy de vacaciones (evento: descanso/ocio)
+5. Comenzó después de la muerte de mi padre hace 2 años (evento: duelo)
 
 Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
         )
@@ -684,9 +585,9 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
         st.markdown("---")
         st.markdown("#### 👥 **ENTORNO SOCIAL ACTUAL**")
         entorno_social = st.text_area(
-            "Describa su entorno social actual:",
+            "Describa su entorno social actual y relaciones significativas:",
             height=100,
-            placeholder="Ej: Vivo solo después de divorcio, tengo 2 hijos, pocos amigos cercanos, relación conflictiva con jefe..."
+            placeholder="Ej: Vivo solo después de divorcio, tengo 2 hijos que veo fines de semana, pocos amigos cercanos, relación conflictiva con jefe..."
         )
         
         st.markdown("---")
@@ -718,8 +619,9 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
             st.session_state.mostrar_diagnostico = True
             st.rerun()
 
+# ================= GENERAR DIAGNÓSTICO COMPLETO =================
 def generar_diagnostico_triangulacion(sistema, datos_paciente):
-    """Genera diagnóstico completo con triangulación."""
+    """Genera diagnóstico completo con triangulación, conocimiento especializado y diagnóstico médico."""
     
     conocimiento_especializado = buscar_conocimiento_especializado(datos_paciente['dolencia'])
     
@@ -729,11 +631,12 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
         **DIAGNÓSTICO MÉDICO PREVIO:**
         {datos_paciente['diagnostico_medico']}
         
-        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación.
+        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación, 
+        considerándolo como información valiosa pero analizando desde la perspectiva emocional/simbólica.
         """
     
     prompt = f"""
-    ## 🧠 DIAGNÓSTICO DE BIODESCODIFICACIÓN CON TRIANGULACIÓN - MINDGEEKCLINIC v6.0
+    ## 🧠 DIAGNÓSTICO DE BIODESCODIFICACIÓN CON TRIANGULACIÓN - MINDGEEKCLINIC
     
     **DATOS COMPLETOS DEL PACIENTE:**
     - Iniciales: {datos_paciente['iniciales']}
@@ -760,71 +663,83 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     {datos_paciente['entorno_social']}
     
     **CONOCIMIENTO ESPECIALIZADO RELEVANTE:**
-    {conocimiento_especializado if conocimiento_especializado else "Basándose en la base de conocimientos completa."}
+    {conocimiento_especializado if conocimiento_especializado else "No se encontró conocimiento especializado específico para esta dolencia."}
     
-    **INSTRUCCIONES ESPECÍFICAS PARA EL ASISTENTE:**
+    **INSTRUCCIONES ESPECÍFICAS PARA EL ASISTENTE ESPECIALIZADO:**
     
-    1. **CONSULTAR LA BASE DE CONOCIMIENTOS COMPLETA:**
-       - Base principal + Conocimiento especializado de Google Drive
-       - Incluir referencias de ambos sistemas de conocimiento
-       - Priorizar información más reciente y especializada
-    
-    2. **TRIANGULACIÓN DIAGNÓSTICA:**
-       - Analizar relación temporal eventos-síntomas
-       - Identificar patrones específicos
+    1. **TRIANGULACIÓN DIAGNÓSTICA:**
+       - Analizar la relación TEMPORAL entre eventos emocionales y síntomas
+       - Identificar PATRONES específicos en los eventos emocionales
+       - Determinar si hay eventos DESENCADENANTES, MANTENEDORES o AGRAVANTES
        - Relacionar tiempo del padecimiento con eventos de vida
     
-    3. **INTEGRAR DIAGNÓSTICO MÉDICO (si aplica):**
-       - Considerar diagnóstico médico como contexto valioso
-       - Proporcionar perspectiva complementaria
+    2. **INTEGRAR DIAGNÓSTICO MÉDICO (si aplica):**
+       - Considerar el diagnóstico médico como información contextual valiosa
+       - Analizar cómo los aspectos emocionales pueden relacionarse con el diagnóstico clínico
+       - Proporcionar una perspectiva complementaria (no contradictoria)
     
-    4. **DIAGNÓSTICO ESPECÍFICO:**
+    3. **INTEGRAR CONOCIMIENTO ESPECIALIZADO (si aplica):**
+       - Incorporar el conocimiento especializado relevante al diagnóstico
+       - Relacionar síntomas específicos con sistemas corporales identificados
+       - Aplicar las preguntas clave sugeridas por el conocimiento especializado
+    
+    4. **DIAGNÓSTICO DE BIODESCODIFICACIÓN ESPECÍFICO:**
        - Interpretar la dolencia según biodescodificación
-       - Identificar CONFLICTO EMOCIONAL PRECISO
-       - Explicar SIGNIFICADO BIOLÓGICO
+       - Identificar el CONFLICTO EMOCIONAL PRECISO basado en triangulación
+       - Explicar SIGNIFICADO BIOLÓGICO del síntoma
+       - Relacionar con eventos específicos mencionados
     
     5. **PROTOCOLO TERAPÉUTICO ESTRUCTURADO (3 SESIONES):**
-       - SESIÓN 1: Enfoque en [conflicto específico]
-       - SESIÓN 2: Trabajo en [eventos emocionales clave]
-       - SESIÓN 3: Integración y estrategias específicas
+       - SESIÓN 1: Enfoque en [conflicto específico identificado por triangulación]
+       - SESIÓN 2: Trabajo en [eventos emocionales clave identificados]
+       - SESIÓN 3: Integración y [estrategias específicas basadas en factores desencadenantes]
     
-    6. **PROTOCOLO DE HIPNOSIS ESPECÍFICO:**
-       - Basado en biblioteca de modelos
-       - Frecuencia: 3 veces por semana
-       - Duración: 15-20 minutos
-       - Técnicas ESPECÍFICAS
+    6. **PROTOCOLO DE HIPNOSIS ESPECÍFICO (basado en biblioteca de modelos):**
+       - Frecuencia: 3 veces por semana (como indica biblioteca)
+       - Duración: 15-20 minutos por sesión
+       - Técnicas ESPECÍFICAS de la biblioteca de modelos de hipnosis
+       - INSTRUCCIONES DETALLADAS para grabación o aplicación
     
     7. **RECOMENDACIONES PERSONALIZADAS:**
-       - Basadas en triangulación
-       - Ejercicios específicos
-       - Estrategias prácticas
+       - Actividades de autohipnosis DIARIAS basadas en triangulación
+       - Ejercicios emocionales ESPECÍFICOS para eventos identificados
+       - Estrategias para manejar factores desencadenantes
+    
+    **REQUISITOS ESTRICTOS DE RESPUESTA:**
+    1. DEBE basarse en la biblioteca de biodescodificación disponible
+    2. DEBE usar modelos de hipnosis de la biblioteca
+    3. DEBE incluir INSTRUCCIONES ESPECÍFICAS para terapia
+    4. DEBE mencionar técnicas CONCRETAS de la biblioteca
+    5. DEBE ser ESTRUCTURADO y PROFESIONAL
+    6. DEBE integrar el conocimiento especializado cuando sea relevante
+    7. DEBE considerar el diagnóstico médico (si existe) como contexto valioso
     
     **FORMATO DE RESPUESTA:**
     
-    ## 🔍 DIAGNÓSTICO POR TRIANGULACIÓN (CON BASE EXPANDIDA)
+    ## 🔍 DIAGNÓSTICO POR TRIANGULACIÓN
     
-    ### 1. Análisis con Conocimiento Expandido
-    [Incluir referencias de base principal + Drive]
+    ### 1. Análisis de Patrones Identificados
+    [Explicar relación eventos-síntomas]
     
-    ### 2. Patrones de Triangulación Identificados
-    [Relación eventos-síntomas]
+    ### 2. Contexto Médico (si aplica)
+    [Integrar diagnóstico médico si existe]
     
-    ### 3. Contexto Médico
-    [Si aplica]
+    ### 3. Integración de Conocimiento Especializado
+    [Incorporar conocimiento especializado relevante]
     
     ### 4. Diagnóstico de Biodescodificación
-    [Conflicto emocional + significado biológico]
+    [Conflicto emocional específico + significado biológico]
     
-    ### 5. Protocolo de 3 Sesiones
-    Sesión 1: [Instrucciones]
-    Sesión 2: [Instrucciones]
-    Sesión 3: [Instrucciones]
+    ### 5. Protocolo de 3 Sesiones Terapéuticas
+    Sesión 1: [Instrucciones específicas]
+    Sesión 2: [Instrucciones específicas]
+    Sesión 3: [Instrucciones específicas]
     
-    ### 6. Protocolo de Hipnosis
-    [Instrucciones DETALLADAS]
+    ### 6. Protocolo de Hipnosis/Autohipnosis
+    [Instrucciones DETALLADAS para grabación o aplicación]
     
     ### 7. Recomendaciones Específicas
-    [Basadas en análisis completo]
+    [Basadas en triangulación de eventos]
     
     **RESPUESTA PROFESIONAL ESTRUCTURADA:**
     """
@@ -835,8 +750,9 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
     except Exception as e:
         return f"Error al generar diagnóstico: {str(e)}"
 
+# ================= GENERAR GUIÓN DE HIPNOSIS =================
 def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
-    """Genera guión específico de hipnosis."""
+    """Genera guión específico de hipnosis basado en biblioteca."""
     
     tipo_texto = "para aplicación por terapeuta" if tipo == "terapeuta" else "para grabación de autohipnosis"
     
@@ -845,26 +761,41 @@ def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     
     **CONTEXTO DEL PACIENTE:**
     - Síntoma: {datos_paciente['dolencia']}
+    - Conflicto identificado: [Basado en triangulación anterior]
     - Eventos emocionales: {datos_paciente['eventos_emocionales'][:200]}
     
-    **INSTRUCCIONES:**
-    Generar guión COMPLETO de hipnosis {tipo_texto} basado en la biblioteca completa.
+    **INSTRUCCIONES PARA EL ASISTENTE:**
     
-    **ESTRUCTURA:**
+    Generar un guión COMPLETO de hipnosis {tipo_texto} basado en la biblioteca de modelos de hipnosis.
+    
+    **REQUISITOS:**
+    1. Usar técnicas ESPECÍFICAS de la biblioteca de modelos
+    2. Incluir inducción, trabajo terapéutico y despertar
+    3. Duración: 15-20 minutos
+    4. Frecuencia: 3 veces por semana
+    5. Instrucciones PRECISAS para {'el terapeuta' if tipo == 'terapeuta' else 'grabación'}
+    
+    **ESTRUCTURA DEL GUIÓN:**
     
     ### 🎯 OBJETIVO TERAPÉUTICO
+    [Objetivo específico basado en triangulación]
     
     ### 📝 GUIÓN COMPLETO
     
     **INDUCCIÓN:**
+    [Texto completo de inducción hipnótica]
     
     **TRABAJO TERAPÉUTICO:**
+    [Instrucciones específicas para trabajar el conflicto]
     
     **SUGERENCIAS POSHIPNÓTICAS:**
+    [Sugerencias para después de la sesión]
     
     **DESPERTAR:**
+    [Instrucciones para finalizar]
     
     ### 🕒 INSTRUCCIONES DE APLICACIÓN
+    [Instrucciones específicas para {'terapeuta' if tipo == 'terapeuta' else 'paciente'}]
     
     **GUIÓN COMPLETO:**
     """
@@ -875,27 +806,20 @@ def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     except Exception as e:
         return f"Error al generar guión: {str(e)}"
 
+# ================= SISTEMA PRINCIPAL =================
 @st.cache_resource
 def cargar_sistema_completo():
-    """Carga el sistema RAG con biblioteca especializada y contenido de Drive."""
+    """Carga el sistema RAG con biblioteca especializada."""
     
-    # Verificar que la API Key está configurada
     if not GROQ_API_KEY:
-        st.error("❌ GROQ_API_KEY no configurada en secrets.toml")
-        st.info("""
-        **Cómo configurar:**
-        1. Crea/edita `.streamlit/secrets.toml`
-        2. Añade: GROQ_API_KEY = "tu_api_key_aqui"
-        3. Reinicia la aplicación
-        """)
+        st.error("❌ Configura GROQ_API_KEY en Streamlit Secrets.")
         return None
     
-    with st.spinner("🔄 Cargando sistema especializado con conocimiento expandido..."):
+    with st.spinner("🔄 Cargando sistema especializado..."):
         try:
-            # ===== 1. CARGAR BASE PRINCIPAL =====
             response = requests.get(ZIP_URL, stream=True, timeout=60)
             if response.status_code != 200:
-                st.error(f"❌ Error al descargar biblioteca principal.")
+                st.error(f"❌ Error al descargar biblioteca.")
                 return None
             
             temp_dir = tempfile.mkdtemp()
@@ -909,26 +833,9 @@ def cargar_sistema_completo():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_path)
             
-            # ===== 2. CONFIGURAR EMBEDDINGS Y VECTOR STORE =====
             embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            vector_store = Chroma(
-                persist_directory=extract_path,
-                embedding_function=embeddings
-            )
+            vector_store = Chroma(persist_directory=extract_path, embedding_function=embeddings)
             
-            # ===== 3. CARGAR CONOCIMIENTO DE DRIVE =====
-            st.info("🌐 Conectando con Google Drive para conocimiento avanzado...")
-            documentos_drive = cargar_documentos_drive(GOOGLE_DRIVE_URL)
-            
-            if documentos_drive:
-                if enriquecer_base_conocimientos(vector_store, documentos_drive):
-                    st.success("✅ Sistema cargado con conocimiento expandido")
-                else:
-                    st.info("ℹ️ Usando solo base principal")
-            else:
-                st.info("ℹ️ No se cargó conocimiento adicional de Drive")
-            
-            # ===== 4. CONFIGURAR LLM Y CHAIN =====
             llm = ChatGroq(
                 groq_api_key=GROQ_API_KEY,
                 model_name="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -939,7 +846,7 @@ def cargar_sistema_completo():
             qa_chain = RetrievalQA.from_chain_type(
                 llm=llm,
                 chain_type="stuff",
-                retriever=vector_store.as_retriever(search_kwargs={"k": 12}),
+                retriever=vector_store.as_retriever(search_kwargs={"k": 10}),
                 return_source_documents=True,
                 verbose=False
             )
@@ -947,12 +854,12 @@ def cargar_sistema_completo():
             return qa_chain
             
         except Exception as e:
-            st.error(f"❌ Error: {str(e)[:200]}")
+            st.error(f"❌ Error: {str(e)[:150]}")
             return None
 
 # ================= INTERFAZ PRINCIPAL =================
 st.set_page_config(
-    page_title="MINDGEEKCLINIC - Biodescodificación con Conocimiento Expandido",
+    page_title="MINDGEEKCLINIC - Biodescodificación con Triangulación",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -962,7 +869,7 @@ st.set_page_config(
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/271/271226.png", width=80)
     st.markdown("### 🏥 MINDGEEKCLINIC")
-    st.markdown("**v6.0 con Base de Conocimientos Expandida**")
+    st.markdown("**Sistema Profesional con Triangulación Diagnóstica**")
     st.markdown("---")
     
     st.markdown("#### 📊 Estadísticas")
@@ -971,34 +878,24 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Indicador de conocimiento
-    st.markdown("#### 🧠 Sistema de Conocimiento")
-    st.markdown("✅ **Base principal** (ZIP)")
-    st.markdown("✅ **Conocimiento Drive** (Actualizado)")
-    st.markdown("✅ **Conocimiento especializado** (Diccionario)")
-    
-    st.markdown("---")
-    
     if st.button("🆕 Nuevo Diagnóstico", use_container_width=True, type="primary"):
         st.session_state.mostrar_diagnostico = False
         st.session_state.generar_guion = False
         st.session_state.generar_grabacion = False
         st.session_state.pdf_generado = None
-        st.session_state.diagnostico_completo = None
         st.rerun()
     
-    if st.button("🔄 Recargar Conocimiento", use_container_width=True):
+    if st.button("🔄 Reiniciar Sistema", use_container_width=True):
         st.cache_resource.clear()
-        st.success("Conocimiento recargado")
         st.rerun()
     
     st.markdown("---")
-    st.caption("🎯 Sistema con Triangulación + Conocimiento Expandido")
+    st.caption("🎯 Sistema con Triangulación y Conocimiento Especializado")
 
 # Título principal
-st.title("🧠 MINDGEEKCLINIC v6.0")
-st.markdown("### **Sistema de Biodescodificación con Base de Conocimientos Expandida**")
-st.markdown("*Integración de conocimiento especializado desde Google Drive para diagnósticos más precisos*")
+st.title("🧠 MINDGEEKCLINIC")
+st.markdown("### **Sistema de Diagnóstico por Biodescodificación con Triangulación Emocional**")
+st.markdown("*Identificación precisa de relaciones evento-síntoma para protocolos personalizados*")
 st.markdown("---")
 
 # Inicializar estados
@@ -1031,7 +928,7 @@ else:
     # Mostrar datos del paciente
     st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
     
-    with st.expander("📋 Ver datos completos", expanded=True):
+    with st.expander("📋 Ver datos completos con triangulación"):
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**Estado civil:** {paciente['estado_civil']}")
@@ -1058,29 +955,47 @@ else:
     
     # Generar diagnóstico con triangulación
     st.markdown("---")
-    st.markdown("### 🔬 **DIAGNÓSTICO CON CONOCIMIENTO EXPANDIDO**")
+    st.markdown("### 🔬 **DIAGNÓSTICO CON TRIANGULACIÓN EMOCIONAL**")
     
     if st.session_state.diagnostico_completo is None:
-        with st.spinner("🔄 Analizando con base de conocimientos completa..."):
+        with st.spinner("🔄 Analizando patrones evento-síntoma..."):
             diagnostico = generar_diagnostico_triangulacion(sistema, paciente)
             st.session_state.diagnostico_completo = diagnostico
     
     # Mostrar diagnóstico
     st.markdown(st.session_state.diagnostico_completo)
     
-    # SECCIÓN DE HIPNOSIS
+    # ==== SECCIÓN DE HIPNOSIS ====
     st.markdown("---")
-    st.markdown("### 🎧 **PROTOCOLOS DE HIPNOSIS**")
+    st.markdown("### 🎧 **PROTOCOLOS DE HIPNOSIS ESPECÍFICOS**")
     
     if not st.session_state.generar_guion and not st.session_state.generar_grabacion:
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("📝 Generar guión para terapeuta", use_container_width=True):
+            st.markdown("#### 👨‍⚕️ **Para aplicación por terapeuta:**")
+            st.info("""
+            **Basado en biblioteca de modelos de hipnosis:**
+            - Técnicas específicas de inducción
+            - Protocolos validados
+            - Duración: 15-20 minutos
+            - Frecuencia: 3 veces/semana
+            """)
+            
+            if st.button("📝 Generar guión COMPLETO para terapeuta", use_container_width=True):
                 st.session_state.generar_guion = True
                 st.rerun()
         
         with col2:
+            st.markdown("#### 🎵 **Para autohipnosis (grabación personal):**")
+            st.info("""
+            **Instrucciones específicas de la biblioteca:**
+            - Técnicas de autoinducción
+            - Sugerencias poshipnóticas
+            - Grabación en dispositivo de audio
+            - Escuchar 3 veces por semana
+            """)
+            
             if st.button("🎤 Generar guión para GRABACIÓN", use_container_width=True):
                 st.session_state.generar_grabacion = True
                 st.rerun()
@@ -1088,34 +1003,45 @@ else:
     # Generar guiones específicos
     if st.session_state.generar_guion:
         st.markdown("---")
-        st.markdown("### 👨‍⚕️ **GUIÓN PARA TERAPEUTA**")
-        with st.spinner("Generando guión..."):
+        st.markdown("### 👨‍⚕️ **GUIÓN COMPLETO PARA TERAPEUTA**")
+        with st.spinner("Generando guión basado en biblioteca de modelos..."):
             guion = generar_guion_hipnosis(sistema, paciente, "terapeuta")
             st.markdown(guion)
             
-            if st.button("↩️ Volver", use_container_width=True):
+            if st.button("↩️ Volver a opciones", use_container_width=True):
                 st.session_state.generar_guion = False
                 st.rerun()
     
     if st.session_state.generar_grabacion:
         st.markdown("---")
-        st.markdown("### 🎵 **GUIÓN PARA AUTOGRABACIÓN**")
+        st.markdown("### 🎵 **GUIÓN PARA GRABACIÓN DE AUTOHIPNOSIS**")
         with st.spinner("Generando guión para grabación..."):
             guion = generar_guion_hipnosis(sistema, paciente, "grabacion")
             st.markdown(guion)
             
-            if st.button("↩️ Volver", use_container_width=True):
+            st.markdown("---")
+            st.markdown("#### 📋 **INSTRUCCIONES PARA GRABACIÓN:**")
+            st.success("""
+            1. **Preparación:** Ambiente tranquilo, sin interrupciones
+            2. **Equipo:** Usar micrófono de buena calidad o smartphone
+            3. **Voz:** Hablar lentamente, con tono calmado
+            4. **Pausas:** Dejar espacios para respiración
+            5. **Guardar:** Nombrar archivo claramente (ej: "Autohipnosis_[fecha]")
+            6. **Uso:** Escuchar con auriculares, posición cómoda
+            """)
+            
+            if st.button("↩️ Volver a opciones", use_container_width=True):
                 st.session_state.generar_grabacion = False
                 st.rerun()
     
-    # BOTÓN DE GUARDAR COMO PDF
+    # ===== BOTÓN DE GUARDAR COMO PDF =====
     st.markdown("---")
-    st.markdown("### 💾 **EXPORTAR DIAGNÓSTICO**")
+    st.markdown("### 💾 **GUARDAR DIAGNÓSTICO COMPLETO**")
     
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col_n1, col_n2, col_n3 = st.columns([2, 1, 1])
     
-    with col1:
-        if st.button("🆕 NUEVO diagnóstico", use_container_width=True, type="primary"):
+    with col_n1:
+        if st.button("🆕 Realizar NUEVO diagnóstico", use_container_width=True, type="primary"):
             st.session_state.mostrar_diagnostico = False
             st.session_state.diagnostico_completo = None
             st.session_state.generar_guion = False
@@ -1123,9 +1049,9 @@ else:
             st.session_state.pdf_generado = None
             st.rerun()
     
-    with col2:
-        if st.button("📄 Generar PDF", use_container_width=True, type="secondary"):
-            with st.spinner("🔄 Generando PDF..."):
+    with col_n2:
+        if st.button("📄 Generar y Descargar PDF", use_container_width=True, type="secondary"):
+            with st.spinner("🔄 Generando PDF profesional..."):
                 if st.session_state.paciente_actual and st.session_state.diagnostico_completo:
                     pdf_bytes = generar_pdf_diagnostico(
                         st.session_state.paciente_actual,
@@ -1134,43 +1060,55 @@ else:
                     
                     if pdf_bytes:
                         st.session_state.pdf_generado = pdf_bytes
-                        st.success("✅ PDF generado")
+                        st.success("✅ PDF generado correctamente")
                         
                         nombre_archivo = f"Diagnostico_{paciente['iniciales']}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                        st.markdown("---")
+                        st.markdown("#### 📥 **Descargar PDF**")
                         
                         b64 = base64.b64encode(pdf_bytes).decode()
                         href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" target="_blank">'
-                        href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF</button>'
+                        href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF ahora</button>'
                         href += '</a>'
                         
                         st.markdown(href, unsafe_allow_html=True)
+                        
+                        st.info(f"""
+                        **Archivo:** {nombre_archivo}
+                        **Tamaño:** {len(pdf_bytes) / 1024:.1f} KB
+                        **Compatible:** Teléfono, Tablet, Computador
+                        **Contenido:** Datos del paciente + Diagnóstico completo
+                        """)
                     else:
-                        st.error("❌ Error al generar PDF")
+                        st.error("❌ Error al generar el PDF")
                 else:
                     st.warning("⚠️ No hay diagnóstico para generar PDF")
     
-    with col3:
-        if st.button("ℹ️ Información", use_container_width=True):
-            st.info("""
-            **Sistema de Conocimiento:**
-            - Base principal ZIP: Fundamentos teóricos
-            - Google Drive: Conocimiento especializado actualizado
-            - Diccionario especializado: Sistemas corporales específicos
-            
-            **Actualización:**
-            - El sistema recarga conocimiento automáticamente
-            - Añade nuevos documentos de Drive al reiniciar
-            - Integra múltiples fuentes de conocimiento
-            """)
+    with col_n3:
+        if st.button("🖨️ Más opciones", use_container_width=True):
+            with st.expander("📋 Opciones adicionales"):
+                st.markdown("""
+                **Opciones de exportación:**
+                - **Imprimir directamente:** Usa Ctrl+P en la página
+                - **Compartir por email:** Adjunta el PDF descargado
+                - **Guardar en la nube:** Sube el PDF a Google Drive, Dropbox, etc.
+                - **Archivar:** Guarda en carpeta de pacientes
+                
+                **Formato del PDF:**
+                - Portada profesional
+                - Datos completos del paciente (incluyendo diagnóstico médico si existe)
+                - Diagnóstico estructurado
+                - Información legal y de confidencialidad
+                """)
 
 # Footer
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Conocimiento Expandido • 
-    Base ZIP + Google Drive + Conocimiento Especializado • 
-    Diagnósticos más precisos y profesionales
+    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • 
+    Conocimiento Especializado Integrado • Diagnóstico Médico Opcional • 
+    Compatible con móvil y computador
     </div>
     """,
     unsafe_allow_html=True
