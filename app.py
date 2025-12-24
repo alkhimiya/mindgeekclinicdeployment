@@ -182,7 +182,7 @@ Vida, comunicación, libertad, espacio vital.
 Problemas respiratorios = Conflictos con el territorio, miedo a la muerte, falta de libertad.
 
 **ESPECIFICIDADES POR SÍNTOMA:**
-- **ASMA:** "Me siente ahogado en mi territorio (hogar, trabajo, familia)"
+- **ASMA:** "Me siento ahogado en mi territorio (hogar, trabajo, familia)"
 - **BRONQUITIS:** Conflictos de territorio con peleas o gritos
 - **RINITIS/ALERGIA:** "El aire que respiro (ambiente) me molesta"
 - **SINUSITIS:** "Alguien cercano me irrita profundamente"
@@ -359,13 +359,12 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         story.append(Paragraph("INFORMACIÓN DEL PACIENTE", estilo_titulo))
         story.append(Spacer(1, 0.25*inch))
         
-        # ============ TABLA BÁSICA CON DOLENCIA EN POSICIÓN CORRECTA ============
         datos_basicos = [
             ["<b>Estado Civil:</b>", datos_paciente['estado_civil']],
             ["<b>Situación Laboral:</b>", datos_paciente['situacion_laboral']],
             ["<b>Tensión Arterial:</b>", datos_paciente['tension']],
-            ["<b>Dolencia/Síntoma Principal:</b>", datos_paciente['dolencia']],  # ← POSICIÓN 4
-            ["<b>Tiempo Padecimiento:</b>", datos_paciente['tiempo_padecimiento']],  # ← POSICIÓN 5
+            ["<b>Dolencia/Síntoma Principal:</b>", datos_paciente['dolencia']],  # ← DOLENCIA AQUÍ (posición 4)
+            ["<b>Tiempo Padecimiento:</b>", datos_paciente['tiempo_padecimiento']],  # ← TIEMPO AQUÍ (posición 5)
             ["<b>Frecuencia:</b>", datos_paciente['frecuencia']],
             ["<b>Intensidad:</b>", f"{datos_paciente['intensidad']}/10"]
         ]
@@ -389,6 +388,11 @@ def generar_pdf_diagnostico(datos_paciente, diagnostico):
         
         story.append(tabla_datos)
         story.append(Spacer(1, 0.3*inch))
+        
+        # SE ELIMINAN ESTAS 3 LÍNEAS QUE MOSTRABAN LA DOLENCIA POR SEPARADO
+        # story.append(Paragraph("DOLENCIA PRINCIPAL", estilo_subtitulo))
+        # story.append(Paragraph(datos_paciente['dolencia'], estilo_cuerpo))
+        # story.append(Spacer(1, 0.2*inch))
         
         if datos_paciente.get('factores_desencadenantes'):
             story.append(Paragraph("FACTORES DESENCADENANTES", estilo_subtitulo))
