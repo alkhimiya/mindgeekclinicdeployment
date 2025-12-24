@@ -537,7 +537,7 @@ with st.sidebar:
     situacion_laboral = st.selectbox("Situación laboral:", ["Empleado", "Desempleado", "Independiente", "Estudiante", "Jubilado", "Otro"])
     tension = st.selectbox("Tensión arterial:", ["Normal", "Hipotensión", "Hipertensión", "No sabe"])
     
-    # CAMBIO ÚNICO: DOLENCIA movida aquí (antes estaba después de "Tiempo de padecimiento")
+    # ÚNICO CAMBIO: DOLENCIA movida aquí (antes estaba después de "Tiempo de padecimiento")
     dolencia = st.text_area("Dolencia o síntoma principal:", 
                            placeholder="Describa su dolencia principal (ej: dolor de cabeza recurrente, ansiedad, problemas digestivos...)", 
                            height=80)
