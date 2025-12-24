@@ -29,6 +29,53 @@ import re  # Importación añadida para limpiar HTML
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 ZIP_URL = "https://github.com/alkhimiya/mindgeekclinicdeployment/raw/refs/heads/main/mindgeekclinic_db.zip"
 
+# ================= NUEVO: CONTADOR DE ACCESOS (ARCHIVO JSON) =================
+COUNTER_FILE = Path("mindgeek_access_counter.json")
+
+def update_access_counter(action="view"):
+    """
+    Actualiza el contador de accesos en un archivo JSON.
+    action: 'view' (acceso a la app) o 'diagnostic' (PDF generado).
+    """
+    try:
+        if COUNTER_FILE.exists():
+            with open(COUNTER_FILE, 'r') as f:
+                data = json.load(f)
+        else:
+            data = {"total_views": 0, "diagnostics_generated": 0, "last_updated": None}
+        
+        if action == "view":
+            data["total_views"] += 1
+        elif action == "diagnostic":
+            data["diagnostics_generated"] += 1
+        
+        data["last_updated"] = datetime.now().isoformat()
+        
+        temp_file = COUNTER_FILE.with_suffix('.tmp')
+        with open(temp_file, 'w') as f:
+            json.dump(data, f, indent=4)
+        temp_file.replace(COUNTER_FILE)
+        
+        return data
+    except Exception as e:
+        return {"total_views": "N/A", "diagnostics_generated": "N/A", "last_updated": None}
+
+def load_counter_data():
+    """Solo carga los datos del contador sin incrementar."""
+    try:
+        if COUNTER_FILE.exists():
+            with open(COUNTER_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {"total_views": 0, "diagnostics_generated": 0, "last_updated": None}
+
+# Contar cada vez que alguien abre la app
+if 'view_counted' not in st.session_state:
+    update_access_counter("view")
+    st.session_state.view_counted = True
+# ===================================================================
+
 # ================= SISTEMA DE CONOCIMIENTO ESPECIALIZADO (NUEVO MÓDULO) =================
 
 CONOCIMIENTO_ESPECIALIZADO = {
@@ -477,7 +524,6 @@ def guardar_paciente(datos):
     """Guarda datos del paciente en session_state."""
     if "pacientes" not in st.session_state:
         st.session_state.pacientes = []
-    
     datos["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     datos["id"] = f"{datos['iniciales']}_{len(st.session_state.pacientes)+1:03d}"
     st.session_state.pacientes.append(datos)
@@ -487,55 +533,44 @@ def guardar_paciente(datos):
 def formulario_diagnostico():
     """Muestra formulario clínico estructurado con diagnóstico médico opcional."""
     st.markdown("### 📋 FORMULARIO DE EVALUACIÓN CLÍNICA ESPECIALIZADA")
-    
     with st.form("formulario_clinico"):
         col1, col2 = st.columns(2)
-        
         with col1:
-            iniciales = st.text_input("📝 **Iniciales del nombre**", max_chars=3, 
-                                     help="Ej: JPG para Juan Pérez García")
+            iniciales = st.text_input("📝 **Iniciales del nombre**", max_chars=3, help="Ej: JPG para Juan Pérez García")
             edad = st.number_input("🎂 **Edad**", min_value=1, max_value=120, value=30)
             estado_civil = st.selectbox(
                 "💍 **Estado civil**",
                 ["Soltero", "Casado", "Divorciado", "Viudo", "Unión libre", "Separado"]
             )
-            
         with col2:
             situacion_laboral = st.selectbox(
                 "💼 **Situación laboral**",
                 ["Empleado", "Desempleado", "Independiente", "Estudiante", "Jubilado", "Incapacitado"]
             )
-            tension_alta = st.number_input("🩺 **Tensión arterial alta (sistólica)**", 
-                                          min_value=50, max_value=250, value=120)
-            tension_baja = st.number_input("🩺 **Tensión arterial baja (diastólica)**",
-                                          min_value=30, max_value=150, value=80)
+            tension_alta = st.number_input("🩺 **Tensión arterial alta (sistólica)**", min_value=50, max_value=250, value=120)
+            tension_baja = st.number_input("🩺 **Tensión arterial baja (diastólica)**", min_value=30, max_value=150, value=80)
         
         st.markdown("---")
         st.markdown("#### ⏳ **TIEMPO DEL PADECIMIENTO**")
-        
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             tiempo_padecimiento = st.selectbox(
                 "¿Desde hace cuánto tiempo siente este padecimiento?",
-                ["Menos de 1 mes", "1-3 meses", "3-6 meses", "6-12 meses", 
-                 "1-2 años", "2-5 años", "Más de 5 años", "Desde la infancia"]
+                ["Menos de 1 mes", "1-3 meses", "3-6 meses", "6-12 meses", "1-2 años", "2-5 años", "Más de 5 años", "Desde la infancia"]
             )
-        
         with col_t2:
             frecuencia = st.selectbox(
                 "¿Con qué frecuencia se presenta?",
-                ["Constante", "Diariamente", "Varias veces por semana", 
-                 "Semanalmente", "Mensualmente", "Ocasionalmente", "Solo en ciertas situaciones"]
+                ["Constante", "Diariamente", "Varias veces por semana", "Semanalmente", "Mensualmente", "Ocasionalmente", "Solo en ciertas situaciones"]
             )
         
         # ===== DIAGNÓSTICO MÉDICO OPCIONAL =====
         st.markdown("---")
         st.markdown("#### 🏥 **INFORMACIÓN MÉDICA (OPCIONAL)**")
-        
         diagnostico_medico = st.text_area(
             "**Diagnóstico médico recibido (si aplica):**",
             height=80,
-            placeholder="""Ejemplo: 
+            placeholder="""Ejemplo:
 - Diagnóstico: Gastritis crónica tipo B
 - Tratamiento: Omeprazol 40mg/día
 - Estudios realizados: Endoscopia digestiva alta
@@ -547,9 +582,7 @@ O déjelo en blanco si no tiene diagnóstico médico formal.""",
         
         st.markdown("---")
         st.markdown("#### 🎯 **EVENTOS EMOCIONALES ASOCIADOS (TRIANGULACIÓN)**")
-        
         st.markdown("**Pregunta clave:** ¿Qué eventos suceden en su vida que impactan emocionalmente CUANDO se presenta el cuadro?")
-        
         eventos_emocionales = st.text_area(
             "Describa los eventos específicos (pasados o presentes) que coinciden con la aparición/worsening de los síntomas:",
             height=150,
@@ -565,7 +598,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
         
         st.markdown("---")
         st.markdown("#### 🤒 **DOLENCIA / SÍNTOMA PRINCIPAL**")
-        
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             dolencia = st.text_area(
@@ -573,7 +605,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
                 height=120,
                 placeholder="Ej: Dolor de cabeza tipo migraña, insomnio, ansiedad, labios quebradizos..."
             )
-        
         with col_s2:
             intensidad = st.slider("Intensidad (1-10)", 1, 10, 5)
             factores_desencadenantes = st.text_area(
@@ -592,8 +623,8 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
         
         st.markdown("---")
         submitted = st.form_submit_button(
-            "🚀 **ANALIZAR CON BIODESCODIFICACIÓN Y TRIANGULACIÓN**", 
-            type="primary", 
+            "🚀 **ANALIZAR CON BIODESCODIFICACIÓN Y TRIANGULACIÓN**",
+            type="primary",
             use_container_width=True
         )
         
@@ -613,7 +644,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
                 "factores_desencadenantes": factores_desencadenantes,
                 "entorno_social": entorno_social
             }
-            
             paciente_id = guardar_paciente(datos_paciente)
             st.session_state.paciente_actual = datos_paciente
             st.session_state.mostrar_diagnostico = True
@@ -622,7 +652,6 @@ Describa la RELACIÓN TEMPORAL entre eventos y síntomas:"""
 # ================= GENERAR DIAGNÓSTICO COMPLETO =================
 def generar_diagnostico_triangulacion(sistema, datos_paciente):
     """Genera diagnóstico completo con triangulación, conocimiento especializado y diagnóstico médico."""
-    
     conocimiento_especializado = buscar_conocimiento_especializado(datos_paciente['dolencia'])
     
     diagnostico_medico_texto = ""
@@ -631,8 +660,7 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
         **DIAGNÓSTICO MÉDICO PREVIO:**
         {datos_paciente['diagnostico_medico']}
         
-        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación, 
-        considerándolo como información valiosa pero analizando desde la perspectiva emocional/simbólica.
+        **INSTRUCCIÓN ESPECÍFICA:** Integrar este diagnóstico médico en el análisis de biodescodificación, considerándolo como información valiosa pero analizando desde la perspectiva emocional/simbólica.
         """
     
     prompt = f"""
@@ -753,7 +781,6 @@ def generar_diagnostico_triangulacion(sistema, datos_paciente):
 # ================= GENERAR GUIÓN DE HIPNOSIS =================
 def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     """Genera guión específico de hipnosis basado en biblioteca."""
-    
     tipo_texto = "para aplicación por terapeuta" if tipo == "terapeuta" else "para grabación de autohipnosis"
     
     prompt = f"""
@@ -765,7 +792,6 @@ def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     - Eventos emocionales: {datos_paciente['eventos_emocionales'][:200]}
     
     **INSTRUCCIONES PARA EL ASISTENTE:**
-    
     Generar un guión COMPLETO de hipnosis {tipo_texto} basado en la biblioteca de modelos de hipnosis.
     
     **REQUISITOS:**
@@ -781,7 +807,6 @@ def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
     [Objetivo específico basado en triangulación]
     
     ### 📝 GUIÓN COMPLETO
-    
     **INDUCCIÓN:**
     [Texto completo de inducción hipnótica]
     
@@ -810,7 +835,6 @@ def generar_guion_hipnosis(sistema, datos_paciente, tipo="terapeuta"):
 @st.cache_resource
 def cargar_sistema_completo():
     """Carga el sistema RAG con biblioteca especializada."""
-    
     if not GROQ_API_KEY:
         st.error("❌ Configura GROQ_API_KEY en Streamlit Secrets.")
         return None
@@ -876,6 +900,29 @@ with st.sidebar:
     if "pacientes" in st.session_state:
         st.metric("Pacientes atendidos", len(st.session_state.pacientes))
     
+    # ================= NUEVO: CONTADOR DE ACCESOS =================
+    st.divider()
+    st.markdown("#### 🌐 Uso de la Herramienta")
+    
+    stats = load_counter_data()
+    
+    col_stat1, col_stat2 = st.columns(2)
+    with col_stat1:
+        st.metric(label="Accesos Totales", value=stats.get("total_views", 0))
+    with col_stat2:
+        st.metric(label="Diagnósticos PDF", value=stats.get("diagnostics_generated", 0))
+    
+    last_update = stats.get("last_updated")
+    if last_update:
+        try:
+            dt = datetime.fromisoformat(last_update)
+            st.caption(f"📅 Última actualización: {dt.strftime('%d/%m/%Y %H:%M')}")
+        except (ValueError, TypeError):
+            pass
+    
+    st.caption("*Contador actualizado automáticamente*")
+    # ==============================================================
+    
     st.markdown("---")
     
     if st.button("🆕 Nuevo Diagnóstico", use_container_width=True, type="primary"):
@@ -914,7 +961,6 @@ if "pdf_generado" not in st.session_state:
 
 # Cargar sistema
 sistema = cargar_sistema_completo()
-
 if not sistema:
     st.error("⚠️ Sistema no disponible. Verifica configuración.")
     st.stop()
@@ -927,7 +973,6 @@ else:
     
     # Mostrar datos del paciente
     st.markdown(f"### 📄 **PACIENTE:** {paciente['iniciales']} • {paciente['edad']} años")
-    
     with st.expander("📋 Ver datos completos con triangulación"):
         col1, col2 = st.columns(2)
         with col1:
@@ -936,7 +981,6 @@ else:
             st.write(f"**Tiempo padecimiento:** {paciente['tiempo_padecimiento']}")
             st.write(f"**Frecuencia:** {paciente['frecuencia']}")
             st.write(f"**Intensidad:** {paciente['intensidad']}/10")
-        
         with col2:
             st.write(f"**Tensión arterial:** {paciente['tension']}")
             st.write(f"**Dolencia:** {paciente['dolencia']}")
@@ -956,7 +1000,6 @@ else:
     # Generar diagnóstico con triangulación
     st.markdown("---")
     st.markdown("### 🔬 **DIAGNÓSTICO CON TRIANGULACIÓN EMOCIONAL**")
-    
     if st.session_state.diagnostico_completo is None:
         with st.spinner("🔄 Analizando patrones evento-síntoma..."):
             diagnostico = generar_diagnostico_triangulacion(sistema, paciente)
@@ -971,7 +1014,6 @@ else:
     
     if not st.session_state.generar_guion and not st.session_state.generar_grabacion:
         col1, col2 = st.columns(2)
-        
         with col1:
             st.markdown("#### 👨‍⚕️ **Para aplicación por terapeuta:**")
             st.info("""
@@ -981,7 +1023,6 @@ else:
             - Duración: 15-20 minutos
             - Frecuencia: 3 veces/semana
             """)
-            
             if st.button("📝 Generar guión COMPLETO para terapeuta", use_container_width=True):
                 st.session_state.generar_guion = True
                 st.rerun()
@@ -995,7 +1036,6 @@ else:
             - Grabación en dispositivo de audio
             - Escuchar 3 veces por semana
             """)
-            
             if st.button("🎤 Generar guión para GRABACIÓN", use_container_width=True):
                 st.session_state.generar_grabacion = True
                 st.rerun()
@@ -1007,10 +1047,10 @@ else:
         with st.spinner("Generando guión basado en biblioteca de modelos..."):
             guion = generar_guion_hipnosis(sistema, paciente, "terapeuta")
             st.markdown(guion)
-            
-            if st.button("↩️ Volver a opciones", use_container_width=True):
-                st.session_state.generar_guion = False
-                st.rerun()
+        
+        if st.button("↩️ Volver a opciones", use_container_width=True):
+            st.session_state.generar_guion = False
+            st.rerun()
     
     if st.session_state.generar_grabacion:
         st.markdown("---")
@@ -1018,28 +1058,27 @@ else:
         with st.spinner("Generando guión para grabación..."):
             guion = generar_guion_hipnosis(sistema, paciente, "grabacion")
             st.markdown(guion)
-            
-            st.markdown("---")
-            st.markdown("#### 📋 **INSTRUCCIONES PARA GRABACIÓN:**")
-            st.success("""
-            1. **Preparación:** Ambiente tranquilo, sin interrupciones
-            2. **Equipo:** Usar micrófono de buena calidad o smartphone
-            3. **Voz:** Hablar lentamente, con tono calmado
-            4. **Pausas:** Dejar espacios para respiración
-            5. **Guardar:** Nombrar archivo claramente (ej: "Autohipnosis_[fecha]")
-            6. **Uso:** Escuchar con auriculares, posición cómoda
-            """)
-            
-            if st.button("↩️ Volver a opciones", use_container_width=True):
-                st.session_state.generar_grabacion = False
-                st.rerun()
+        
+        st.markdown("---")
+        st.markdown("#### 📋 **INSTRUCCIONES PARA GRABACIÓN:**")
+        st.success("""
+        1. **Preparación:** Ambiente tranquilo, sin interrupciones
+        2. **Equipo:** Usar micrófono de buena calidad o smartphone
+        3. **Voz:** Hablar lentamente, con tono calmado
+        4. **Pausas:** Dejar espacios para respiración
+        5. **Guardar:** Nombrar archivo claramente (ej: "Autohipnosis_[fecha]")
+        6. **Uso:** Escuchar con auriculares, posición cómoda
+        """)
+        
+        if st.button("↩️ Volver a opciones", use_container_width=True):
+            st.session_state.generar_grabacion = False
+            st.rerun()
     
     # ===== BOTÓN DE GUARDAR COMO PDF =====
     st.markdown("---")
     st.markdown("### 💾 **GUARDAR DIAGNÓSTICO COMPLETO**")
     
     col_n1, col_n2, col_n3 = st.columns([2, 1, 1])
-    
     with col_n1:
         if st.button("🆕 Realizar NUEVO diagnóstico", use_container_width=True, type="primary"):
             st.session_state.mostrar_diagnostico = False
@@ -1057,20 +1096,21 @@ else:
                         st.session_state.paciente_actual,
                         st.session_state.diagnostico_completo
                     )
-                    
                     if pdf_bytes:
+                        # ========== NUEVO: CONTAR PDF GENERADO ==========
+                        update_access_counter("diagnostic")
+                        # ================================================
+                        
                         st.session_state.pdf_generado = pdf_bytes
                         st.success("✅ PDF generado correctamente")
-                        
                         nombre_archivo = f"Diagnostico_{paciente['iniciales']}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                        
                         st.markdown("---")
                         st.markdown("#### 📥 **Descargar PDF**")
-                        
                         b64 = base64.b64encode(pdf_bytes).decode()
                         href = f'<a href="data:application/pdf;base64,{b64}" download="{nombre_archivo}" target="_blank">'
                         href += '<button style="background-color: #4CAF50; color: white; padding: 14px 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;">📥 Descargar PDF ahora</button>'
                         href += '</a>'
-                        
                         st.markdown(href, unsafe_allow_html=True)
                         
                         st.info(f"""
@@ -1106,9 +1146,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • 
-    Conocimiento Especializado Integrado • Diagnóstico Médico Opcional • 
-    Compatible con móvil y computador
+    🧠 <b>MINDGEEKCLINIC v6.0</b> • Sistema con Triangulación Diagnóstica • Conocimiento Especializado Integrado • Diagnóstico Médico Opcional • Compatible con móvil y computador
     </div>
     """,
     unsafe_allow_html=True
