@@ -45,24 +45,20 @@ st.set_page_config(
 # SECCIÓN 1: CONFIGURACIÓN Y SECRETOS
 # ============================================
 
-# Configuración de la aplicación
-APP_VERSION = "3.0.0"  # Actualizado por panel admin
+APP_VERSION = "3.0.0"
 DATA_FILE = "mindgeekclinic_data.json"
 AFFILIATE_DB_FILE = "affiliates_db.json"
 ACCESS_LOG_FILE = "access_log.json"
-PAYMENT_LOG_FILE = "payment_log.json"  # NUEVO: Log de pagos
+PAYMENT_LOG_FILE = "payment_log.json"
 
-# Configuración de la base de datos Chroma
 CHROMA_DB_PATH = "./chroma_db"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-# Cargar secrets de Streamlit
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 CHROMA_PERSIST_DIRECTORY = st.secrets.get("CHROMA_PERSIST_DIRECTORY", CHROMA_DB_PATH)
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "Enaraure25..")  # NUEVO
-ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "promptandmente@gmail.com")  # NUEVO
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "Enaraure25..")
+ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "promptandmente@gmail.com")
 
-# Configuración SMTP para emails (Fase 2)
 SMTP_CONFIG = {
     "host": st.secrets.get("SMTP_HOST", ""),
     "port": st.secrets.get("SMTP_PORT", 587),
@@ -83,7 +79,6 @@ if 'pacientes_registrados' not in st.session_state:
 if 'access_count' not in st.session_state:
     st.session_state.access_count = 0
 
-# Variables para el sistema de afiliados
 if 'affiliate_code_input' not in st.session_state:
     st.session_state.affiliate_code_input = ""
 if 'current_affiliate' not in st.session_state:
@@ -94,15 +89,16 @@ if 'verification_email' not in st.session_state:
     st.session_state.verification_email = None
 if 'verification_time' not in st.session_state:
     st.session_state.verification_time = None
+if 'verified_email' not in st.session_state:
+    st.session_state.verified_email = None
 
-# NUEVO: Variables para admin
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'admin_session_id' not in st.session_state:
     st.session_state.admin_session_id = None
 
 # ============================================
-# SECCIÓN 3: FUNCIONES DE BASE DE DATOS Y ESTADO
+# SECCIÓN 3: FUNCIONES DE BASE DE DATOS
 # ============================================
 
 def load_data():
@@ -136,18 +132,6 @@ def load_data():
         return initial_data
     except json.JSONDecodeError:
         st.error("Error al leer el archivo de datos. Se creará una nueva base de datos.")
-        initial_data = {
-            "patients": [],
-            "diagnoses": [],
-            "statistics": {
-                "total_accesses": 0,
-                "total_diagnoses": 0,
-                "total_patients": 0,
-                "access_count": 0,
-                "daily_access": {},
-                "monthly_trend": {}
-            }
-        }
         return initial_data
 
 def save_data(data):
@@ -177,7 +161,7 @@ def load_affiliate_db():
             "payout_schedule": "weekly"
         }}
     except json.JSONDecodeError:
-        st.error("Error al leer la base de datos de afiliados. Se usará una estructura vacía.")
+        st.error("Error al leer la base de datos de afiliados.")
         return {"affiliates": [], "settings": {
             "commission_rates": {"therapy": 0.345, "pdf": 0.333, "subscription": 0.316},
             "min_withdrawal": 50.0,
@@ -213,11 +197,10 @@ def save_payment_log(log_data):
         return False
 
 # ============================================
-# SECCIÓN 4: FUNCIONES DE CONTADOR DE ACCESOS
+# SECCIÓN 4: CONTADOR DE ACCESOS
 # ============================================
 
 def load_access_log():
-    """Carga el registro de accesos."""
     try:
         with open(ACCESS_LOG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -225,7 +208,6 @@ def load_access_log():
         return {"accesses": [], "daily_stats": {}}
 
 def save_access_log(log_data):
-    """Guarda el registro de accesos."""
     try:
         with open(ACCESS_LOG_FILE, 'w', encoding='utf-8') as f:
             json.dump(log_data, f, indent=2, ensure_ascii=False)
@@ -233,7 +215,6 @@ def save_access_log(log_data):
         st.error(f"Error al guardar registro de accesos: {str(e)}")
 
 def track_access():
-    """Registra un nuevo acceso a la aplicación."""
     st.session_state.access_count += 1
     st.session_state.page_views += 1
     
@@ -256,11 +237,10 @@ def track_access():
     save_access_log(log_data)
 
 # ============================================
-# SECCIÓN 5: FUNCIONES DE CONOCIMIENTO ESPECIALIZADO
+# SECCIÓN 5: CONOCIMIENTO ESPECIALIZADO
 # ============================================
 
 def get_specialized_knowledge():
-    """Retorna el conocimiento especializado por sistemas corporales."""
     knowledge_base = {
         "ocular": {
             "name": "Sistema Ocular",
@@ -351,7 +331,6 @@ def get_specialized_knowledge():
     return knowledge_base
 
 def get_system_by_symptom(symptom):
-    """Devuelve el sistema corporal más relacionado con un síntoma."""
     symptom_mapping = {
         "ocular": ["visión", "ojo", "ver", "miope", "catarata", "glaucoma", "retina"],
         "dermatologico": ["piel", "dermatitis", "eczema", "acné", "urticaria", "picor", "roncha"],
@@ -368,11 +347,10 @@ def get_system_by_symptom(symptom):
     return "general"
 
 # ============================================
-# SECCIÓN 6: FUNCIONES DE IA Y RAG
+# SECCIÓN 6: IA Y RAG
 # ============================================
 
 def initialize_chroma_db():
-    """Inicializa o carga la base de datos vectorial Chroma."""
     try:
         chroma_client = chromadb.PersistentClient(
             path=CHROMA_PERSIST_DIRECTORY,
@@ -391,7 +369,6 @@ def initialize_chroma_db():
         return None, None
 
 def get_embeddings(texts):
-    """Genera embeddings para los textos usando Sentence Transformers."""
     try:
         model = SentenceTransformer(EMBEDDING_MODEL)
         embeddings = model.encode(texts, show_progress_bar=False)
@@ -401,7 +378,6 @@ def get_embeddings(texts):
         return None
 
 def query_knowledge_base(query, collection, n_results=3):
-    """Consulta la base de conocimiento vectorial."""
     if not collection:
         return []
     
@@ -422,9 +398,8 @@ def query_knowledge_base(query, collection, n_results=3):
         return []
 
 def generate_with_groq(prompt, context=""):
-    """Genera texto usando la API de Groq."""
     if not GROQ_API_KEY:
-        st.warning("API key de Groq no configurada. Usando respuestas predefinidas.")
+        st.warning("API key de Groq no configurada.")
         return "Consulta no disponible: configure la API key de Groq en los secrets."
     
     try:
@@ -457,11 +432,10 @@ def generate_with_groq(prompt, context=""):
         return f"Error al generar respuesta: {str(e)}"
 
 # ============================================
-# SECCIÓN 7: FUNCIONES DE DIAGNÓSTICO Y TRIANGULACIÓN
+# SECCIÓN 7: DIAGNÓSTICO Y TRIANGULACIÓN
 # ============================================
 
 def analyze_emotional_triangulation(symptoms, events, time_period):
-    """Analiza la relación entre eventos emocionales y síntomas."""
     analysis = {
         "correlaciones": [],
         "conflictos_detectados": [],
@@ -512,7 +486,6 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
     return analysis
 
 def generate_diagnosis_report(patient_data, triangulation_analysis):
-    """Genera un reporte de diagnóstico profesional."""
     report = f"""
     # 📋 INFORME DE BIODESCODIFICACIÓN
     
@@ -601,7 +574,7 @@ def generate_hypnosis_protocol(system, conflict_type):
             
             ## Visualización Guiada
             "Imagina que tus ojos son ventanas hacia tu alma...
-            Visualiza una luz suca que limpia cada capa de tensión...
+            Visualiza una luz suave que limpia cada capa de tensión...
             Permite que tu visión interna se aclare..."
             
             ## Sugestiones Post-Hipnóticas
@@ -863,7 +836,7 @@ def backup_data():
         return False
 
 # ============================================
-# SECCIÓN 11: SISTEMA DE AFILIADOS (KYC)
+# SECCIÓN 11: SISTEMA DE AFILIADOS (KYC) - CORREGIDO
 # ============================================
 
 COUNTRIES_LIST = [
@@ -919,8 +892,14 @@ def verify_email_code(input_code):
         return False, "El código ha expirado (válido por 10 minutos)"
     
     if input_code == st.session_state['verification_code']:
+        # Guardar email verificado
+        st.session_state['verified_email'] = st.session_state['verification_email']
+        
+        # Limpiar estado temporal
         st.session_state['verification_code'] = None
         st.session_state['verification_time'] = None
+        st.session_state['verification_email'] = None
+        
         return True, "¡Email verificado correctamente!"
     else:
         return False, "Código incorrecto. Intenta nuevamente."
@@ -1067,8 +1046,6 @@ def calculate_affiliate_metrics(affiliate):
 def send_admin_notification(subject, message):
     """Envía una notificación por email al administrador."""
     try:
-        # En producción, usarías SMTP real
-        # Por ahora solo registramos en logs
         log_payment_activity({
             "type": "admin_notification",
             "subject": subject,
@@ -1093,7 +1070,6 @@ def log_payment_activity(activity_data):
         
         log_data["activities"].append(activity_data)
         
-        # Mantener solo últimas 500 actividades
         if len(log_data["activities"]) > 500:
             log_data["activities"] = log_data["activities"][-500:]
         
@@ -1108,15 +1084,12 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
     try:
         db = load_affiliate_db()
         
-        # Encontrar el afiliado
         for affiliate in db['affiliates']:
             if affiliate['id'] == affiliate_id:
-                # Actualizar balances
                 affiliate['balance'] += affiliate['pending_payout']
                 affiliate['pending_payout'] = 0.0
                 affiliate['last_payout_date'] = datetime.now().isoformat()
                 
-                # Registrar pago en historial
                 payment_data = {
                     "id": str(uuid.uuid4()),
                     "affiliate_id": affiliate_id,
@@ -1129,28 +1102,23 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
                     "processed_by": "admin"
                 }
                 
-                # Guardar en base de datos de afiliados
                 if "payment_history" not in affiliate:
                     affiliate["payment_history"] = []
                 affiliate["payment_history"].append(payment_data)
                 
-                # Guardar cambios
                 save_affiliate_db(db)
                 
-                # Registrar en log de pagos
                 log_data = load_payment_log()
                 if "payments" not in log_data:
                     log_data["payments"] = []
                 
                 log_data["payments"].append(payment_data)
                 
-                # Actualizar resumen
                 log_data["summary"]["total_paid"] = log_data["summary"].get("total_paid", 0) + amount
                 log_data["summary"]["payments_count"] = log_data["summary"].get("payments_count", 0) + 1
                 
                 save_payment_log(log_data)
                 
-                # Enviar notificación al administrador
                 notification_subject = f"Pago procesado - {affiliate['full_name']}"
                 notification_message = f"""
                 Se ha procesado un pago a un afiliado:
@@ -1169,7 +1137,6 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
                 
                 send_admin_notification(notification_subject, notification_message)
                 
-                # Registrar actividad
                 log_payment_activity({
                     "type": "payment_processed",
                     "affiliate_id": affiliate_id,
@@ -1187,12 +1154,11 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
         return False
 
 # ============================================
-# SECCIÓN 13: PANEL DE ADMINISTRACIÓN - NUEVO
+# SECCIÓN 13: PANEL DE ADMINISTRACIÓN
 # ============================================
 
 def check_admin_access():
     """Verifica si el usuario tiene acceso de administrador."""
-    # Verificar parámetro en URL
     query_params = st.query_params
     url_password = query_params.get("admin", [""])[0]
     
@@ -1201,7 +1167,6 @@ def check_admin_access():
         st.session_state.admin_session_id = str(uuid.uuid4())[:8]
         return True
     
-    # Verificar sesión activa
     if st.session_state.admin_logged_in:
         return True
     
@@ -1216,7 +1181,6 @@ def show_admin_panel():
     st.title("👑 Panel de Administración - MINDGEEKCLINIC")
     st.success(f"Sesión activa: {st.session_state.admin_session_id}")
     
-    # Pestañas principales
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "💰 Pagos Pendientes", 
         "👥 Todos los Afiliados", 
@@ -1270,17 +1234,14 @@ def show_pending_payments():
     
     db = load_affiliate_db()
     
-    # Filtrar afiliados con pending_payout > 0
     pending_affiliates = [
         aff for aff in db['affiliates'] 
         if aff['pending_payout'] > 0
     ]
     
-    # Calcular totales
     total_pending = sum(aff['pending_payout'] for aff in pending_affiliates)
     eligible_for_payout = [aff for aff in pending_affiliates if aff['pending_payout'] >= 50]
     
-    # Métricas
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("💰 Total a Pagar", f"${total_pending:.2f} USD")
@@ -1295,13 +1256,10 @@ def show_pending_payments():
         st.info("🎉 No hay pagos pendientes actualmente.")
         return
     
-    # Tabla de pagos pendientes
     st.subheader("📋 Lista de Pagos Pendientes")
     
-    # Ordenar por monto descendente
     pending_affiliates.sort(key=lambda x: x['pending_payout'], reverse=True)
     
-    # Mostrar tabla
     for i, affiliate in enumerate(pending_affiliates):
         with st.container():
             col1, col2, col3, col4 = st.columns([3, 2, 2, 3])
@@ -1323,7 +1281,6 @@ def show_pending_payments():
                 st.caption(eligibility)
             
             with col4:
-                # Formulario para marcar como pagado
                 with st.form(key=f"pay_form_{affiliate['id']}"):
                     tx_hash = st.text_input(
                         "TX Hash Binance", 
@@ -1360,7 +1317,6 @@ def show_all_affiliates():
         st.info("No hay afiliados registrados aún.")
         return
     
-    # Filtros
     col1, col2, col3 = st.columns(3)
     with col1:
         search_term = st.text_input("🔍 Buscar por nombre o email")
@@ -1369,7 +1325,6 @@ def show_all_affiliates():
     with col3:
         status_filter = st.selectbox("Filtrar por estado", ["Todos", "active", "suspended", "pending"])
     
-    # Aplicar filtros
     filtered_affiliates = db['affiliates']
     
     if search_term:
@@ -1391,7 +1346,6 @@ def show_all_affiliates():
             if aff['status'] == status_filter
         ]
     
-    # Métricas
     total_affiliates = len(db['affiliates'])
     active_affiliates = len([aff for aff in db['affiliates'] if aff['status'] == 'active'])
     total_commissions = sum(aff['total_earned'] for aff in db['affiliates'])
@@ -1406,10 +1360,8 @@ def show_all_affiliates():
     
     st.markdown("---")
     
-    # Tabla de afiliados
     st.subheader(f"📊 Lista de Afiliados ({len(filtered_affiliates)})")
     
-    # Crear DataFrame para mejor visualización
     affiliate_data = []
     for aff in filtered_affiliates:
         join_date = datetime.fromisoformat(aff['join_date']).strftime('%d/%m/%Y')
@@ -1448,7 +1400,6 @@ def show_all_affiliates():
             use_container_width=True
         )
         
-        # Botón de exportación
         col1, col2 = st.columns([4, 1])
         with col2:
             if st.button("📤 Exportar a CSV", use_container_width=True):
@@ -1470,7 +1421,6 @@ def show_admin_reports():
     db = load_affiliate_db()
     payment_log = load_payment_log()
     
-    # Métricas principales
     col1, col2, col3, col4 = st.columns(4)
     
     total_affiliates = len(db['affiliates'])
@@ -1489,10 +1439,8 @@ def show_admin_reports():
     
     st.markdown("---")
     
-    # Gráfico de comisiones por mes (simulado)
     st.subheader("📈 Comisiones por Mes")
     
-    # Datos simulados para el gráfico
     months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
     commissions = np.random.uniform(500, 5000, 6)
     
@@ -1507,7 +1455,6 @@ def show_admin_reports():
     
     st.plotly_chart(fig, use_container_width=True)
     
-    # Top 10 afiliados
     st.subheader("🏆 Top 10 Afiliados")
     
     top_affiliates = sorted(
@@ -1535,7 +1482,6 @@ def show_admin_reports():
         df_top = pd.DataFrame(top_data)
         st.dataframe(df_top, hide_index=True, use_container_width=True)
     
-    # Reporte de actividades recientes
     st.subheader("📋 Actividades Recientes")
     
     payment_log = load_payment_log()
@@ -1568,18 +1514,15 @@ def show_payment_history():
         st.info("No hay historial de pagos aún.")
         return
     
-    # Filtros
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.date_input("Fecha inicio", value=datetime.now() - timedelta(days=30))
     with col2:
         end_date = st.date_input("Fecha fin", value=datetime.now())
     
-    # Convertir fechas
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
     
-    # Filtrar pagos por fecha
     filtered_payments = []
     for payment in payments:
         try:
@@ -1591,7 +1534,6 @@ def show_payment_history():
     
     st.metric("Pagos en período", len(filtered_payments))
     
-    # Tabla de pagos
     if filtered_payments:
         payment_data = []
         for payment in filtered_payments:
@@ -1609,7 +1551,6 @@ def show_payment_history():
         df_payments = pd.DataFrame(payment_data)
         st.dataframe(df_payments, hide_index=True, use_container_width=True)
         
-        # Exportar a CSV
         csv_data = df_payments.to_csv(index=False)
         st.download_button(
             label="📥 Descargar Historial (CSV)",
@@ -1619,7 +1560,6 @@ def show_payment_history():
             use_container_width=True
         )
         
-        # Resumen
         st.subheader("📊 Resumen del Período")
         col1, col2, col3 = st.columns(3)
         
@@ -1700,16 +1640,13 @@ def show_admin_settings():
         )
         
         if st.form_submit_button("💾 Guardar Configuración", use_container_width=True):
-            # Actualizar comisiones
             settings['commission_rates']['therapy'] = therapy_rate / 100
             settings['commission_rates']['pdf'] = pdf_rate / 100
             settings['commission_rates']['subscription'] = subscription_rate / 100
             
-            # Actualizar otros settings
             settings['min_withdrawal'] = min_withdrawal
             settings['payout_schedule'] = payout_schedule
             
-            # Guardar cambios
             db['settings'] = settings
             if save_affiliate_db(db):
                 st.success("✅ Configuración guardada exitosamente")
@@ -1718,7 +1655,6 @@ def show_admin_settings():
     
     st.markdown("---")
     
-    # Herramientas de administración
     st.subheader("🛠️ Herramientas de Administración")
     
     col1, col2 = st.columns(2)
@@ -1774,7 +1710,6 @@ def show_affiliate_details(affiliate_id):
     
     st.markdown("---")
     
-    # Métricas
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -1786,11 +1721,10 @@ def show_affiliate_details(affiliate_id):
     with col4:
         st.metric("Pendiente", f"${affiliate['pending_payout']:.2f}")
     
-    # Historial de ventas
     if affiliate.get('sales'):
         st.subheader("💼 Historial de Ventas")
         
-        sales_df = pd.DataFrame(affiliate['sales'][-20:])  # Últimas 20 ventas
+        sales_df = pd.DataFrame(affiliate['sales'][-20:])
         if not sales_df.empty:
             sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y %H:%M')
             sales_df['amount_usd'] = sales_df['amount_usd'].apply(lambda x: f"${x:.2f}")
@@ -1809,7 +1743,6 @@ def show_affiliate_details(affiliate_id):
                 use_container_width=True
             )
     
-    # Historial de pagos
     if affiliate.get('payment_history'):
         st.subheader("💰 Historial de Pagos")
         
@@ -1835,13 +1768,9 @@ def show_affiliate_details(affiliate_id):
 # ============================================
 
 def main():
-    # Registrar acceso
     track_access()
-    
-    # Cargar datos
     data = load_data()
     
-    # Título principal
     st.markdown("""
     <style>
     .main-header {
@@ -1862,12 +1791,10 @@ def main():
     st.markdown('<h1 class="main-header">🧠 MINDGEEKCLINIC</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Plataforma Profesional de Biodescodificación con IA</p>', unsafe_allow_html=True)
     
-    # Sidebar con navegación
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/000000/brain.png", width=80)
         st.title("Navegación")
         
-        # Opciones de navegación principales
         menu_option = st.radio(
             "Selecciona una sección:",
             ["🏠 Inicio", "📝 Nuevo Diagnóstico", "🔍 Consultar IA", "📊 Estadísticas", "💾 Backup"],
@@ -1876,7 +1803,6 @@ def main():
         
         st.markdown("---")
         
-        # Sección de afiliados
         st.subheader("👥 Programa de Afiliados")
         
         affiliate_menu = st.radio(
@@ -1884,7 +1810,6 @@ def main():
             ["📋 Registrarse como Afiliado", "📊 Dashboard de Afiliado"]
         )
         
-        # Detectar código de afiliado en la URL
         query_params = st.query_params
         detected_affiliate_code = query_params.get("affiliate", [""])[0]
         
@@ -1899,14 +1824,12 @@ def main():
         
         st.markdown("---")
         
-        # NUEVO: Acceso al panel de administración (oculto hasta que se acceda)
         if check_admin_access():
             st.subheader("👑 Administración")
             if st.button("📊 Panel de Admin", use_container_width=True):
                 st.query_params = {"admin": ADMIN_PASSWORD}
                 st.rerun()
         else:
-            # Botón pequeño para acceder al admin
             with st.expander("🔐 Acceso Admin"):
                 admin_pass = st.text_input("Contraseña", type="password")
                 if st.button("Acceder", use_container_width=True):
@@ -1920,23 +1843,16 @@ def main():
         
         st.markdown("---")
         
-        # Información de la aplicación
         st.caption(f"Versión {APP_VERSION}")
         st.caption(f"Accesos hoy: {random.randint(10, 50)}")
         
         if st.button("🔄 Actualizar", use_container_width=True):
             st.rerun()
     
-    # ============================================
-    # CONTENIDO PRINCIPAL BASADO EN SELECCIÓN
-    # ============================================
-    
-    # Verificar si se accedió al panel admin desde URL
     if check_admin_access() and st.query_params.get("admin", [""])[0] == ADMIN_PASSWORD:
         show_admin_panel()
         return
     
-    # Lógica para mostrar contenido basado en el menú principal
     if menu_option == "🏠 Inicio":
         show_homepage()
     elif menu_option == "📝 Nuevo Diagnóstico":
@@ -1948,7 +1864,6 @@ def main():
     elif menu_option == "💾 Backup":
         show_backup_page()
     
-    # Lógica para mostrar contenido de afiliados
     if affiliate_menu == "📋 Registrarse como Afiliado":
         show_affiliate_registration()
     elif affiliate_menu == "📊 Dashboard de Afiliado":
@@ -2017,7 +1932,6 @@ def show_homepage():
     
     st.markdown("---")
     
-    # Llamada a la acción
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -2056,7 +1970,6 @@ def show_diagnosis_form(data):
         
         st.markdown("---")
         
-        # Campo de código de afiliado
         col_aff1, col_aff2 = st.columns([3, 1])
         with col_aff1:
             query_params = st.query_params
@@ -2087,7 +2000,6 @@ def show_diagnosis_form(data):
         
         st.markdown("---")
         
-        # Eventos emocionales
         st.subheader("🎭 Eventos Emocionales Relevantes")
         eventos = st.text_area(
             "Describe eventos significativos alrededor del inicio de los síntomas*",
@@ -2095,7 +2007,6 @@ def show_diagnosis_form(data):
             height=100
         )
         
-        # Síntomas específicos
         st.subheader("🔍 Síntomas Específicos")
         sintomas = st.text_area(
             "Lista todos los síntomas (separados por comas)*",
@@ -2103,7 +2014,6 @@ def show_diagnosis_form(data):
             height=100
         )
         
-        # Información adicional
         with st.expander("📋 Información Adicional (opcional)"):
             antecedentes = st.text_area("Antecedentes familiares relevantes")
             tratamientos_previos = st.text_area("Tratamientos previos intentados")
@@ -2116,7 +2026,6 @@ def show_diagnosis_form(data):
                 st.error("Por favor, completa todos los campos obligatorios (*)")
             else:
                 with st.spinner("Analizando triangulación emocional..."):
-                    # Crear datos del paciente
                     patient_data = {
                         "id": str(uuid.uuid4()),
                         "nombre": nombre,
@@ -2135,7 +2044,6 @@ def show_diagnosis_form(data):
                         "affiliate_code": affiliate_code if affiliate_code else None
                     }
                     
-                    # Registrar afiliado si hay código válido
                     if affiliate_code:
                         affiliate = get_affiliate_by_code(affiliate_code)
                         if affiliate:
@@ -2146,26 +2054,16 @@ def show_diagnosis_form(data):
                             save_affiliate_db(db)
                             st.success(f"✅ Referido registrado para afiliado: {affiliate_code}")
                     
-                    # Analizar triangulación
                     triangulation = analyze_emotional_triangulation(sintomas, eventos, tiempo)
-                    
-                    # Generar diagnóstico
                     diagnosis = generate_diagnosis_report(patient_data, triangulation)
-                    
-                    # Obtener sistema principal afectado
                     main_system = get_system_by_symptom(dolencia)
-                    
-                    # Generar protocolo de hipnosis
                     protocol = generate_hypnosis_protocol(main_system, "conflicto_visual")
                     
-                    # Mostrar resultados
                     st.success("✅ Diagnóstico generado exitosamente!")
                     
-                    # Actualizar estadísticas
                     st.session_state.diagnosticos_realizados += 1
                     st.session_state.pacientes_registrados += 1
                     
-                    # Guardar en base de datos
                     data["patients"].append(patient_data)
                     data["diagnoses"].append({
                         "patient_id": patient_data["id"],
@@ -2176,7 +2074,6 @@ def show_diagnosis_form(data):
                     
                     save_data(data)
                     
-                    # Mostrar resultados en pestañas
                     tab1, tab2, tab3, tab4 = st.tabs(["📋 Diagnóstico", "🧠 Protocolo", "🧘 Autohipnosis", "📄 PDF"])
                     
                     with tab1:
@@ -2400,11 +2297,11 @@ def show_backup_page():
                 st.success(f"Datos exportados en formato {export_format}")
 
 # ============================================
-# SECCIÓN 16: INTERFACES DEL SISTEMA DE AFILIADOS
+# SECCIÓN 16: INTERFACES DEL SISTEMA DE AFILIADOS - CORREGIDO
 # ============================================
 
 def show_affiliate_registration():
-    """Muestra el formulario de registro de afiliados."""
+    """Muestra el formulario de registro de afiliados - CORREGIDO."""
     st.subheader("👥 Registro en el Programa de Afiliados")
     st.markdown("""
     Únete como afiliado de **MINDGEEKCLINIC** y gana comisiones recomendando nuestros servicios.
@@ -2412,89 +2309,129 @@ def show_affiliate_registration():
     **Retiro mínimo:** $50 USD semanales vía Binance.
     """)
     
+    # ============================================
+    # SECCIÓN 1: VERIFICACIÓN DE EMAIL (FUERA DEL FORM)
+    # ============================================
+    
+    st.markdown("### 📧 Verificación de Email")
+    
+    col_verify1, col_verify2 = st.columns([2, 1])
+    
+    with col_verify1:
+        email_for_verification = st.text_input("Email para verificación", 
+                                              key="email_verify_input",
+                                              placeholder="Ingresa tu email primero")
+    
+    with col_verify2:
+        st.markdown("###")
+        if st.button("📨 Enviar código de verificación", 
+                    key="send_code_btn",
+                    use_container_width=True):
+            if email_for_verification:
+                verification_code = send_verification_code(email_for_verification)
+                st.success(f"Código enviado a {email_for_verification}")
+                st.info(f"**DEMO:** Tu código es: `{verification_code}`")
+                st.rerun()
+            else:
+                st.error("Primero ingresa un email")
+    
+    # Si hay código pendiente, mostrar campo para ingresarlo
+    if 'verification_code' in st.session_state and st.session_state['verification_code']:
+        st.info(f"Código pendiente para: {st.session_state.get('verification_email', '')}")
+        
+        verification_input = st.text_input("Ingresa el código de 6 dígitos", 
+                                         max_chars=6,
+                                         key="code_input",
+                                         help="Revisa tu email (en demo, código aparece arriba)")
+        
+        if verification_input:
+            verified, message = verify_email_code(verification_input)
+            if verified:
+                st.success(message)
+                st.session_state['verified_email'] = st.session_state.get('verification_email', '')
+            else:
+                st.error(message)
+        
+        st.warning(f"**DEMO:** Código actual: `{st.session_state['verification_code']}`")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 2: FORMULARIO PRINCIPAL DE REGISTRO
+    # ============================================
+    
     with st.form("affiliate_registration_form"):
         st.markdown("### 📝 Información Personal (KYC)")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            full_name = st.text_input("Nombre completo*")
-            email = st.text_input("Email*", help="Se enviará un código de verificación")
-            id_number = st.text_input("Número de identificación*", help="DNI, cédula, pasaporte, etc.")
+            full_name = st.text_input("Nombre completo*", key="full_name")
+            email = st.text_input("Email*", 
+                                value=st.session_state.get('verified_email', ''),
+                                disabled=bool(st.session_state.get('verified_email')),
+                                help="Se enviará un código de verificación")
+            id_number = st.text_input("Número de identificación*", key="id_number")
         
         with col2:
-            country = st.selectbox("País*", COUNTRIES_LIST)
-            phone = st.text_input("Teléfono*", help="Incluir código de país")
+            country = st.selectbox("País*", COUNTRIES_LIST, key="country")
+            phone = st.text_input("Teléfono*", key="phone")
             binance_wallet = st.text_input("Wallet de Binance (USDT)*", 
+                                         key="binance_wallet",
                                          help="Dirección donde recibirás pagos")
         
+        # Validación de wallet
+        wallet_valid = False
         if binance_wallet:
             if validate_binance_wallet(binance_wallet):
                 st.success("✅ Formato de wallet válido")
+                wallet_valid = True
             else:
                 st.warning("⚠️ El formato no coincide con direcciones comunes de Binance. Verifica.")
-        
-        st.markdown("---")
-        st.markdown("### 📧 Verificación de Email")
-        
-        email_verified = False
-        
-        if 'verification_code' in st.session_state and st.session_state['verification_code']:
-            st.info(f"Código enviado a: {st.session_state.get('verification_email', '')}")
-            
-            verification_input = st.text_input("Ingresa el código de 6 dígitos*", 
-                                             max_chars=6,
-                                             help="Revisa tu email (en esta demo, el código aparece abajo)")
-            
-            if verification_input:
-                verified, message = verify_email_code(verification_input)
-                if verified:
-                    st.success(message)
-                    email_verified = True
-                else:
-                    st.error(message)
-            
-            st.warning(f"**DEMO:** Para propósitos de prueba, tu código es: `{st.session_state['verification_code']}`")
-            
-            if st.button("🔄 Reenviar código"):
-                if email:
-                    new_code = send_verification_code(email)
-                    st.success(f"Nuevo código enviado a {email}")
-                    st.info(f"**DEMO:** Nuevo código: `{new_code}`")
-                else:
-                    st.error("Primero ingresa un email")
-        else:
-            if email and st.button("📨 Enviar código de verificación"):
-                verification_code = send_verification_code(email)
-                st.success(f"Código de verificación enviado a {email}")
-                st.info(f"**DEMO:** Tu código es: `{verification_code}`")
-                st.rerun()
+                wallet_valid = False
         
         st.markdown("---")
         
+        # Términos y condiciones
         st.markdown("### ✅ Términos y Condiciones")
         
         col_terms1, col_terms2 = st.columns(2)
         
         with col_terms1:
-            accept_terms = st.checkbox("Acepto los términos y condiciones*")
-            accept_privacy = st.checkbox("Acepto la política de privacidad*")
+            accept_terms = st.checkbox("Acepto los términos y condiciones*", key="accept_terms")
+            accept_privacy = st.checkbox("Acepto la política de privacidad*", key="accept_privacy")
         
         with col_terms2:
-            confirm_kyc = st.checkbox("Confirmo que la información es verídica*")
-            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*")
+            confirm_kyc = st.checkbox("Confirmo que la información es verídica*", key="confirm_kyc")
+            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*", key="accept_payments")
         
-        submitted = st.form_submit_button("🚀 Registrar como Afiliado", use_container_width=True)
+        # ============================================
+        # BOTÓN DE SUBMIT CORREGIDO
+        # ============================================
+        submitted = st.form_submit_button("🚀 Registrar como Afiliado", 
+                                         use_container_width=True,
+                                         type="primary")
         
+        # Validación después del submit
         if submitted:
+            # Verificar email verificado
+            email_verified = bool(st.session_state.get('verified_email'))
+            if not email_verified:
+                st.error("❌ Debes verificar tu email antes de registrar. Usa la sección de verificación arriba.")
+                return
+            
+            # Verificar que el email del formulario coincida con el verificado
+            if email != st.session_state.get('verified_email', ''):
+                st.error("❌ El email debe coincidir con el email verificado")
+                return
+            
+            # Validar otros campos
             if not all([full_name, email, id_number, country, phone, binance_wallet]):
                 st.error("Por favor, completa todos los campos obligatorios (*)")
-            elif not validate_binance_wallet(binance_wallet):
+            elif not wallet_valid:
                 st.error("Por favor, ingresa una dirección de Binance válida")
             elif not all([accept_terms, accept_privacy, confirm_kyc, accept_payments]):
                 st.error("Debes aceptar todos los términos y condiciones")
-            elif not email_verified and 'verification_code' in st.session_state:
-                st.error("Debes verificar tu email antes de registrar")
             else:
                 with st.spinner("Registrando afiliado..."):
                     affiliate_data = {
@@ -2512,12 +2449,18 @@ def show_affiliate_registration():
                         st.balloons()
                         st.success(message)
                         
+                        # Limpiar estado de verificación
+                        if 'verified_email' in st.session_state:
+                            del st.session_state['verified_email']
+                        if 'verification_code' in st.session_state:
+                            del st.session_state['verification_code']
+                        
                         st.markdown("""
                         ### 🎉 ¡Registro Exitoso!
                         
                         **Próximos pasos:**
-                        1. **Guarda tu código de afiliado** (también llegará por email)
-                        2. **Comparte tu link:** `https://tudominio.com/?affiliate=TU-CODIGO`
+                        1. **Guarda tu código de afiliado** (aparece arriba)
+                        2. **Comparte tu link:** `https://tu-app.streamlit.app/?affiliate=TU-CODIGO`
                         3. **Monitorea** tu dashboard para ver referidos y comisiones
                         4. **Retira** tus ganancias cada jueves (mínimo $50 USD)
                         
@@ -2684,7 +2627,7 @@ def show_affiliate_dashboard():
     col_act1, col_act2, col_act3 = st.columns(3)
     
     with col_act1:
-        if st.button("🔄 Actualizar Datos", use_container_width=True):
+        if st.button("🔄 Actualizar Datas", use_container_width=True):
             st.rerun()
     
     with col_act2:
