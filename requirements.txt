@@ -1,40 +1,11 @@
-# ============================================
-# DEPENDENCIAS PRINCIPALES DE MINDGEEKCLINIC
-# ============================================
-
-# Framework principal
 streamlit>=1.28.0
-
-# Manipulación de datos
 pandas>=2.0.0
 numpy>=1.24.0
-
-# Visualizaciones y gráficos
 plotly>=5.17.0
-
-# Generación de PDFs
 reportlab>=4.0.0
-
-# IA y procesamiento de lenguaje
 groq>=0.3.0
-sentence-transformers>=2.2.0
-
-# Base de datos vectorial
+sentence-transformers>=2.2.2
 chromadb>=0.4.15
-
-# Utilidades generales
-python-dotenv>=1.0.0
-pyyaml>=6.0
-
-# ============================================
-# DEPENDENCIAS DE SISTEMA (manejadas por Streamlit Cloud)
-# ============================================
-
-# Estas son manejadas automáticamente por Streamlit Cloud
-# No necesitas agregarlas manualmente
-
-# ============================================
-# VERSIÓN DE PYTHON
-# ============================================
-
-python_version >= "3.9"
+pypdf>=3.17.0
+typing-extensions>=4.8.0
+protobuf==3.20.3
