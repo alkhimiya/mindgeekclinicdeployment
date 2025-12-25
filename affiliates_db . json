@@ -1,0 +1,12 @@
+{
+  "affiliates": [],
+  "settings": {
+    "commission_rates": {
+      "therapy": 0.345,
+      "pdf": 0.333,
+      "subscription": 0.316
+    },
+    "min_withdrawal": 50.0,
+    "payout_schedule": "weekly"
+  }
+}
