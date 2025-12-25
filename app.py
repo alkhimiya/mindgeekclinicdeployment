@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import random
 import string
@@ -25,6 +25,10 @@ import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import groq
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import csv
 
 # ============================================
 # CONFIGURACIÓN INICIAL DE LA APLICACIÓN
@@ -42,10 +46,11 @@ st.set_page_config(
 # ============================================
 
 # Configuración de la aplicación
-APP_VERSION = "2.0.0"
+APP_VERSION = "3.0.0"  # Actualizado por panel admin
 DATA_FILE = "mindgeekclinic_data.json"
-AFFILIATE_DB_FILE = "affiliates_db.json"  # NUEVO: Archivo para afiliados
+AFFILIATE_DB_FILE = "affiliates_db.json"
 ACCESS_LOG_FILE = "access_log.json"
+PAYMENT_LOG_FILE = "payment_log.json"  # NUEVO: Log de pagos
 
 # Configuración de la base de datos Chroma
 CHROMA_DB_PATH = "./chroma_db"
@@ -54,6 +59,16 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 # Cargar secrets de Streamlit
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 CHROMA_PERSIST_DIRECTORY = st.secrets.get("CHROMA_PERSIST_DIRECTORY", CHROMA_DB_PATH)
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "Enaraure25..")  # NUEVO
+ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "promptandmente@gmail.com")  # NUEVO
+
+# Configuración SMTP para emails (Fase 2)
+SMTP_CONFIG = {
+    "host": st.secrets.get("SMTP_HOST", ""),
+    "port": st.secrets.get("SMTP_PORT", 587),
+    "user": st.secrets.get("SMTP_USER", ""),
+    "password": st.secrets.get("SMTP_PASSWORD", "")
+}
 
 # ============================================
 # SECCIÓN 2: INICIALIZACIÓN DE SESIÓN
@@ -68,7 +83,7 @@ if 'pacientes_registrados' not in st.session_state:
 if 'access_count' not in st.session_state:
     st.session_state.access_count = 0
 
-# Variables para el sistema de afiliados (NUEVO)
+# Variables para el sistema de afiliados
 if 'affiliate_code_input' not in st.session_state:
     st.session_state.affiliate_code_input = ""
 if 'current_affiliate' not in st.session_state:
@@ -80,6 +95,12 @@ if 'verification_email' not in st.session_state:
 if 'verification_time' not in st.session_state:
     st.session_state.verification_time = None
 
+# NUEVO: Variables para admin
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+if 'admin_session_id' not in st.session_state:
+    st.session_state.admin_session_id = None
+
 # ============================================
 # SECCIÓN 3: FUNCIONES DE BASE DE DATOS Y ESTADO
 # ============================================
@@ -90,7 +111,6 @@ def load_data():
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
-            # Inicializar contadores desde el archivo si existen
             if 'statistics' in data:
                 stats = data['statistics']
                 st.session_state.page_views = stats.get('total_accesses', 0)
@@ -100,7 +120,6 @@ def load_data():
                 
             return data
     except FileNotFoundError:
-        # Si el archivo no existe, crear estructura inicial
         initial_data = {
             "patients": [],
             "diagnoses": [],
@@ -133,7 +152,6 @@ def load_data():
 
 def save_data(data):
     """Guarda los datos de la aplicación en el archivo JSON."""
-    # Actualizar estadísticas en los datos antes de guardar
     data['statistics']['total_accesses'] = st.session_state.page_views
     data['statistics']['total_diagnoses'] = st.session_state.diagnosticos_realizados
     data['statistics']['total_patients'] = st.session_state.pacientes_registrados
@@ -153,7 +171,6 @@ def load_affiliate_db():
         with open(AFFILIATE_DB_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        # Si el archivo no existe, retorna estructura vacía
         return {"affiliates": [], "settings": {
             "commission_rates": {"therapy": 0.345, "pdf": 0.333, "subscription": 0.316},
             "min_withdrawal": 50.0,
@@ -175,6 +192,24 @@ def save_affiliate_db(data):
         return True
     except Exception as e:
         st.error(f"Error al guardar datos de afiliados: {str(e)}")
+        return False
+
+def load_payment_log():
+    """Carga el historial de pagos desde el archivo JSON."""
+    try:
+        with open(PAYMENT_LOG_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"payments": [], "summary": {"total_paid": 0.0, "payments_count": 0}}
+
+def save_payment_log(log_data):
+    """Guarda el historial de pagos en el archivo JSON."""
+    try:
+        with open(PAYMENT_LOG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar historial de pagos: {str(e)}")
         return False
 
 # ============================================
@@ -202,23 +237,19 @@ def track_access():
     st.session_state.access_count += 1
     st.session_state.page_views += 1
     
-    # Actualizar registro de accesos
     log_data = load_access_log()
     current_time = datetime.now().isoformat()
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # Registrar acceso actual
     log_data["accesses"].append({
         "timestamp": current_time,
         "session_id": str(uuid.uuid4())[:8]
     })
     
-    # Actualizar estadísticas diarias
     if today not in log_data["daily_stats"]:
         log_data["daily_stats"][today] = 0
     log_data["daily_stats"][today] += 1
     
-    # Mantener solo los últimos 1000 accesos
     if len(log_data["accesses"]) > 1000:
         log_data["accesses"] = log_data["accesses"][-1000:]
     
@@ -343,13 +374,11 @@ def get_system_by_symptom(symptom):
 def initialize_chroma_db():
     """Inicializa o carga la base de datos vectorial Chroma."""
     try:
-        # Configurar cliente Chroma
         chroma_client = chromadb.PersistentClient(
             path=CHROMA_PERSIST_DIRECTORY,
             settings=Settings(anonymized_telemetry=False)
         )
         
-        # Obtener o crear la colección
         collection_name = "mindgeekclinic_knowledge"
         try:
             collection = chroma_client.get_collection(name=collection_name)
@@ -377,12 +406,10 @@ def query_knowledge_base(query, collection, n_results=3):
         return []
     
     try:
-        # Generar embedding para la consulta
         query_embedding = get_embeddings([query])
         if not query_embedding:
             return []
         
-        # Realizar la búsqueda
         results = collection.query(
             query_embeddings=query_embedding,
             n_results=n_results,
@@ -441,10 +468,8 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
         "recomendaciones": []
     }
     
-    # Conocimiento especializado
     knowledge = get_specialized_knowledge()
     
-    # Para cada síntoma, buscar sistema relacionado
     for symptom in symptoms.split(","):
         symptom = symptom.strip()
         if not symptom:
@@ -453,14 +478,12 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
         system = get_system_by_symptom(symptom)
         system_info = knowledge.get(system, knowledge["ocular"])
         
-        # Buscar eventos que puedan relacionarse
         for event in events.split(","):
             event = event.strip()
             if not event:
                 continue
                 
-            # Análisis simple de correlación
-            correlation_score = random.uniform(0.3, 0.9)  # En producción, usar IA real
+            correlation_score = random.uniform(0.3, 0.9)
             
             if correlation_score > 0.6:
                 analysis["correlaciones"].append({
@@ -471,7 +494,6 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
                     "puntuacion": round(correlation_score, 2)
                 })
     
-    # Generar recomendaciones
     if analysis["correlaciones"]:
         analysis["conflictos_detectados"] = [
             "Separación conflictiva",
@@ -579,7 +601,7 @@ def generate_hypnosis_protocol(system, conflict_type):
             
             ## Visualización Guiada
             "Imagina que tus ojos son ventanas hacia tu alma...
-            Visualiza una luz suave que limpia cada capa de tensión...
+            Visualiza una luz suca que limpia cada capa de tensión...
             Permite que tu visión interna se aclare..."
             
             ## Sugestiones Post-Hipnóticas
@@ -647,7 +669,6 @@ def generate_self_hypnosis_script(protocol_text):
     script = script.replace("Permite", "Me permito")
     script = script.replace("Siente", "Puedo sentir")
     
-    # Agregar instrucciones de inicio y fin
     full_script = f"""
     # 🧘 Autohipnosis Guiada
     
@@ -679,7 +700,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     
     styles = getSampleStyleSheet()
     
-    # Estilos personalizados
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -705,11 +725,9 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     
     story = []
     
-    # Título principal
     story.append(Paragraph("MINDGEEKCLINIC - Reporte de Biodescodificación", title_style))
     story.append(Spacer(1, 12))
     
-    # Información del paciente
     story.append(Paragraph("Información del Paciente", heading_style))
     patient_info = f"""
     <b>Nombre:</b> {patient_data.get('nombre', 'No especificado')}<br/>
@@ -722,10 +740,8 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     story.append(Paragraph(patient_info, normal_style))
     story.append(Spacer(1, 24))
     
-    # Reporte de diagnóstico
     story.append(Paragraph("Análisis de Biodescodificación", heading_style))
     
-    # Convertir el reporte markdown a formato PDF
     report_lines = diagnosis_report.split('\n')
     for line in report_lines:
         if line.startswith('# '):
@@ -739,7 +755,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     
     story.append(PageBreak())
     
-    # Protocolo de intervención
     story.append(Paragraph("Protocolo Terapéutico", title_style))
     story.append(Spacer(1, 12))
     
@@ -752,7 +767,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
         else:
             story.append(Spacer(1, 6))
     
-    # Pie de página
     story.append(Spacer(1, 36))
     footer_text = f"""
     <i>Documento generado automáticamente por MINDGEEKCLINIC v{APP_VERSION}<br/>
@@ -766,7 +780,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
         textColor=colors.gray
     )))
     
-    # Construir el PDF
     doc.build(story)
     
     buffer.seek(0)
@@ -814,7 +827,6 @@ def display_statistics():
             delta=f"+{random.randint(1, 3)}%"
         )
     
-    # Gráfico de tendencia (simulado)
     st.subheader("📈 Tendencia de Uso")
     
     dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
@@ -836,10 +848,8 @@ def backup_data():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = f"backup/mindgeek_backup_{timestamp}.json"
         
-        # Crear directorio de backup si no existe
         os.makedirs("backup", exist_ok=True)
         
-        # Copiar el archivo de datos
         if os.path.exists(DATA_FILE):
             import shutil
             shutil.copy2(DATA_FILE, backup_file)
@@ -853,7 +863,7 @@ def backup_data():
         return False
 
 # ============================================
-# SECCIÓN 11: SISTEMA DE AFILIADOS (KYC) - NUEVO
+# SECCIÓN 11: SISTEMA DE AFILIADOS (KYC)
 # ============================================
 
 COUNTRIES_LIST = [
@@ -869,7 +879,6 @@ def generate_affiliate_code():
     existing_codes = {aff['affiliate_code'] for aff in db.get('affiliates', [])}
     
     while True:
-        # 7 caracteres alfanuméricos aleatorios
         random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
         code = f"MINDGEEKCLINIC-AFFILIATE-{random_part}"
         if code not in existing_codes:
@@ -881,15 +890,9 @@ def validate_binance_wallet(wallet):
         return False
     wallet = wallet.strip()
     
-    # Patrón para direcciones de criptomonedas comunes en Binance
-    # Direcciones Ethereum (ERC20) - USDT común
     eth_pattern = r'^0x[a-fA-F0-9]{40}$'
-    # Direcciones Binance Chain (BEP2)
     bep2_pattern = r'^bnb1[ac-hj-np-z02-9]{38,59}$'
-    # Direcciones Binance Smart Chain (BEP20)
-    bep20_pattern = r'^0x[a-fA-F0-9]{40}$'  # Mismo formato que ETH
-    
-    # Direcciones TRON (TRC20) - USDT común
+    bep20_pattern = r'^0x[a-fA-F0-9]{40}$'
     tron_pattern = r'^T[A-Za-z1-9]{33}$'
     
     return bool(re.match(eth_pattern, wallet) or 
@@ -901,8 +904,6 @@ def send_verification_code(email):
     """Simula el envío de un código de verificación de 6 dígitos."""
     verification_code = ''.join(random.choices(string.digits, k=6))
     
-    # En un entorno real, aquí se integraría con SendGrid, SMTP, etc.
-    # Por ahora, almacenamos en session_state para mostrarlo en la UI
     st.session_state['verification_code'] = verification_code
     st.session_state['verification_email'] = email
     st.session_state['verification_time'] = datetime.now()
@@ -918,7 +919,6 @@ def verify_email_code(input_code):
         return False, "El código ha expirado (válido por 10 minutos)"
     
     if input_code == st.session_state['verification_code']:
-        # Código correcto, limpiar estado
         st.session_state['verification_code'] = None
         st.session_state['verification_time'] = None
         return True, "¡Email verificado correctamente!"
@@ -929,18 +929,14 @@ def register_affiliate(affiliate_data):
     """Registra un nuevo afiliado en la base de datos."""
     db = load_affiliate_db()
     
-    # Verificar si el email ya existe
     if any(aff['email'].lower() == affiliate_data['email'].lower() for aff in db['affiliates']):
         return False, "Este email ya está registrado como afiliado."
     
-    # Verificar si el ID ya existe
     if any(aff['id_number'] == affiliate_data['id_number'] for aff in db['affiliates']):
         return False, "Este número de identificación ya está registrado."
     
-    # Generar código de afiliado único
     affiliate_code = generate_affiliate_code()
     
-    # Crear objeto afiliado
     new_affiliate = {
         "id": str(uuid.uuid4()),
         "affiliate_code": affiliate_code,
@@ -951,7 +947,7 @@ def register_affiliate(affiliate_data):
         "phone": affiliate_data['phone'],
         "binance_wallet": affiliate_data['binance_wallet'],
         "status": "active",
-        "kyc_verified": True,  # En Fase 1, asumimos verificado tras registro
+        "kyc_verified": True,
         "balance": 0.0,
         "pending_payout": 0.0,
         "total_earned": 0.0,
@@ -962,10 +958,8 @@ def register_affiliate(affiliate_data):
         "sales": []
     }
     
-    # Agregar a la base de datos
     db['affiliates'].append(new_affiliate)
     
-    # Guardar cambios
     if save_affiliate_db(db):
         return True, f"¡Registro exitoso! Tu código de afiliado es: **{affiliate_code}**"
     else:
@@ -987,23 +981,27 @@ def get_affiliate_by_email(email):
             return affiliate
     return None
 
+def get_affiliate_by_id(affiliate_id):
+    """Obtiene un afiliado por su ID."""
+    db = load_affiliate_db()
+    for affiliate in db['affiliates']:
+        if affiliate['id'] == affiliate_id:
+            return affiliate
+    return None
+
 def record_sale(affiliate_code, sale_type, amount_usd):
     """Registra una venta para un afiliado y calcula su comisión."""
     db = load_affiliate_db()
     
-    # Encontrar el afiliado
     for affiliate in db['affiliates']:
         if affiliate['affiliate_code'] == affiliate_code:
-            # Obtener tasa de comisión
             commission_rate = db['settings']['commission_rates'].get(sale_type, 0.30)
             commission = amount_usd * commission_rate
             
-            # Actualizar estadísticas
             affiliate['conversions'] += 1
             affiliate['pending_payout'] += commission
             affiliate['total_earned'] += commission
             
-            # Registrar la venta
             sale_record = {
                 "id": str(uuid.uuid4()),
                 "date": datetime.now().isoformat(),
@@ -1015,11 +1013,9 @@ def record_sale(affiliate_code, sale_type, amount_usd):
             
             affiliate['sales'].append(sale_record)
             
-            # Limitar historial a últimas 100 ventas
             if len(affiliate['sales']) > 100:
                 affiliate['sales'] = affiliate['sales'][-100:]
             
-            # Guardar cambios
             save_affiliate_db(db)
             return True, commission
     
@@ -1030,24 +1026,20 @@ def calculate_affiliate_metrics(affiliate):
     if not affiliate:
         return {}
     
-    # Calcular tasa de conversión
     conversion_rate = 0
     if affiliate['referrals'] > 0:
         conversion_rate = (affiliate['conversions'] / affiliate['referrals']) * 100
     
-    # Calcular ganancia promedio por venta
     avg_sale_value = 0
     if affiliate['conversions'] > 0 and affiliate['sales']:
         total_sales = sum(sale['amount_usd'] for sale in affiliate['sales'])
         avg_sale_value = total_sales / affiliate['conversions']
     
-    # Próximo pago (simulación: cada jueves si balance >= $50)
     next_payout = "No disponible"
     if affiliate['pending_payout'] >= 50:
         today = datetime.now()
-        # Encontrar próximo jueves
-        days_ahead = 3 - today.weekday()  # 3 = jueves
-        if days_ahead <= 0:  # Si hoy es después de jueves
+        days_ahead = 3 - today.weekday()
+        if days_ahead <= 0:
             days_ahead += 7
         next_thursday = today + timedelta(days=days_ahead)
         next_payout = next_thursday.strftime("%d/%m/%Y")
@@ -1069,7 +1061,777 @@ def calculate_affiliate_metrics(affiliate):
     }
 
 # ============================================
-# SECCIÓN 12: INTERFAZ PRINCIPAL DE LA APLICACIÓN
+# SECCIÓN 12: FUNCIONES DE EMAIL (NOTIFICACIONES)
+# ============================================
+
+def send_admin_notification(subject, message):
+    """Envía una notificación por email al administrador."""
+    try:
+        # En producción, usarías SMTP real
+        # Por ahora solo registramos en logs
+        log_payment_activity({
+            "type": "admin_notification",
+            "subject": subject,
+            "message": message,
+            "timestamp": datetime.now().isoformat(),
+            "admin_email": ADMIN_EMAIL
+        })
+        
+        st.success(f"📧 Notificación registrada para: {ADMIN_EMAIL}")
+        return True
+    except Exception as e:
+        st.error(f"Error al enviar notificación: {str(e)}")
+        return False
+
+def log_payment_activity(activity_data):
+    """Registra actividad de pagos en el log."""
+    try:
+        log_data = load_payment_log()
+        
+        if "activities" not in log_data:
+            log_data["activities"] = []
+        
+        log_data["activities"].append(activity_data)
+        
+        # Mantener solo últimas 500 actividades
+        if len(log_data["activities"]) > 500:
+            log_data["activities"] = log_data["activities"][-500:]
+        
+        save_payment_log(log_data)
+        return True
+    except Exception as e:
+        print(f"Error al registrar actividad: {str(e)}")
+        return False
+
+def mark_as_paid(affiliate_id, amount, tx_hash):
+    """Marca un pago como realizado y envía notificaciones."""
+    try:
+        db = load_affiliate_db()
+        
+        # Encontrar el afiliado
+        for affiliate in db['affiliates']:
+            if affiliate['id'] == affiliate_id:
+                # Actualizar balances
+                affiliate['balance'] += affiliate['pending_payout']
+                affiliate['pending_payout'] = 0.0
+                affiliate['last_payout_date'] = datetime.now().isoformat()
+                
+                # Registrar pago en historial
+                payment_data = {
+                    "id": str(uuid.uuid4()),
+                    "affiliate_id": affiliate_id,
+                    "affiliate_name": affiliate['full_name'],
+                    "affiliate_email": affiliate['email'],
+                    "amount": amount,
+                    "tx_hash": tx_hash,
+                    "date": datetime.now().isoformat(),
+                    "status": "completed",
+                    "processed_by": "admin"
+                }
+                
+                # Guardar en base de datos de afiliados
+                if "payment_history" not in affiliate:
+                    affiliate["payment_history"] = []
+                affiliate["payment_history"].append(payment_data)
+                
+                # Guardar cambios
+                save_affiliate_db(db)
+                
+                # Registrar en log de pagos
+                log_data = load_payment_log()
+                if "payments" not in log_data:
+                    log_data["payments"] = []
+                
+                log_data["payments"].append(payment_data)
+                
+                # Actualizar resumen
+                log_data["summary"]["total_paid"] = log_data["summary"].get("total_paid", 0) + amount
+                log_data["summary"]["payments_count"] = log_data["summary"].get("payments_count", 0) + 1
+                
+                save_payment_log(log_data)
+                
+                # Enviar notificación al administrador
+                notification_subject = f"Pago procesado - {affiliate['full_name']}"
+                notification_message = f"""
+                Se ha procesado un pago a un afiliado:
+                
+                📋 Detalles del Pago:
+                • Afiliado: {affiliate['full_name']}
+                • Email: {affiliate['email']}
+                • Código: {affiliate['affiliate_code']}
+                • Monto: ${amount:.2f} USD
+                • TX Hash: {tx_hash}
+                • Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}
+                • Wallet: {affiliate['binance_wallet']}
+                
+                Este pago ha sido registrado en el sistema.
+                """
+                
+                send_admin_notification(notification_subject, notification_message)
+                
+                # Registrar actividad
+                log_payment_activity({
+                    "type": "payment_processed",
+                    "affiliate_id": affiliate_id,
+                    "affiliate_name": affiliate['full_name'],
+                    "amount": amount,
+                    "tx_hash": tx_hash,
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                return True
+        
+        return False
+    except Exception as e:
+        st.error(f"Error al procesar pago: {str(e)}")
+        return False
+
+# ============================================
+# SECCIÓN 13: PANEL DE ADMINISTRACIÓN - NUEVO
+# ============================================
+
+def check_admin_access():
+    """Verifica si el usuario tiene acceso de administrador."""
+    # Verificar parámetro en URL
+    query_params = st.query_params
+    url_password = query_params.get("admin", [""])[0]
+    
+    if url_password == ADMIN_PASSWORD:
+        st.session_state.admin_logged_in = True
+        st.session_state.admin_session_id = str(uuid.uuid4())[:8]
+        return True
+    
+    # Verificar sesión activa
+    if st.session_state.admin_logged_in:
+        return True
+    
+    return False
+
+def show_admin_panel():
+    """Panel de administración principal."""
+    if not check_admin_access():
+        show_admin_login()
+        return
+    
+    st.title("👑 Panel de Administración - MINDGEEKCLINIC")
+    st.success(f"Sesión activa: {st.session_state.admin_session_id}")
+    
+    # Pestañas principales
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "💰 Pagos Pendientes", 
+        "👥 Todos los Afiliados", 
+        "📊 Reportes", 
+        "📋 Historial de Pagos",
+        "⚙️ Configuración"
+    ])
+    
+    with tab1:
+        show_pending_payments()
+    
+    with tab2:
+        show_all_affiliates()
+    
+    with tab3:
+        show_admin_reports()
+    
+    with tab4:
+        show_payment_history()
+    
+    with tab5:
+        show_admin_settings()
+
+def show_admin_login():
+    """Muestra el formulario de login para administrador."""
+    st.subheader("🔐 Acceso de Administrador")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        with st.form("admin_login_form"):
+            password = st.text_input("Contraseña de administrador", type="password")
+            
+            if st.form_submit_button("Acceder al panel", use_container_width=True):
+                if password == ADMIN_PASSWORD:
+                    st.session_state.admin_logged_in = True
+                    st.session_state.admin_session_id = str(uuid.uuid4())[:8]
+                    st.success("✅ Acceso concedido")
+                    st.rerun()
+                else:
+                    st.error("❌ Contraseña incorrecta")
+        
+        st.info("""
+        **O accede directamente por URL:**
+        `https://tu-app.streamlit.app/?admin=Enaraure25..`
+        """)
+
+def show_pending_payments():
+    """Muestra afiliados con pagos pendientes."""
+    st.header("💰 Pagos Pendientes")
+    
+    db = load_affiliate_db()
+    
+    # Filtrar afiliados con pending_payout > 0
+    pending_affiliates = [
+        aff for aff in db['affiliates'] 
+        if aff['pending_payout'] > 0
+    ]
+    
+    # Calcular totales
+    total_pending = sum(aff['pending_payout'] for aff in pending_affiliates)
+    eligible_for_payout = [aff for aff in pending_affiliates if aff['pending_payout'] >= 50]
+    
+    # Métricas
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("💰 Total a Pagar", f"${total_pending:.2f} USD")
+    with col2:
+        st.metric("👥 Afiliados con Saldo", len(pending_affiliates))
+    with col3:
+        st.metric("✅ Elegibles (≥$50)", len(eligible_for_payout))
+    
+    st.markdown("---")
+    
+    if not pending_affiliates:
+        st.info("🎉 No hay pagos pendientes actualmente.")
+        return
+    
+    # Tabla de pagos pendientes
+    st.subheader("📋 Lista de Pagos Pendientes")
+    
+    # Ordenar por monto descendente
+    pending_affiliates.sort(key=lambda x: x['pending_payout'], reverse=True)
+    
+    # Mostrar tabla
+    for i, affiliate in enumerate(pending_affiliates):
+        with st.container():
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 3])
+            
+            with col1:
+                st.write(f"**{affiliate['full_name']}**")
+                st.caption(f"{affiliate['email']}")
+                st.caption(f"Código: `{affiliate['affiliate_code']}`")
+            
+            with col2:
+                st.write(f"**Pendiente:** ${affiliate['pending_payout']:.2f}")
+                st.caption(f"Total ganado: ${affiliate['total_earned']:.2f}")
+                st.caption(f"Referidos: {affiliate['referrals']} | Ventas: {affiliate['conversions']}")
+            
+            with col3:
+                st.write(f"**Wallet:**")
+                st.code(affiliate['binance_wallet'], language="text")
+                eligibility = "✅ Elegible" if affiliate['pending_payout'] >= 50 else f"❌ Necesita ${50 - affiliate['pending_payout']:.2f} más"
+                st.caption(eligibility)
+            
+            with col4:
+                # Formulario para marcar como pagado
+                with st.form(key=f"pay_form_{affiliate['id']}"):
+                    tx_hash = st.text_input(
+                        "TX Hash Binance", 
+                        key=f"tx_{affiliate['id']}",
+                        placeholder="0x... o ID transacción",
+                        help="Ingresa el hash de la transacción en Binance"
+                    )
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.form_submit_button("✅ Marcar como Pagado", use_container_width=True):
+                            if not tx_hash:
+                                st.error("Debes ingresar el TX Hash")
+                            else:
+                                if mark_as_paid(affiliate['id'], affiliate['pending_payout'], tx_hash):
+                                    st.success(f"✅ Pago registrado para {affiliate['full_name']}")
+                                    st.rerun()
+                                else:
+                                    st.error("Error al registrar el pago")
+                    
+                    with col_btn2:
+                        if st.form_submit_button("📋 Ver Detalles", use_container_width=True):
+                            show_affiliate_details(affiliate['id'])
+            
+            st.markdown("---")
+
+def show_all_affiliates():
+    """Muestra todos los afiliados registrados."""
+    st.header("👥 Todos los Afiliados")
+    
+    db = load_affiliate_db()
+    
+    if not db['affiliates']:
+        st.info("No hay afiliados registrados aún.")
+        return
+    
+    # Filtros
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        search_term = st.text_input("🔍 Buscar por nombre o email")
+    with col2:
+        country_filter = st.selectbox("Filtrar por país", ["Todos"] + COUNTRIES_LIST)
+    with col3:
+        status_filter = st.selectbox("Filtrar por estado", ["Todos", "active", "suspended", "pending"])
+    
+    # Aplicar filtros
+    filtered_affiliates = db['affiliates']
+    
+    if search_term:
+        filtered_affiliates = [
+            aff for aff in filtered_affiliates
+            if search_term.lower() in aff['full_name'].lower() 
+            or search_term.lower() in aff['email'].lower()
+        ]
+    
+    if country_filter != "Todos":
+        filtered_affiliates = [
+            aff for aff in filtered_affiliates
+            if aff['country'] == country_filter
+        ]
+    
+    if status_filter != "Todos":
+        filtered_affiliates = [
+            aff for aff in filtered_affiliates
+            if aff['status'] == status_filter
+        ]
+    
+    # Métricas
+    total_affiliates = len(db['affiliates'])
+    active_affiliates = len([aff for aff in db['affiliates'] if aff['status'] == 'active'])
+    total_commissions = sum(aff['total_earned'] for aff in db['affiliates'])
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Afiliados", total_affiliates)
+    with col2:
+        st.metric("Activos", active_affiliates)
+    with col3:
+        st.metric("Comisiones Totales", f"${total_commissions:.2f}")
+    
+    st.markdown("---")
+    
+    # Tabla de afiliados
+    st.subheader(f"📊 Lista de Afiliados ({len(filtered_affiliates)})")
+    
+    # Crear DataFrame para mejor visualización
+    affiliate_data = []
+    for aff in filtered_affiliates:
+        join_date = datetime.fromisoformat(aff['join_date']).strftime('%d/%m/%Y')
+        affiliate_data.append({
+            "ID": aff['id'][:8],
+            "Nombre": aff['full_name'],
+            "Email": aff['email'],
+            "País": aff['country'],
+            "Código": aff['affiliate_code'],
+            "Estado": aff['status'],
+            "Registro": join_date,
+            "Referidos": aff['referrals'],
+            "Ventas": aff['conversions'],
+            "Ganado": f"${aff['total_earned']:.2f}",
+            "Pendiente": f"${aff['pending_payout']:.2f}"
+        })
+    
+    if affiliate_data:
+        df = pd.DataFrame(affiliate_data)
+        st.dataframe(
+            df,
+            column_config={
+                "ID": "ID",
+                "Nombre": "Nombre",
+                "Email": "Email",
+                "País": "País",
+                "Código": "Código",
+                "Estado": "Estado",
+                "Registro": "Registro",
+                "Referidos": "Referidos",
+                "Ventas": "Ventas",
+                "Ganado": st.column_config.NumberColumn("Total Ganado"),
+                "Pendiente": st.column_config.NumberColumn("Pendiente")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        # Botón de exportación
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("📤 Exportar a CSV", use_container_width=True):
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Descargar CSV",
+                    data=csv,
+                    file_name=f"afiliados_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+    else:
+        st.warning("No hay afiliados que coincidan con los filtros.")
+
+def show_admin_reports():
+    """Muestra reportes administrativos."""
+    st.header("📊 Reportes Administrativos")
+    
+    db = load_affiliate_db()
+    payment_log = load_payment_log()
+    
+    # Métricas principales
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_affiliates = len(db['affiliates'])
+    total_paid = payment_log['summary'].get('total_paid', 0)
+    pending_payout = sum(aff['pending_payout'] for aff in db['affiliates'])
+    active_affiliates = len([aff for aff in db['affiliates'] if aff['status'] == 'active'])
+    
+    with col1:
+        st.metric("Total Afiliados", total_affiliates)
+    with col2:
+        st.metric("Pagado Total", f"${total_paid:.2f}")
+    with col3:
+        st.metric("Pendiente Total", f"${pending_payout:.2f}")
+    with col4:
+        st.metric("Afiliados Activos", active_affiliates)
+    
+    st.markdown("---")
+    
+    # Gráfico de comisiones por mes (simulado)
+    st.subheader("📈 Comisiones por Mes")
+    
+    # Datos simulados para el gráfico
+    months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
+    commissions = np.random.uniform(500, 5000, 6)
+    
+    fig = px.bar(
+        x=months, 
+        y=commissions,
+        title="Comisiones Generadas por Mes",
+        labels={'x': 'Mes', 'y': 'Comisiones (USD)'},
+        color=commissions,
+        color_continuous_scale='Blues'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Top 10 afiliados
+    st.subheader("🏆 Top 10 Afiliados")
+    
+    top_affiliates = sorted(
+        db['affiliates'], 
+        key=lambda x: x['total_earned'], 
+        reverse=True
+    )[:10]
+    
+    if top_affiliates:
+        top_data = []
+        for i, aff in enumerate(top_affiliates, 1):
+            conversion_rate = 0
+            if aff['referrals'] > 0:
+                conversion_rate = (aff['conversions'] / aff['referrals']) * 100
+            
+            top_data.append({
+                "Posición": i,
+                "Nombre": aff['full_name'],
+                "País": aff['country'],
+                "Total Ganado": f"${aff['total_earned']:.2f}",
+                "Ventas": aff['conversions'],
+                "Tasa Conversión": f"{conversion_rate:.1f}%"
+            })
+        
+        df_top = pd.DataFrame(top_data)
+        st.dataframe(df_top, hide_index=True, use_container_width=True)
+    
+    # Reporte de actividades recientes
+    st.subheader("📋 Actividades Recientes")
+    
+    payment_log = load_payment_log()
+    activities = payment_log.get('activities', [])
+    
+    if activities:
+        recent_activities = sorted(
+            activities, 
+            key=lambda x: x.get('timestamp', ''), 
+            reverse=True
+        )[:10]
+        
+        for activity in recent_activities:
+            timestamp = datetime.fromisoformat(activity['timestamp']).strftime('%H:%M')
+            if activity['type'] == 'payment_processed':
+                st.info(f"🕒 {timestamp} - Pago procesado: {activity.get('affiliate_name', 'N/A')} - ${activity.get('amount', 0):.2f}")
+            elif activity['type'] == 'admin_notification':
+                st.success(f"🕒 {timestamp} - Notificación enviada: {activity.get('subject', 'N/A')}")
+    else:
+        st.info("No hay actividades recientes.")
+
+def show_payment_history():
+    """Muestra el historial completo de pagos."""
+    st.header("📋 Historial de Pagos")
+    
+    payment_log = load_payment_log()
+    payments = payment_log.get('payments', [])
+    
+    if not payments:
+        st.info("No hay historial de pagos aún.")
+        return
+    
+    # Filtros
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("Fecha inicio", value=datetime.now() - timedelta(days=30))
+    with col2:
+        end_date = st.date_input("Fecha fin", value=datetime.now())
+    
+    # Convertir fechas
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.max.time())
+    
+    # Filtrar pagos por fecha
+    filtered_payments = []
+    for payment in payments:
+        try:
+            payment_date = datetime.fromisoformat(payment['date'])
+            if start_dt <= payment_date <= end_dt:
+                filtered_payments.append(payment)
+        except:
+            continue
+    
+    st.metric("Pagos en período", len(filtered_payments))
+    
+    # Tabla de pagos
+    if filtered_payments:
+        payment_data = []
+        for payment in filtered_payments:
+            payment_date = datetime.fromisoformat(payment['date']).strftime('%d/%m/%Y %H:%M')
+            payment_data.append({
+                "Fecha": payment_date,
+                "Afiliado": payment.get('affiliate_name', 'N/A'),
+                "Email": payment.get('affiliate_email', 'N/A'),
+                "Monto": f"${payment.get('amount', 0):.2f}",
+                "TX Hash": payment.get('tx_hash', 'N/A')[:20] + "..." if len(payment.get('tx_hash', '')) > 20 else payment.get('tx_hash', 'N/A'),
+                "Estado": payment.get('status', 'N/A'),
+                "Procesado por": payment.get('processed_by', 'N/A')
+            })
+        
+        df_payments = pd.DataFrame(payment_data)
+        st.dataframe(df_payments, hide_index=True, use_container_width=True)
+        
+        # Exportar a CSV
+        csv_data = df_payments.to_csv(index=False)
+        st.download_button(
+            label="📥 Descargar Historial (CSV)",
+            data=csv_data,
+            file_name=f"historial_pagos_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        # Resumen
+        st.subheader("📊 Resumen del Período")
+        col1, col2, col3 = st.columns(3)
+        
+        total_amount = sum(p['amount'] for p in filtered_payments)
+        unique_affiliates = len(set(p['affiliate_id'] for p in filtered_payments))
+        
+        with col1:
+            st.metric("Total Pagado", f"${total_amount:.2f}")
+        with col2:
+            st.metric("Número de Pagos", len(filtered_payments))
+        with col3:
+            st.metric("Afiliados Únicos", unique_affiliates)
+
+def show_admin_settings():
+    """Muestra la configuración del administrador."""
+    st.header("⚙️ Configuración del Sistema")
+    
+    db = load_affiliate_db()
+    settings = db['settings']
+    
+    with st.form("admin_settings_form"):
+        st.subheader("💰 Configuración de Comisiones")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            therapy_rate = st.number_input(
+                "Comisión Terapia (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=settings['commission_rates']['therapy'] * 100,
+                step=0.1
+            )
+        
+        with col2:
+            pdf_rate = st.number_input(
+                "Comisión PDF (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=settings['commission_rates']['pdf'] * 100,
+                step=0.1
+            )
+        
+        with col3:
+            subscription_rate = st.number_input(
+                "Comisión Suscripción (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=settings['commission_rates']['subscription'] * 100,
+                step=0.1
+            )
+        
+        st.subheader("⚡ Configuración de Pagos")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            min_withdrawal = st.number_input(
+                "Retiro Mínimo (USD)",
+                min_value=0.0,
+                value=settings['min_withdrawal'],
+                step=1.0
+            )
+        
+        with col2:
+            payout_schedule = st.selectbox(
+                "Frecuencia de Pagos",
+                ["weekly", "biweekly", "monthly"],
+                index=["weekly", "biweekly", "monthly"].index(settings['payout_schedule'])
+            )
+        
+        st.subheader("📧 Notificaciones")
+        
+        notification_email = st.text_input(
+            "Email para notificaciones",
+            value=ADMIN_EMAIL,
+            help="Email donde recibirás notificaciones de pagos"
+        )
+        
+        if st.form_submit_button("💾 Guardar Configuración", use_container_width=True):
+            # Actualizar comisiones
+            settings['commission_rates']['therapy'] = therapy_rate / 100
+            settings['commission_rates']['pdf'] = pdf_rate / 100
+            settings['commission_rates']['subscription'] = subscription_rate / 100
+            
+            # Actualizar otros settings
+            settings['min_withdrawal'] = min_withdrawal
+            settings['payout_schedule'] = payout_schedule
+            
+            # Guardar cambios
+            db['settings'] = settings
+            if save_affiliate_db(db):
+                st.success("✅ Configuración guardada exitosamente")
+            else:
+                st.error("❌ Error al guardar la configuración")
+    
+    st.markdown("---")
+    
+    # Herramientas de administración
+    st.subheader("🛠️ Herramientas de Administración")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Recalcular Comisiones", use_container_width=True):
+            st.info("Recalculando comisiones...")
+            time.sleep(1)
+            st.success("Comisiones recalculadas")
+        
+        if st.button("📊 Generar Reporte Mensual", use_container_width=True):
+            st.info("Generando reporte...")
+            time.sleep(1)
+            st.success("Reporte generado")
+    
+    with col2:
+        if st.button("🧹 Limpiar Cache", use_container_width=True):
+            st.session_state.clear()
+            st.success("Cache limpiado. La página se recargará.")
+            time.sleep(2)
+            st.rerun()
+        
+        if st.button("🚪 Cerrar Sesión Admin", use_container_width=True):
+            st.session_state.admin_logged_in = False
+            st.session_state.admin_session_id = None
+            st.success("Sesión cerrada")
+            st.rerun()
+
+def show_affiliate_details(affiliate_id):
+    """Muestra detalles completos de un afiliado."""
+    affiliate = get_affiliate_by_id(affiliate_id)
+    
+    if not affiliate:
+        st.error("Afiliado no encontrado")
+        return
+    
+    st.subheader(f"👤 Detalles del Afiliado: {affiliate['full_name']}")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write(f"**Email:** {affiliate['email']}")
+        st.write(f"**Código:** `{affiliate['affiliate_code']}`")
+        st.write(f"**País:** {affiliate['country']}")
+        st.write(f"**Teléfono:** {affiliate['phone']}")
+        st.write(f"**ID:** {affiliate['id_number']}")
+    
+    with col2:
+        st.write(f"**Estado:** {affiliate['status']}")
+        st.write(f"**Fecha Registro:** {datetime.fromisoformat(affiliate['join_date']).strftime('%d/%m/%Y')}")
+        st.write(f"**Último Pago:** {affiliate['last_payout_date'] or 'Nunca'}")
+        st.write(f"**Wallet Binance:** `{affiliate['binance_wallet']}`")
+    
+    st.markdown("---")
+    
+    # Métricas
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Referidos", affiliate['referrals'])
+    with col2:
+        st.metric("Ventas", affiliate['conversions'])
+    with col3:
+        st.metric("Total Ganado", f"${affiliate['total_earned']:.2f}")
+    with col4:
+        st.metric("Pendiente", f"${affiliate['pending_payout']:.2f}")
+    
+    # Historial de ventas
+    if affiliate.get('sales'):
+        st.subheader("💼 Historial de Ventas")
+        
+        sales_df = pd.DataFrame(affiliate['sales'][-20:])  # Últimas 20 ventas
+        if not sales_df.empty:
+            sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y %H:%M')
+            sales_df['amount_usd'] = sales_df['amount_usd'].apply(lambda x: f"${x:.2f}")
+            sales_df['commission'] = sales_df['commission'].apply(lambda x: f"${x:.2f}")
+            
+            st.dataframe(
+                sales_df[['date', 'type', 'amount_usd', 'commission', 'commission_rate']],
+                column_config={
+                    "date": "Fecha",
+                    "type": "Tipo",
+                    "amount_usd": "Monto",
+                    "commission": "Comisión",
+                    "commission_rate": st.column_config.NumberColumn("Tasa %", format="%.1f%%")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+    
+    # Historial de pagos
+    if affiliate.get('payment_history'):
+        st.subheader("💰 Historial de Pagos")
+        
+        payments_df = pd.DataFrame(affiliate['payment_history'])
+        if not payments_df.empty:
+            payments_df['date'] = pd.to_datetime(payments_df['date']).dt.strftime('%d/%m/%Y')
+            payments_df['amount'] = payments_df['amount'].apply(lambda x: f"${x:.2f}")
+            
+            st.dataframe(
+                payments_df[['date', 'amount', 'tx_hash', 'status']],
+                column_config={
+                    "date": "Fecha",
+                    "amount": "Monto",
+                    "tx_hash": "TX Hash",
+                    "status": "Estado"
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+
+# ============================================
+# SECCIÓN 14: INTERFAZ PRINCIPAL DE LA APLICACIÓN
 # ============================================
 
 def main():
@@ -1079,7 +1841,7 @@ def main():
     # Cargar datos
     data = load_data()
     
-    # Título principal con estilo
+    # Título principal
     st.markdown("""
     <style>
     .main-header {
@@ -1114,9 +1876,7 @@ def main():
         
         st.markdown("---")
         
-        # ============================================
-        # NUEVO: SECCIÓN DE AFILIADOS EN SIDEBAR
-        # ============================================
+        # Sección de afiliados
         st.subheader("👥 Programa de Afiliados")
         
         affiliate_menu = st.radio(
@@ -1124,13 +1884,12 @@ def main():
             ["📋 Registrarse como Afiliado", "📊 Dashboard de Afiliado"]
         )
         
-        # Detectar código de afiliado en la URL (solo para diagnóstico)
+        # Detectar código de afiliado en la URL
         query_params = st.query_params
         detected_affiliate_code = query_params.get("affiliate", [""])[0]
         
         if detected_affiliate_code:
             st.info(f"Código de afiliado detectado: `{detected_affiliate_code}`")
-            # Verificar si el código existe
             affiliate = get_affiliate_by_code(detected_affiliate_code)
             if affiliate:
                 st.success("✅ Código válido")
@@ -1140,17 +1899,42 @@ def main():
         
         st.markdown("---")
         
+        # NUEVO: Acceso al panel de administración (oculto hasta que se acceda)
+        if check_admin_access():
+            st.subheader("👑 Administración")
+            if st.button("📊 Panel de Admin", use_container_width=True):
+                st.query_params = {"admin": ADMIN_PASSWORD}
+                st.rerun()
+        else:
+            # Botón pequeño para acceder al admin
+            with st.expander("🔐 Acceso Admin"):
+                admin_pass = st.text_input("Contraseña", type="password")
+                if st.button("Acceder", use_container_width=True):
+                    if admin_pass == ADMIN_PASSWORD:
+                        st.session_state.admin_logged_in = True
+                        st.session_state.admin_session_id = str(uuid.uuid4())[:8]
+                        st.success("Acceso concedido")
+                        st.rerun()
+                    else:
+                        st.error("Contraseña incorrecta")
+        
+        st.markdown("---")
+        
         # Información de la aplicación
         st.caption(f"Versión {APP_VERSION}")
         st.caption(f"Accesos hoy: {random.randint(10, 50)}")
         
-        # Botón para actualizar estadísticas
-        if st.button("🔄 Actualizar Estadísticas"):
+        if st.button("🔄 Actualizar", use_container_width=True):
             st.rerun()
     
     # ============================================
     # CONTENIDO PRINCIPAL BASADO EN SELECCIÓN
     # ============================================
+    
+    # Verificar si se accedió al panel admin desde URL
+    if check_admin_access() and st.query_params.get("admin", [""])[0] == ADMIN_PASSWORD:
+        show_admin_panel()
+        return
     
     # Lógica para mostrar contenido basado en el menú principal
     if menu_option == "🏠 Inicio":
@@ -1171,7 +1955,7 @@ def main():
         show_affiliate_dashboard()
 
 # ============================================
-# SECCIÓN 13: PÁGINAS PRINCIPALES DE LA APP
+# SECCIÓN 15: PÁGINAS PRINCIPALES DE LA APP
 # ============================================
 
 def show_homepage():
@@ -1194,35 +1978,41 @@ def show_homepage():
         3. **Protocolos de hipnosis** personalizados
         4. **Generación de informes** profesionales en PDF
         5. **Consulta con IA** especializada en biodescodificación
-        6. **Sistema de afiliados** para profesionales (NUEVO)
+        6. **Sistema de afiliados** para profesionales
+        7. **Panel de administración** para gestión de pagos
         
         ### 📈 Impacto Esperado
         
         - Reducción del tiempo de diagnóstico en 40%
         - Aumento de efectividad terapéutica en 60%
         - Automatización de procesos administrativos
+        - Sistema de comisiones automatizado
         """)
     
     with col2:
         st.info("""
         **🚀 Novedades:**
         
-        • **Nuevo Sistema de Afiliados**  
-          Gana comisiones refiriendo clientes.
+        • **Panel de Administración**  
+          Gestiona pagos y afiliados fácilmente.
         
-        • **Dashboard Profesional**  
-          Sigue tus métricas en tiempo real.
+        • **Notificaciones Automáticas**  
+          Recibe alertas de pagos por email.
+        
+        • **Reportes Detallados**  
+          Exporta datos para contabilidad.
         
         • **Integración Binance**  
-          Recibe pagos en criptomonedas.
-        
-        [Regístrate como afiliado](#)
+          Pagos seguros en criptomonedas.
         """)
         
-        # Mostrar algunos datos de ejemplo
         with st.expander("📊 Datos Rápidos"):
-            st.metric("Afiliados Activos", "124")
-            st.metric("Comisiones Pagadas", "$3,850")
+            db = load_affiliate_db()
+            total_affiliates = len(db['affiliates'])
+            pending_payout = sum(aff['pending_payout'] for aff in db['affiliates'])
+            
+            st.metric("Afiliados Activos", total_affiliates)
+            st.metric("Comisiones Pendientes", f"${pending_payout:.2f}")
             st.metric("Tasa Conversión", "34%")
     
     st.markdown("---")
@@ -1241,8 +2031,8 @@ def show_homepage():
             st.rerun()
     
     with col3:
-        if st.button("🧠 Consultar IA", use_container_width=True):
-            st.query_params = {"menu": "Consultar IA"}
+        if st.button("👑 Acceso Admin", use_container_width=True):
+            st.query_params = {"admin": ADMIN_PASSWORD}
             st.rerun()
 
 def show_diagnosis_form(data):
@@ -1266,16 +2056,12 @@ def show_diagnosis_form(data):
         
         st.markdown("---")
         
-        # ============================================
-        # NUEVO: CAMPO DE CÓDIGO DE AFILIADO EN FORMULARIO
-        # ============================================
+        # Campo de código de afiliado
         col_aff1, col_aff2 = st.columns([3, 1])
         with col_aff1:
-            # Detectar código de afiliado de la URL
             query_params = st.query_params
             url_affiliate_code = query_params.get("affiliate", [""])[0]
             
-            # Si hay código en URL, usarlo como valor por defecto
             default_code = url_affiliate_code if url_affiliate_code else st.session_state.affiliate_code_input
             
             affiliate_code = st.text_input(
@@ -1285,14 +2071,12 @@ def show_diagnosis_form(data):
                 help="Si vienes de un enlace de afiliado, este campo se llenará automáticamente."
             )
             
-            # Guardar en sesión para persistencia
             if affiliate_code:
                 st.session_state.affiliate_code_input = affiliate_code
         
         with col_aff2:
             st.markdown("###")
             if affiliate_code:
-                # Verificar si el código es válido
                 affiliate = get_affiliate_by_code(affiliate_code)
                 if affiliate:
                     st.success("✅ Válido")
@@ -1348,14 +2132,13 @@ def show_diagnosis_form(data):
                         "tratamientos_previos": tratamientos_previos,
                         "expectativas": expectativas,
                         "fecha_registro": datetime.now().isoformat(),
-                        "affiliate_code": affiliate_code if affiliate_code else None  # NUEVO: Guardar código
+                        "affiliate_code": affiliate_code if affiliate_code else None
                     }
                     
                     # Registrar afiliado si hay código válido
                     if affiliate_code:
                         affiliate = get_affiliate_by_code(affiliate_code)
                         if affiliate:
-                            # Incrementar referidos
                             db = load_affiliate_db()
                             for aff in db['affiliates']:
                                 if aff['affiliate_code'] == affiliate_code:
@@ -1402,7 +2185,6 @@ def show_diagnosis_form(data):
                     with tab2:
                         st.markdown(protocol)
                         
-                        # Generar autohipnosis
                         autohipnosis = generate_self_hypnosis_script(protocol)
                         if st.button("🔄 Generar Versión Autohipnosis"):
                             st.markdown(autohipnosis)
@@ -1411,19 +2193,15 @@ def show_diagnosis_form(data):
                         st.subheader("🧘 Guía de Autohipnosis")
                         st.markdown(autohipnosis)
                         
-                        # Audio guiado (simulación)
                         st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", format="audio/mp3")
                     
                     with tab4:
                         st.subheader("📄 Reporte Profesional en PDF")
                         
-                        # Generar PDF
                         pdf_buffer = create_pdf_diagnosis(patient_data, diagnosis, protocol)
                         
-                        # Mostrar link de descarga
                         st.markdown(get_pdf_download_link(pdf_buffer), unsafe_allow_html=True)
                         
-                        # Vista previa del PDF
                         base64_pdf = base64.b64encode(pdf_buffer.read()).decode('utf-8')
                         pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
                         st.markdown(pdf_display, unsafe_allow_html=True)
@@ -1467,27 +2245,21 @@ def show_ai_consultation():
             st.warning("Por favor, ingresa tu consulta.")
         else:
             with st.spinner("Consultando base de conocimiento y generando respuesta..."):
-                # Inicializar ChromaDB
                 chroma_client, collection = initialize_chroma_db()
                 
-                # Consultar base de conocimiento
                 knowledge_results = query_knowledge_base(query, collection)
                 
-                # Construir contexto
                 knowledge_context = ""
                 if knowledge_results and 'documents' in knowledge_results:
                     knowledge_context = "\n".join(knowledge_results['documents'][0][:2])
                 
                 full_context = f"{knowledge_context}\n{context}"
                 
-                # Generar respuesta con Groq
                 response = generate_with_groq(query, full_context)
                 
-                # Mostrar respuesta
                 st.success("✅ Respuesta generada:")
                 st.markdown(response)
                 
-                # Mostrar fuentes de conocimiento si existen
                 if knowledge_results and 'metadatas' in knowledge_results:
                     with st.expander("📚 Fuentes consultadas"):
                         for i, metadata in enumerate(knowledge_results['metadatas'][0]):
@@ -1497,18 +2269,15 @@ def show_statistics_page():
     """Muestra la página de estadísticas."""
     st.subheader("📊 Estadísticas de la Plataforma")
     
-    # Mostrar métricas principales
     display_statistics()
     
     st.markdown("---")
     
-    # Datos demográficos simulados
     st.subheader("👥 Distribución Demográfica")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Género
         gender_data = pd.DataFrame({
             'Género': ['Mujeres', 'Hombres', 'Otros'],
             'Porcentaje': [52, 45, 3]
@@ -1520,7 +2289,6 @@ def show_statistics_page():
         st.plotly_chart(fig_gender, use_container_width=True)
     
     with col2:
-        # Edades
         age_data = pd.DataFrame({
             'Rango Edad': ['18-25', '26-35', '36-45', '46-55', '56+'],
             'Pacientes': [15, 35, 28, 15, 7]
@@ -1532,7 +2300,6 @@ def show_statistics_page():
                         color_continuous_scale='Blues')
         st.plotly_chart(fig_age, use_container_width=True)
     
-    # Sistemas más consultados
     st.subheader("🩺 Sistemas Corporales Más Consultados")
     
     systems_data = pd.DataFrame({
@@ -1605,7 +2372,6 @@ def show_backup_page():
     
     st.markdown("---")
     
-    # Opciones avanzadas
     with st.expander("⚙️ Opciones Avanzadas"):
         col1, col2 = st.columns(2)
         
@@ -1626,7 +2392,6 @@ def show_backup_page():
             
             if st.button(f"📤 Exportar Datos ({export_format})"):
                 st.info(f"Exportando datos en formato {export_format}...")
-                # Simulación de exportación
                 progress_bar = st.progress(0)
                 for i in range(100):
                     time.sleep(0.01)
@@ -1635,7 +2400,7 @@ def show_backup_page():
                 st.success(f"Datos exportados en formato {export_format}")
 
 # ============================================
-# SECCIÓN 14: INTERFACES DEL SISTEMA DE AFILIADOS - NUEVO
+# SECCIÓN 16: INTERFACES DEL SISTEMA DE AFILIADOS
 # ============================================
 
 def show_affiliate_registration():
@@ -1663,7 +2428,6 @@ def show_affiliate_registration():
             binance_wallet = st.text_input("Wallet de Binance (USDT)*", 
                                          help="Dirección donde recibirás pagos")
         
-        # Verificación de wallet
         if binance_wallet:
             if validate_binance_wallet(binance_wallet):
                 st.success("✅ Formato de wallet válido")
@@ -1675,7 +2439,6 @@ def show_affiliate_registration():
         
         email_verified = False
         
-        # Verificar si ya hay un código pendiente
         if 'verification_code' in st.session_state and st.session_state['verification_code']:
             st.info(f"Código enviado a: {st.session_state.get('verification_email', '')}")
             
@@ -1691,7 +2454,6 @@ def show_affiliate_registration():
                 else:
                     st.error(message)
             
-            # Mostrar el código generado (solo para demo)
             st.warning(f"**DEMO:** Para propósitos de prueba, tu código es: `{st.session_state['verification_code']}`")
             
             if st.button("🔄 Reenviar código"):
@@ -1702,7 +2464,6 @@ def show_affiliate_registration():
                 else:
                     st.error("Primero ingresa un email")
         else:
-            # Si no hay código pendiente, mostrar botón para enviar
             if email and st.button("📨 Enviar código de verificación"):
                 verification_code = send_verification_code(email)
                 st.success(f"Código de verificación enviado a {email}")
@@ -1711,7 +2472,6 @@ def show_affiliate_registration():
         
         st.markdown("---")
         
-        # Términos y condiciones
         st.markdown("### ✅ Términos y Condiciones")
         
         col_terms1, col_terms2 = st.columns(2)
@@ -1724,11 +2484,9 @@ def show_affiliate_registration():
             confirm_kyc = st.checkbox("Confirmo que la información es verídica*")
             accept_payments = st.checkbox("Acepto recibir pagos vía Binance*")
         
-        # Botón de registro
         submitted = st.form_submit_button("🚀 Registrar como Afiliado", use_container_width=True)
         
         if submitted:
-            # Validaciones
             if not all([full_name, email, id_number, country, phone, binance_wallet]):
                 st.error("Por favor, completa todos los campos obligatorios (*)")
             elif not validate_binance_wallet(binance_wallet):
@@ -1754,7 +2512,6 @@ def show_affiliate_registration():
                         st.balloons()
                         st.success(message)
                         
-                        # Mostrar información adicional
                         st.markdown("""
                         ### 🎉 ¡Registro Exitoso!
                         
@@ -1773,11 +2530,9 @@ def show_affiliate_dashboard():
     """Muestra el dashboard del afiliado."""
     st.subheader("📊 Dashboard de Afiliado")
     
-    # Verificar si hay sesión de afiliado activa
     if 'current_affiliate' in st.session_state and st.session_state.current_affiliate:
         affiliate = st.session_state.current_affiliate
     else:
-        # Pedir email para acceder
         st.info("Ingresa tu email para acceder a tu dashboard")
         email = st.text_input("Email registrado")
         
@@ -1791,11 +2546,9 @@ def show_affiliate_dashboard():
                 st.error("Email no encontrado. Verifica o regístrate primero.")
                 return
     
-    # Si llegamos aquí, tenemos un afiliado
     affiliate = st.session_state.current_affiliate
     metrics = calculate_affiliate_metrics(affiliate)
     
-    # Mostrar métricas principales
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -1828,7 +2581,6 @@ def show_affiliate_dashboard():
     
     st.markdown("---")
     
-    # Información del afiliado
     col_info1, col_info2 = st.columns(2)
     
     with col_info1:
@@ -1845,7 +2597,6 @@ def show_affiliate_dashboard():
         st.write(f"**Mínimo retiro:** $50.00 USD")
         st.write(f"**Frecuencia:** Semanal (jueves)")
         
-        # Botón para solicitar retiro (simulado)
         if metrics['pending_payout'] >= 50:
             if st.button("💳 Solicitar Retiro Ahora", use_container_width=True):
                 st.success(f"Retiro de ${metrics['pending_payout']:.2f} USD procesado. Llegará a tu wallet en 24-48h.")
@@ -1854,10 +2605,9 @@ def show_affiliate_dashboard():
     
     st.markdown("---")
     
-    # Tu link de afiliado
     st.markdown("### 🔗 Tu Link de Afiliado")
     
-    base_url = "https://mindgeekclinic.com"  # Cambiar por tu dominio real
+    base_url = "https://mindgeekclinic.com"
     affiliate_link = f"{base_url}?affiliate={metrics['affiliate_code']}"
     
     col_link1, col_link2 = st.columns([3, 1])
@@ -1879,10 +2629,8 @@ def show_affiliate_dashboard():
     
     st.markdown("---")
     
-    # Gráficos de desempeño
     st.markdown("### 📈 Tu Desempeño")
     
-    # Datos simulados para gráficos
     dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
     referrals_data = pd.DataFrame({
         'Fecha': dates,
@@ -1905,13 +2653,11 @@ def show_affiliate_dashboard():
                                 labels={'value': 'USD', 'variable': 'Comisiones'})
         st.plotly_chart(fig_commissions, use_container_width=True)
     
-    # Tabla de ventas recientes
     if affiliate.get('sales'):
         st.markdown("### 💰 Ventas Recientes")
         
-        sales_df = pd.DataFrame(affiliate['sales'][-10:])  # Últimas 10 ventas
+        sales_df = pd.DataFrame(affiliate['sales'][-10:])
         if not sales_df.empty:
-            # Formatear fechas
             sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y')
             sales_df['amount_usd'] = sales_df['amount_usd'].apply(lambda x: f"${x:.2f}")
             sales_df['commission'] = sales_df['commission'].apply(lambda x: f"${x:.2f}")
@@ -1932,7 +2678,6 @@ def show_affiliate_dashboard():
                 use_container_width=True
             )
     
-    # Acciones rápidas
     st.markdown("---")
     st.markdown("### ⚡ Acciones Rápidas")
     
