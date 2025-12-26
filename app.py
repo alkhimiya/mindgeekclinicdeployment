@@ -141,7 +141,19 @@ AUDIO_CAPABILITIES = {
     'binaural_beats': True,   # Podemos generar tonos binaurales
     'text_to_speech': False   # Necesitaríamos API externa para TTS
 }
+# ... (esto es el final de tu Bloque 1)
 
+# Variable global para que otras partes del código sepan si sounddevice funciona
+AUDIO_CAPABILITIES = {
+    'realtime_playback': SOUNDDEVICE_AVAILABLE,
+    'file_generation': True,  # Siempre podemos generar archivos
+    'binaural_beats': True,   # Podemos generar tonos binaurales
+    'text_to_speech': False   # Necesitaríamos API externa para TTS
+}
+
+# 👇 PEGA AQUÍ EL BLOQUE 2 - Justo en esta línea.
+# Configuración de logging
+logging.basicConfig(level=logging.INFO)
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
