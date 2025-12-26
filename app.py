@@ -88,13 +88,59 @@ from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
 
 # Importaciones para audio (sesiones de hipnosis)
-import soundfile as sf
-import sounddevice as sd
-import librosa
-import librosa.display
-from pydub import AudioSegment
-from pydub.generators import Sine, Sawtooth, Square, Triangle, WhiteNoise
-import io
+# ============================================
+# MANEJO SEGURO DE sounddevice (para evitar error PortAudio)
+# ============================================
+try:
+    import sounddevice as sd
+    SOUNDDEVICE_AVAILABLE = True
+    print("✅ Módulo sounddevice cargado correctamente")
+except OSError as e:
+    # Esto ocurrirá en entornos sin PortAudio (como teléfonos)
+    print(f"⚠️  Advertencia: sounddevice no pudo cargarse - {e}")
+    print("⚠️  El sistema funcionará en modo limitado: audios se generarán como archivos para descargar.")
+    
+    # Creamos un objeto simulado para evitar errores en el resto del código
+    class MockSoundDevice:
+        def __init__(self):
+            self.available = False
+            self.default = None
+            self.default_output_device = None
+            self.default_input_device = None
+        
+        def __getattr__(self, name):
+            # Si cualquier parte del código intenta usar sd.funcion()
+            def mock_method(*args, **kwargs):
+                print(f"🔇 [Modo Simulado] Se llamó a sounddevice.{name}()")
+                print("   Los audios se generarán como archivos descargables (no reproducción en tiempo real).")
+                # Para funciones comunes, retornamos valores simulados
+                if name == 'query_devices':
+                    return []
+                if name == 'play':
+                    print("   [Simulación] Audio 'reproducido' (archivo disponible para descarga)")
+                    return None
+                if name == 'stop':
+                    return None
+                if name == 'get_status':
+                    return {'active': False}
+                return None
+            return mock_method
+        
+        def play(self, *args, **kwargs):
+            print("🔇 [Modo Simulado] Reproducción de audio simulada")
+            print("   Descarga el archivo .mp3 o .wav para escucharlo")
+            return None
+    
+    sd = MockSoundDevice()
+    SOUNDDEVICE_AVAILABLE = False
+
+# Variable global para que otras partes del código sepan si sounddevice funciona
+AUDIO_CAPABILITIES = {
+    'realtime_playback': SOUNDDEVICE_AVAILABLE,
+    'file_generation': True,  # Siempre podemos generar archivos
+    'binaural_beats': True,   # Podemos generar tonos binaurales
+    'text_to_speech': False   # Necesitaríamos API externa para TTS
+}
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
