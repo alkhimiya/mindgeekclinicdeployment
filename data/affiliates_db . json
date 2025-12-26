@@ -1,0 +1,21 @@
+{
+  "affiliates": {},
+  "next_id": 1,
+  "referrals": {},
+  "verification_codes": {},
+  "statistics": {
+    "total_registered": 0,
+    "active_affiliates": 0,
+    "pending_affiliates": 0,
+    "suspended_affiliates": 0,
+    "total_earnings": 0.0,
+    "total_payments": 0.0,
+    "total_referrals": 0,
+    "total_conversions": 0
+  },
+  "settings": {
+    "commission_rate": 0.30,
+    "min_payout": 50.0,
+    "payout_day": "thursday"
+  }
+}
