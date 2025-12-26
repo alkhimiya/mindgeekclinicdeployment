@@ -2402,7 +2402,8 @@ def show_backup_page():
 # ============================================
 # SECCIÓN 16: INTERFACES DEL SISTEMA DE AFILIADOS
 # ============================================
-def show_affiliate_registration():
+
+ def show_affiliate_registration():
     """Muestra el formulario de registro de afiliados - VERSIÓN CORREGIDA"""
     st.subheader("👥 Registro en el Programa de Afiliados")
     st.markdown("""
@@ -2456,6 +2457,122 @@ def show_affiliate_registration():
             else:
                 st.error(message)
         
+        st.warning(f"**DEMO:** Código actual: `{st.session_state['verification_code']}`")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 2: FORMULARIO PRINCIPAL DE REGISTRO
+    # ============================================
+    
+    with st.form("affiliate_registration_form"):
+        st.markdown("### 📝 Información Personal (KYC)")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            full_name = st.text_input("Nombre completo*", key="full_name")
+            email = st.text_input("Email*", 
+                                value=st.session_state.get('verified_email', ''),
+                                disabled=bool(st.session_state.get('verified_email')),
+                                help="Se enviará un código de verificación")
+            id_number = st.text_input("Número de identificación*", key="id_number")
+        
+        with col2:
+            country = st.selectbox("País*", COUNTRIES_LIST, key="country")
+            phone = st.text_input("Teléfono*", key="phone")
+            binance_wallet = st.text_input("Wallet de Binance (USDT)*", 
+                                         key="binance_wallet",
+                                         help="Dirección donde recibirás pagos")
+        
+        # Validación de wallet
+        wallet_valid = False
+        if binance_wallet:
+            if validate_binance_wallet(binance_wallet):
+                st.success("✅ Formato de wallet válido")
+                wallet_valid = True
+            else:
+                st.warning("⚠️ El formato no coincide con direcciones comunes de Binance. Verifica.")
+                wallet_valid = False
+        
+        st.markdown("---")
+        
+        # Términos y condiciones
+        st.markdown("### ✅ Términos y Condiciones")
+        
+        col_terms1, col_terms2 = st.columns(2)
+        
+        with col_terms1:
+            accept_terms = st.checkbox("Acepto los términos y condiciones*", key="accept_terms")
+            accept_privacy = st.checkbox("Acepto la política de privacidad*", key="accept_privacy")
+        
+        with col_terms2:
+            confirm_kyc = st.checkbox("Confirmo que la información es verídica*", key="confirm_kyc")
+            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*", key="accept_payments")
+        
+        # ============================================
+        # BOTÓN DE SUBMIT CORREGIDO - ESTO ES LO QUE FALTABA
+        # ============================================
+        submitted = st.form_submit_button("🚀 Registrar como Afiliado", 
+                                         use_container_width=True,
+                                         type="primary")
+        
+        # Validación después del submit
+        if submitted:
+            # Verificar email verificado
+            email_verified = bool(st.session_state.get('verified_email'))
+            if not email_verified:
+                st.error("❌ Debes verificar tu email antes de registrar. Usa la sección de verificación arriba.")
+                return
+            
+            # Verificar que el email del formulario coincida con el verificado
+            if email != st.session_state.get('verified_email', ''):
+                st.error("❌ El email debe coincidir con el email verificado")
+                return
+            
+            # Validar otros campos
+            if not all([full_name, email, id_number, country, phone, binance_wallet]):
+                st.error("Por favor, completa todos los campos obligatorios (*)")
+            elif not wallet_valid:
+                st.error("Por favor, ingresa una dirección de Binance válida")
+            elif not all([accept_terms, accept_privacy, confirm_kyc, accept_payments]):
+                st.error("Debes aceptar todos los términos y condiciones")
+            else:
+                with st.spinner("Registrando afiliado..."):
+                    affiliate_data = {
+                        "full_name": full_name,
+                        "email": email,
+                        "id_number": id_number,
+                        "country": country,
+                        "phone": phone,
+                        "binance_wallet": binance_wallet
+                    }
+                    
+                    success, message = register_affiliate(affiliate_data)
+                    
+                    if success:
+                        st.balloons()
+                        st.success(message)
+                        
+                        # Limpiar estado de verificación
+                        if 'verified_email' in st.session_state:
+                            del st.session_state['verified_email']
+                        if 'verification_code' in st.session_state:
+                            del st.session_state['verification_code']
+                        
+                        st.markdown("""
+                        ### 🎉 ¡Registro Exitoso!
+                        
+                        **Próximos pasos:**
+                        1. **Guarda tu código de afiliado** (aparece arriba)
+                        2. **Comparte tu link:** `https://tu-app.streamlit.app/?affiliate=TU-CODIGO`
+                        3. **Monitorea** tu dashboard para ver referidos y comisiones
+                        4. **Retira** tus ganancias cada jueves (mínimo $50 USD)
+                        
+                        **Contacto:** affiliates@mindgeekclinic.com
+                        """)
+                    else:
+                        st.error(f"Error en el registro: {message}")       
         st.warning(f"**DEMO:** Código actual: `{st.session_state['verification_code']}`")
     
     st.markdown("---")
