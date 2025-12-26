@@ -64,13 +64,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-import PyPDF2
-from PyPDF2 import PdfReader, PdfWriter
-from fpdf import FPDF
-import pdfkit
-
-# Importaciones para visualización de datos
-import matplotlib.pyplot as plt
+import pypdf as PyPDF2
+from pypdf import PdfReader, PdfWriter
 import seaborn as sns
 from wordcloud import WordCloud, STOPWORDS
 import networkx as nx
