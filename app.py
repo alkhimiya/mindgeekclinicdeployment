@@ -150,8 +150,36 @@ AUDIO_CAPABILITIES = {
     'binaural_beats': True,   # Podemos generar tonos binaurales
     'text_to_speech': False   # Necesitaríamos API externa para TTS
 }
-
-# 👇 PEGA AQUÍ EL BLOQUE 2 - Justo en esta línea.
+# ============================================
+# MANEJO SEGURO DE soundfile
+# ============================================
+try:
+    import soundfile as sf
+    SOUNDFILE_AVAILABLE = True
+    print("✅ Módulo soundfile cargado correctamente")
+except ImportError as e:
+    print(f"⚠️  Advertencia: soundfile no disponible - {e}")
+    
+    class MockSoundFile:
+        def __init__(self):
+            self.available = False
+        
+        def __getattr__(self, name):
+            def mock_method(*args, **kwargs):
+                print(f"📁 [Modo Simulado] Se llamó a soundfile.{name}()")
+                if name == 'write':
+                    print("   [Simulación] Archivo de audio 'guardado' (operación simulada)")
+                    return None
+                return None
+            return mock_method
+        
+        def write(self, file, data, samplerate):
+            print(f"📁 [Simulación] Se habría guardado archivo de audio: {file}")
+            print(f"   Muestras: {len(data)}, Tasa de muestreo: {samplerate}Hz")
+            return None
+    
+    sf = MockSoundFile()
+    SOUNDFILE_AVAILABLE = False
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
 # Configuración de logging
