@@ -1960,14 +1960,40 @@ class PDFGenerator:
         ))
         
         # Estilo para contenido
+def _setup_custom_styles(self):
+    """Configura estilos personalizados"""
+    # Verifica si el estilo ya existe antes de agregarlo
+    if 'CustomTitle' not in self.styles:
+        self.styles.add(ParagraphStyle(
+            name='CustomTitle',
+            parent=self.styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2E86AB'),
+            spaceAfter=30
+        ))
+    
+    # 🔥 CAMBIA ESTA PARTE - VERIFICA SI BodyText YA EXISTE
+    if 'CustomHeading' not in self.styles:
+        self.styles.add(ParagraphStyle(
+            name='CustomHeading',
+            parent=self.styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#A23B72'),
+            spaceAfter=15
+        ))
+    
+    # 🔥 ESTE ES EL CAMBIO CRÍTICO: verifica si 'BodyText' ya existe
+    if 'BodyText' not in self.styles:
         self.styles.add(ParagraphStyle(
             name='BodyText',
             parent=self.styles['Normal'],
             fontSize=11,
-            textColor=colors.HexColor('#2C3E50'),
-            spaceAfter=12,
-            leading=14
+            leading=14,
+            spaceAfter=12
         ))
+    else:
+        # Si ya existe, simplemente lo obtenemos
+        pass  # Ya existe, no necesitamos crearlo
         
         # Estilo para listas
         self.styles.add(ParagraphStyle(
