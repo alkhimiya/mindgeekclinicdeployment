@@ -2431,177 +2431,217 @@ def show_affiliate_registration():
         • Intenta con otro proveedor de email
         • Contacta a soporte: affiliates@mindgeekclinic.com
         """)
-
 def show_affiliate_dashboard():
-    """Muestra el dashboard del afiliado."""
+    """Muestra el dashboard del afiliado - CORREGIDO."""
     st.subheader("📊 Dashboard de Afiliado")
     
-    if 'current_affiliate' in st.session_state and st.session_state.current_affiliate:
-        affiliate = st.session_state.current_affiliate
-    else:
-        st.info("Ingresa tu email para acceder a tu dashboard")
-        email = st.text_input("Email registrado")
+    # Verificar si hay afiliado en sesión
+    if 'current_affiliate' not in st.session_state or not st.session_state.current_affiliate:
+        st.info("🔐 Ingresa tu email para acceder a tu dashboard")
         
-        if email and st.button("Acceder a mi dashboard"):
-            affiliate = get_affiliate_by_email(email)
-            if affiliate:
-                st.session_state.current_affiliate = affiliate
-                st.success(f"¡Bienvenido/a, {affiliate['full_name']}!")
-                st.rerun()
-            else:
-                st.error("Email no encontrado. Verifica o regístrate primero.")
-                return
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            email = st.text_input("Email registrado", key="dashboard_email")
+        
+        with col2:
+            st.markdown("###")
+            if st.button("🚪 Acceder", use_container_width=True, type="primary"):
+                if email:
+                    affiliate = get_affiliate_by_email(email)
+                    if affiliate:
+                        st.session_state.current_affiliate = affiliate
+                        st.success(f"¡Bienvenido/a, {affiliate['full_name']}!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Email no encontrado. Regístrate primero.")
+                else:
+                    st.error("Por favor ingresa un email")
+        
+        # Si no hay afiliado, detener aquí
+        return
     
+    # Si llegamos aquí, hay afiliado en sesión
     affiliate = st.session_state.current_affiliate
+    
+    # Calcular métricas con validación
     metrics = calculate_affiliate_metrics(affiliate)
     
+    # Verificar que metrics tenga datos
+    if not metrics:
+        st.error("⚠️ No se pudieron cargar las métricas del afiliado.")
+        if st.button("🔄 Recargar datos"):
+            st.rerun()
+        return
+    
+    # Mostrar métricas - CON VALIDACIÓN
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        balance = metrics.get('balance', 0.0)
         st.metric(
             label="💰 Balance Disponible",
-            value=f"${metrics['balance']:.2f} USD",
+            value=f"${balance:.2f} USD" if isinstance(balance, (int, float)) else "$0.00 USD",
             help="Disponible para retiro inmediato"
         )
     
     with col2:
+        pending = metrics.get('pending_payout', 0.0)
         st.metric(
             label="📊 Pendiente de Pago",
-            value=f"${metrics['pending_payout']:.2f} USD",
+            value=f"${pending:.2f} USD" if isinstance(pending, (int, float)) else "$0.00 USD",
             help="Acumulado esta semana"
         )
     
     with col3:
+        earned = metrics.get('total_earned', 0.0)
         st.metric(
             label="🏆 Total Ganado",
-            value=f"${metrics['total_earned']:.2f} USD",
+            value=f"${earned:.2f} USD" if isinstance(earned, (int, float)) else "$0.00 USD",
             help="Histórico desde registro"
         )
     
     with col4:
+        conversion = metrics.get('conversion_rate', 0.0)
+        conversions = metrics.get('conversions', 0)
+        referrals = metrics.get('referrals', 0)
         st.metric(
             label="📈 Tasa Conversión",
-            value=f"{metrics['conversion_rate']}%",
-            help=f"{metrics['conversions']} ventas / {metrics['referrals']} referidos"
+            value=f"{conversion:.1f}%" if isinstance(conversion, (int, float)) else "0.0%",
+            help=f"{conversions} ventas / {referrals} referidos"
         )
     
     st.markdown("---")
     
+    # Mostrar información del afiliado
     col_info1, col_info2 = st.columns(2)
     
     with col_info1:
         st.markdown("### 👤 Tu Información")
-        st.write(f"**Código:** `{metrics['affiliate_code']}`")
-        st.write(f"**Nombre:** {metrics['full_name']}")
-        st.write(f"**Estado:** {metrics['status']}")
-        st.write(f"**Fecha registro:** {metrics['join_date']}")
+        st.write(f"**Código:** `{metrics.get('affiliate_code', 'No disponible')}`")
+        st.write(f"**Nombre:** {metrics.get('full_name', 'No disponible')}")
+        st.write(f"**Estado:** {metrics.get('status', 'active').title()}")
+        st.write(f"**Fecha registro:** {metrics.get('join_date', 'No disponible')}")
     
     with col_info2:
         st.markdown("### 🏦 Información de Pagos")
-        st.write(f"**Wallet Binance:** `{metrics['binance_wallet'][:20]}...`")
-        st.write(f"**Próximo pago:** {metrics['next_payout']}")
+        wallet = metrics.get('binance_wallet', 'No configurada')
+        if len(wallet) > 20:
+            st.write(f"**Wallet Binance:** `{wallet[:20]}...`")
+        else:
+            st.write(f"**Wallet Binance:** `{wallet}`")
+        st.write(f"**Próximo pago:** {metrics.get('next_payout', 'No disponible')}")
         st.write(f"**Mínimo retiro:** $50.00 USD")
         st.write(f"**Frecuencia:** Semanal (jueves)")
     
-    if metrics['pending_payout'] >= 50:
-        if st.button("💳 Solicitar Retiro Ahora", use_container_width=True):
-            st.success(f"Retiro de ${metrics['pending_payout']:.2f} USD procesado. Llegará a tu wallet en 24-48h.")
-    else:
-        st.warning(f"Necesitas ${50 - metrics['pending_payout']:.2f} USD más para retirar")
+    # Botón de retiro con validación
+    pending_amount = metrics.get('pending_payout', 0.0)
+    if isinstance(pending_amount, (int, float)) and pending_amount >= 50:
+        if st.button("💳 Solicitar Retiro Ahora", use_container_width=True, type="primary"):
+            st.success(f"✅ Retiro de ${pending_amount:.2f} USD procesado. Llegará a tu wallet en 24-48h.")
+    elif isinstance(pending_amount, (int, float)):
+        needed = 50 - pending_amount
+        st.warning(f"Necesitas ${needed:.2f} USD más para retirar (mínimo: $50)")
     
     st.markdown("---")
     
-    st.markdown("### 🔗 Tu Link de Afiliado")
-    base_url = "https://mindgeekclinic.com"
-    affiliate_link = f"{base_url}?affiliate={metrics['affiliate_code']}"
-    
-    col_link1, col_link2 = st.columns([3, 1])
-    
-    with col_link1:
-        st.code(affiliate_link, language="text")
-    
-    with col_link2:
-        st.markdown("###")
-        st.button("📋 Copiar Link", use_container_width=True)
-    
-    st.markdown(f"""
-    **Comparte este link en:**
-    • Tu sitio web o blog
-    • Redes sociales
-    • Email a tus contactos
-    • Material promocional
-    """)
+    # Mostrar link de afiliado
+    affiliate_code = metrics.get('affiliate_code', '')
+    if affiliate_code:
+        st.markdown("### 🔗 Tu Link de Afiliado")
+        base_url = "https://mindgeekclinic.com"
+        affiliate_link = f"{base_url}?affiliate={affiliate_code}"
+        
+        col_link1, col_link2 = st.columns([3, 1])
+        
+        with col_link1:
+            st.code(affiliate_link, language="text")
+        
+        with col_link2:
+            st.markdown("###")
+            if st.button("📋 Copiar Link", use_container_width=True):
+                # En Streamlit Cloud necesitarías JavaScript para copiar al portapapeles
+                st.success("Link copiado (en producción se copiaría al portapapeles)")
+        
+        st.markdown(f"""
+        **Comparte este link en:**
+        • Tu sitio web o blog
+        • Redes sociales
+        • Email a tus contactos
+        • Material promocional
+        """)
     
     st.markdown("---")
     
+    # Mostrar estadísticas si hay datos
     st.markdown("### 📈 Tu Desempeño")
-    dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
-    referrals_data = pd.DataFrame({
-        'Fecha': dates,
-        'Referidos': np.random.poisson(2, 30).cumsum(),
-        'Ventas': np.random.poisson(1, 30).cumsum(),
-        'Comisiones': np.random.uniform(10, 50, 30).cumsum()
-    })
     
-    col_chart1, col_chart2 = st.columns(2)
+    try:
+        dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
+        referrals_data = pd.DataFrame({
+            'Fecha': dates,
+            'Referidos': np.random.poisson(2, 30).cumsum(),
+            'Ventas': np.random.poisson(1, 30).cumsum(),
+            'Comisiones': np.random.uniform(10, 50, 30).cumsum()
+        })
+        
+        col_chart1, col_chart2 = st.columns(2)
+        
+        with col_chart1:
+            fig_referrals = px.line(referrals_data, x='Fecha', y=['Referidos', 'Ventas'],
+                                   title='Referidos vs Ventas (Últimos 30 días)',
+                                   labels={'value': 'Cantidad', 'variable': 'Métrica'})
+            st.plotly_chart(fig_referrals, use_container_width=True)
+        
+        with col_chart2:
+            fig_commissions = px.area(referrals_data, x='Fecha', y='Comisiones',
+                                     title='Comisiones Acumuladas (USD)',
+                                     labels={'value': 'USD', 'variable': 'Comisiones'})
+            st.plotly_chart(fig_commissions, use_container_width=True)
     
-    with col_chart1:
-        fig_referrals = px.line(referrals_data, x='Fecha', y=['Referidos', 'Ventas'],
-                               title='Referidos vs Ventas (Últimos 30 días)',
-                               labels={'value': 'Cantidad', 'variable': 'Métrica'})
-        st.plotly_chart(fig_referrals, use_container_width=True)
+    except Exception as e:
+        st.warning("No se pudieron cargar las gráficas de desempeño")
     
-    with col_chart2:
-        fig_commissions = px.area(referrals_data, x='Fecha', y='Comisiones',
-                                 title='Comisiones Acumuladas (USD)',
-                                 labels={'value': 'USD', 'variable': 'Comisiones'})
-        st.plotly_chart(fig_commissions, use_container_width=True)
-    
+    # Mostrar ventas recientes si existen
     if affiliate.get('sales'):
         st.markdown("### 💰 Ventas Recientes")
-        sales_df = pd.DataFrame(affiliate['sales'][-10:])
-        if not sales_df.empty:
-            sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y')
-            sales_df['amount_usd'] = sales_df['amount_usd'].apply(lambda x: f"${x:.2f}")
-            sales_df['commission'] = sales_df['commission'].apply(lambda x: f"${x:.2f}")
-            
-            st.dataframe(
-                sales_df[['date', 'type', 'amount_usd', 'commission', 'commission_rate']],
-                column_config={
-                    "date": "Fecha",
-                    "type": "Tipo",
-                    "amount_usd": "Monto",
-                    "commission": "Tu Comisión",
-                    "commission_rate": st.column_config.NumberColumn(
-                        "Tasa %", format="%.1f%%"
-                    )
-                },
-                hide_index=True,
-                use_container_width=True
-            )
+        try:
+            sales_df = pd.DataFrame(affiliate['sales'][-10:])
+            if not sales_df.empty:
+                sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y')
+                sales_df['amount_usd'] = sales_df['amount_usd'].apply(lambda x: f"${x:.2f}" if isinstance(x, (int, float)) else "$0.00")
+                sales_df['commission'] = sales_df['commission'].apply(lambda x: f"${x:.2f}" if isinstance(x, (int, float)) else "$0.00")
+                
+                st.dataframe(
+                    sales_df[['date', 'type', 'amount_usd', 'commission', 'commission_rate']],
+                    column_config={
+                        "date": "Fecha",
+                        "type": "Tipo",
+                        "amount_usd": "Monto",
+                        "commission": "Tu Comisión",
+                        "commission_rate": st.column_config.NumberColumn("Tasa %", format="%.1f%%")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.info("No hay datos de ventas disponibles")
     
     st.markdown("---")
     
+    # Botones de acción
     st.markdown("### ⚡ Acciones Rápidas")
     col_act1, col_act2, col_act3 = st.columns(3)
     
     with col_act1:
-        if st.button("🔄 Actualizar Datas", use_container_width=True):
+        if st.button("🔄 Actualizar Datos", use_container_width=True):
             st.rerun()
     
     with col_act2:
         if st.button("📧 Contactar Soporte", use_container_width=True):
-            st.info("Soporte: affiliates@mindgeekclinic.com")
+            st.info("📧 Soporte: affiliates@mindgeekclinic.com")
     
     with col_act3:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.current_affiliate = None
-            st.success("Sesión cerrada. Vuelve a ingresar con tu email.")
+            st.success("✅ Sesión cerrada. Vuelve a ingresar con tu email.")
             st.rerun()
-
-# ============================================
-# EJECUCIÓN PRINCIPAL
-# ============================================
-
-if __name__ == "__main__":
-    main()
