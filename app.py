@@ -2402,9 +2402,8 @@ def show_backup_page():
 # ============================================
 # SECCIÓN 16: INTERFACES DEL SISTEMA DE AFILIADOS
 # ============================================
-
 def show_affiliate_registration():
-    """Muestra el formulario de registro de afiliados."""
+    """Muestra el formulario de registro de afiliados - VERSIÓN CORREGIDA"""
     st.subheader("👥 Registro en el Programa de Afiliados")
     st.markdown("""
     Únete como afiliado de **MINDGEEKCLINIC** y gana comisiones recomendando nuestros servicios.
@@ -2412,89 +2411,131 @@ def show_affiliate_registration():
     **Retiro mínimo:** $50 USD semanales vía Binance.
     """)
     
+    # ============================================
+    # SECCIÓN 1: VERIFICACIÓN DE EMAIL (FUERA DEL FORM)
+    # ============================================
+    
+    # Gestión de verificación de email SEPARADA del formulario principal
+    st.markdown("### 📧 Verificación de Email")
+    
+    col_verify1, col_verify2 = st.columns([2, 1])
+    
+    with col_verify1:
+        email_for_verification = st.text_input("Email para verificación", 
+                                              key="email_verify_input",
+                                              placeholder="Ingresa tu email primero")
+    
+    with col_verify2:
+        st.markdown("###")
+        if st.button("📨 Enviar código de verificación", 
+                    key="send_code_btn",
+                    use_container_width=True):
+            if email_for_verification:
+                verification_code = send_verification_code(email_for_verification)
+                st.success(f"Código enviado a {email_for_verification}")
+                st.info(f"**DEMO:** Tu código es: `{verification_code}`")
+                st.rerun()
+            else:
+                st.error("Primero ingresa un email")
+    
+    # Si hay código pendiente, mostrar campo para ingresarlo
+    if 'verification_code' in st.session_state and st.session_state['verification_code']:
+        st.info(f"Código pendiente para: {st.session_state.get('verification_email', '')}")
+        
+        verification_input = st.text_input("Ingresa el código de 6 dígitos", 
+                                         max_chars=6,
+                                         key="code_input",
+                                         help="Revisa tu email (en demo, código aparece arriba)")
+        
+        if verification_input:
+            verified, message = verify_email_code(verification_input)
+            if verified:
+                st.success(message)
+                # Guardar email verificado en session_state
+                st.session_state['verified_email'] = st.session_state.get('verification_email', '')
+            else:
+                st.error(message)
+        
+        st.warning(f"**DEMO:** Código actual: `{st.session_state['verification_code']}`")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 2: FORMULARIO PRINCIPAL DE REGISTRO
+    # ============================================
+    
     with st.form("affiliate_registration_form"):
         st.markdown("### 📝 Información Personal (KYC)")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            full_name = st.text_input("Nombre completo*")
-            email = st.text_input("Email*", help="Se enviará un código de verificación")
-            id_number = st.text_input("Número de identificación*", help="DNI, cédula, pasaporte, etc.")
+            full_name = st.text_input("Nombre completo*", key="full_name")
+            email = st.text_input("Email*", 
+                                value=st.session_state.get('verified_email', ''),
+                                disabled=bool(st.session_state.get('verified_email')),
+                                help="Se enviará un código de verificación")
+            id_number = st.text_input("Número de identificación*", key="id_number")
         
         with col2:
-            country = st.selectbox("País*", COUNTRIES_LIST)
-            phone = st.text_input("Teléfono*", help="Incluir código de país")
+            country = st.selectbox("País*", COUNTRIES_LIST, key="country")
+            phone = st.text_input("Teléfono*", key="phone")
             binance_wallet = st.text_input("Wallet de Binance (USDT)*", 
+                                         key="binance_wallet",
                                          help="Dirección donde recibirás pagos")
         
+        # Validación de wallet
+        wallet_valid = False
         if binance_wallet:
             if validate_binance_wallet(binance_wallet):
                 st.success("✅ Formato de wallet válido")
+                wallet_valid = True
             else:
                 st.warning("⚠️ El formato no coincide con direcciones comunes de Binance. Verifica.")
-        
-        st.markdown("---")
-        st.markdown("### 📧 Verificación de Email")
-        
-        email_verified = False
-        
-        if 'verification_code' in st.session_state and st.session_state['verification_code']:
-            st.info(f"Código enviado a: {st.session_state.get('verification_email', '')}")
-            
-            verification_input = st.text_input("Ingresa el código de 6 dígitos*", 
-                                             max_chars=6,
-                                             help="Revisa tu email (en esta demo, el código aparece abajo)")
-            
-            if verification_input:
-                verified, message = verify_email_code(verification_input)
-                if verified:
-                    st.success(message)
-                    email_verified = True
-                else:
-                    st.error(message)
-            
-            st.warning(f"**DEMO:** Para propósitos de prueba, tu código es: `{st.session_state['verification_code']}`")
-            
-            if st.button("🔄 Reenviar código"):
-                if email:
-                    new_code = send_verification_code(email)
-                    st.success(f"Nuevo código enviado a {email}")
-                    st.info(f"**DEMO:** Nuevo código: `{new_code}`")
-                else:
-                    st.error("Primero ingresa un email")
-        else:
-            if email and st.button("📨 Enviar código de verificación"):
-                verification_code = send_verification_code(email)
-                st.success(f"Código de verificación enviado a {email}")
-                st.info(f"**DEMO:** Tu código es: `{verification_code}`")
-                st.rerun()
+                wallet_valid = False
         
         st.markdown("---")
         
+        # Términos y condiciones
         st.markdown("### ✅ Términos y Condiciones")
         
         col_terms1, col_terms2 = st.columns(2)
         
         with col_terms1:
-            accept_terms = st.checkbox("Acepto los términos y condiciones*")
-            accept_privacy = st.checkbox("Acepto la política de privacidad*")
+            accept_terms = st.checkbox("Acepto los términos y condiciones*", key="accept_terms")
+            accept_privacy = st.checkbox("Acepto la política de privacidad*", key="accept_privacy")
         
         with col_terms2:
-            confirm_kyc = st.checkbox("Confirmo que la información es verídica*")
-            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*")
+            confirm_kyc = st.checkbox("Confirmo que la información es verídica*", key="confirm_kyc")
+            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*", key="accept_payments")
         
-        submitted = st.form_submit_button("🚀 Registrar como Afiliado", use_container_width=True)
+        # ============================================
+        # BOTÓN DE SUBMIT CORREGIDO - ESTO ES LO QUE FALTABA
+        # ============================================
+        submitted = st.form_submit_button("🚀 Registrar como Afiliado", 
+                                         use_container_width=True,
+                                         type="primary")
         
+        # Validación después del submit
         if submitted:
+            # Verificar email verificado
+            email_verified = bool(st.session_state.get('verified_email'))
+            if not email_verified:
+                st.error("❌ Debes verificar tu email antes de registrar. Usa la sección de verificación arriba.")
+                return
+            
+            # Verificar que el email del formulario coincida con el verificado
+            if email != st.session_state.get('verified_email', ''):
+                st.error("❌ El email debe coincidir con el email verificado")
+                return
+            
+            # Validar otros campos
             if not all([full_name, email, id_number, country, phone, binance_wallet]):
                 st.error("Por favor, completa todos los campos obligatorios (*)")
-            elif not validate_binance_wallet(binance_wallet):
+            elif not wallet_valid:
                 st.error("Por favor, ingresa una dirección de Binance válida")
             elif not all([accept_terms, accept_privacy, confirm_kyc, accept_payments]):
                 st.error("Debes aceptar todos los términos y condiciones")
-            elif not email_verified and 'verification_code' in st.session_state:
-                st.error("Debes verificar tu email antes de registrar")
             else:
                 with st.spinner("Registrando afiliado..."):
                     affiliate_data = {
@@ -2512,12 +2553,18 @@ def show_affiliate_registration():
                         st.balloons()
                         st.success(message)
                         
+                        # Limpiar estado de verificación
+                        if 'verified_email' in st.session_state:
+                            del st.session_state['verified_email']
+                        if 'verification_code' in st.session_state:
+                            del st.session_state['verification_code']
+                        
                         st.markdown("""
                         ### 🎉 ¡Registro Exitoso!
                         
                         **Próximos pasos:**
-                        1. **Guarda tu código de afiliado** (también llegará por email)
-                        2. **Comparte tu link:** `https://tudominio.com/?affiliate=TU-CODIGO`
+                        1. **Guarda tu código de afiliado** (aparece arriba)
+                        2. **Comparte tu link:** `https://tu-app.streamlit.app/?affiliate=TU-CODIGO`
                         3. **Monitorea** tu dashboard para ver referidos y comisiones
                         4. **Retira** tus ganancias cada jueves (mínimo $50 USD)
                         
@@ -2525,6 +2572,7 @@ def show_affiliate_registration():
                         """)
                     else:
                         st.error(f"Error en el registro: {message}")
+
 
 def show_affiliate_dashboard():
     """Muestra el dashboard del afiliado."""
