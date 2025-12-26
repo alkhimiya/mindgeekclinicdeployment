@@ -1,4 +1,3 @@
-
 import streamlit as st
 import json
 import os
@@ -51,21 +50,26 @@ DATA_FILE = "mindgeekclinic_data.json"
 AFFILIATE_DB_FILE = "affiliates_db.json"
 ACCESS_LOG_FILE = "access_log.json"
 PAYMENT_LOG_FILE = "payment_log.json"
-
 CHROMA_DB_PATH = "./chroma_db"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-CHROMA_PERSIST_DIRECTORY = st.secrets.get("CHROMA_PERSIST_DIRECTORY", CHROMA_DB_PATH)
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "Enaraure25..")
-ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "promptandmente@gmail.com")
+# OBTENER SECRETS CON FORMATO TOML CORRECTO
+try:
+    GROQ_API_KEY = st.secrets["groq"]["api_key"]
+except:
+    GROQ_API_KEY = ""
 
-SMTP_CONFIG = {
-    "host": st.secrets.get("SMTP_HOST", ""),
-    "port": st.secrets.get("SMTP_PORT", 587),
-    "user": st.secrets.get("SMTP_USER", ""),
-    "password": st.secrets.get("SMTP_PASSWORD", "")
-}
+try:
+    CHROMA_PERSIST_DIRECTORY = st.secrets["chroma"]["persist_directory"]
+except:
+    CHROMA_PERSIST_DIRECTORY = CHROMA_DB_PATH
+
+try:
+    ADMIN_PASSWORD = st.secrets["app"]["admin_password"]
+    ADMIN_EMAIL = st.secrets["app"]["admin_email"]
+except:
+    ADMIN_PASSWORD = "Enaraure25.."
+    ADMIN_EMAIL = "promptandmente@gmail.com"
 
 # ============================================
 # SECCIÓN 2: INICIALIZACIÓN DE SESIÓN
@@ -79,7 +83,6 @@ if 'pacientes_registrados' not in st.session_state:
     st.session_state.pacientes_registrados = 0
 if 'access_count' not in st.session_state:
     st.session_state.access_count = 0
-
 if 'affiliate_code_input' not in st.session_state:
     st.session_state.affiliate_code_input = ""
 if 'current_affiliate' not in st.session_state:
@@ -92,7 +95,6 @@ if 'verification_time' not in st.session_state:
     st.session_state.verification_time = None
 if 'verified_email' not in st.session_state:
     st.session_state.verified_email = None
-
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'admin_session_id' not in st.session_state:
@@ -107,15 +109,13 @@ def load_data():
     try:
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            
-            if 'statistics' in data:
-                stats = data['statistics']
-                st.session_state.page_views = stats.get('total_accesses', 0)
-                st.session_state.diagnosticos_realizados = stats.get('total_diagnoses', 0)
-                st.session_state.pacientes_registrados = stats.get('total_patients', 0)
-                st.session_state.access_count = stats.get('access_count', 0)
-                
-            return data
+        if 'statistics' in data:
+            stats = data['statistics']
+            st.session_state.page_views = stats.get('total_accesses', 0)
+            st.session_state.diagnosticos_realizados = stats.get('total_diagnoses', 0)
+            st.session_state.pacientes_registrados = stats.get('total_patients', 0)
+            st.session_state.access_count = stats.get('access_count', 0)
+        return data
     except FileNotFoundError:
         initial_data = {
             "patients": [],
@@ -141,7 +141,6 @@ def save_data(data):
     data['statistics']['total_diagnoses'] = st.session_state.diagnosticos_realizados
     data['statistics']['total_patients'] = st.session_state.pacientes_registrados
     data['statistics']['access_count'] = st.session_state.access_count
-    
     try:
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -218,23 +217,18 @@ def save_access_log(log_data):
 def track_access():
     st.session_state.access_count += 1
     st.session_state.page_views += 1
-    
     log_data = load_access_log()
     current_time = datetime.now().isoformat()
     today = datetime.now().strftime("%Y-%m-%d")
-    
     log_data["accesses"].append({
         "timestamp": current_time,
         "session_id": str(uuid.uuid4())[:8]
     })
-    
     if today not in log_data["daily_stats"]:
         log_data["daily_stats"][today] = 0
     log_data["daily_stats"][today] += 1
-    
     if len(log_data["accesses"]) > 1000:
         log_data["accesses"] = log_data["accesses"][-1000:]
-    
     save_access_log(log_data)
 
 # ============================================
@@ -339,7 +333,6 @@ def get_system_by_symptom(symptom):
         "respiratorio": ["respiración", "pulmón", "asma", "tos", "bronquios", "nariz", "sinusitis"],
         "muscular": ["músculo", "dolor", "articulación", "contractura", "artritis", "tendón", "espalda"]
     }
-    
     symptom_lower = symptom.lower()
     for system, keywords in symptom_mapping.items():
         for keyword in keywords:
@@ -357,13 +350,11 @@ def initialize_chroma_db():
             path=CHROMA_PERSIST_DIRECTORY,
             settings=Settings(anonymized_telemetry=False)
         )
-        
         collection_name = "mindgeekclinic_knowledge"
         try:
             collection = chroma_client.get_collection(name=collection_name)
         except:
             collection = chroma_client.create_collection(name=collection_name)
-        
         return chroma_client, collection
     except Exception as e:
         st.error(f"Error inicializando ChromaDB: {str(e)}")
@@ -381,18 +372,15 @@ def get_embeddings(texts):
 def query_knowledge_base(query, collection, n_results=3):
     if not collection:
         return []
-    
     try:
         query_embedding = get_embeddings([query])
         if not query_embedding:
             return []
-        
         results = collection.query(
             query_embeddings=query_embedding,
             n_results=n_results,
             include=["documents", "metadatas", "distances"]
         )
-        
         return results
     except Exception as e:
         st.error(f"Error consultando base de conocimiento: {str(e)}")
@@ -402,21 +390,15 @@ def generate_with_groq(prompt, context=""):
     if not GROQ_API_KEY:
         st.warning("API key de Groq no configurada.")
         return "Consulta no disponible: configure la API key de Groq en los secrets."
-    
     try:
         client = groq.Groq(api_key=GROQ_API_KEY)
-        
         full_prompt = f"""
         Eres un experto en biodescodificación y medicina psicosomática.
-        
         Contexto adicional: {context}
-        
         Pregunta del usuario: {prompt}
-        
         Proporciona una respuesta profesional, compasiva y basada en los principios de la biodescodificación.
         Incluye posibles conflictos emocionales y sugerencias para la exploración terapéutica.
         """
-        
         response = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "Eres un terapeuta especializado en biodescodificación con 20 años de experiencia."},
@@ -426,7 +408,6 @@ def generate_with_groq(prompt, context=""):
             temperature=0.7,
             max_tokens=1000
         )
-        
         return response.choices[0].message.content
     except Exception as e:
         st.error(f"Error con la API de Groq: {str(e)}")
@@ -442,14 +423,12 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
         "conflictos_detectados": [],
         "recomendaciones": []
     }
-    
     knowledge = get_specialized_knowledge()
     
     for symptom in symptoms.split(","):
         symptom = symptom.strip()
         if not symptom:
             continue
-            
         system = get_system_by_symptom(symptom)
         system_info = knowledge.get(system, knowledge["ocular"])
         
@@ -457,9 +436,7 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
             event = event.strip()
             if not event:
                 continue
-                
             correlation_score = random.uniform(0.3, 0.9)
-            
             if correlation_score > 0.6:
                 analysis["correlaciones"].append({
                     "sintoma": symptom,
@@ -472,7 +449,7 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
     if analysis["correlaciones"]:
         analysis["conflictos_detectados"] = [
             "Separación conflictiva",
-            "Desvalorización en la acción", 
+            "Desvalorización en la acción",
             "Miedo territorial",
             "Conflicto de identidad"
         ][:min(3, len(analysis["correlaciones"]))]
@@ -488,73 +465,68 @@ def analyze_emotional_triangulation(symptoms, events, time_period):
 
 def generate_diagnosis_report(patient_data, triangulation_analysis):
     report = f"""
-    # 📋 INFORME DE BIODESCODIFICACIÓN
-    
-    ## 📊 Datos del Paciente
-    **Nombre:** {patient_data.get('nombre', 'No especificado')}
-    **Edad:** {patient_data.get('edad', 'No especificada')}
-    **Género:** {patient_data.get('genero', 'No especificado')}
-    **Dolencia principal:** {patient_data.get('dolencia', 'No especificada')}
-    **Tiempo de padecimiento:** {patient_data.get('tiempo', 'No especificado')}
-    
-    ## 🎯 Análisis de Triangulación Emocional
-    
-    ### 🔍 Correlaciones Identificadas
-    """
-    
+# 📋 INFORME DE BIODESCODIFICACIÓN
+
+## 📊 Datos del Paciente
+**Nombre:** {patient_data.get('nombre', 'No especificado')}
+**Edad:** {patient_data.get('edad', 'No especificada')}
+**Género:** {patient_data.get('genero', 'No especificado')}
+**Dolencia principal:** {patient_data.get('dolencia', 'No especificada')}
+**Tiempo de padecimiento:** {patient_data.get('tiempo', 'No especificado')}
+
+## 🎯 Análisis de Triangulación Emocional
+
+### 🔍 Correlaciones Identificadas
+"""
     if triangulation_analysis["correlaciones"]:
         for i, corr in enumerate(triangulation_analysis["correlaciones"], 1):
             report += f"""
-    {i}. **{corr['sintoma']}** relacionado con **"{corr['evento']}"**
-       - Sistema corporal: {corr['sistema']}
-       - Conflictos posibles: {', '.join(corr['conflictos_posibles'][:2])}
-       - Nivel de correlación: {corr['puntuacion']}/1.0
-    """
+{i}. **{corr['sintoma']}** relacionado con **"{corr['evento']}"**
+    - Sistema corporal: {corr['sistema']}
+    - Conflictos posibles: {', '.join(corr['conflictos_posibles'][:2])}
+    - Nivel de correlación: {corr['puntuacion']}/1.0
+"""
     else:
-        report += "\n    No se identificaron correlaciones significativas entre eventos y síntomas.\n"
+        report += "\nNo se identificaron correlaciones significativas entre eventos y síntomas.\n"
     
     report += f"""
-    ### 🎭 Conflictos Emocionales Detectados
-    """
-    
+### 🎭 Conflictos Emocionales Detectados
+"""
     if triangulation_analysis["conflictos_detectados"]:
         for conflicto in triangulation_analysis["conflictos_detectados"]:
-            report += f"\n    - {conflicto}"
+            report += f"\n- {conflicto}"
     else:
-        report += "\n    No se detectaron conflictos emocionales específicos.\n"
+        report += "\nNo se detectaron conflictos emocionales específicos.\n"
     
     report += f"""
-    ### 💡 Recomendaciones Terapéuticas
-    """
-    
+### 💡 Recomendaciones Terapéuticas
+"""
     for recomendacion in triangulation_analysis["recomendaciones"]:
-        report += f"\n    - {recomendacion}"
+        report += f"\n- {recomendacion}"
     
     report += f"""
-    
-    ## 🧠 Protocolo Sugerido
-    
-    ### 1. Exploración Inicial
-    - Diálogo con el síntoma: preguntar qué emoción representa
-    - Línea del tiempo emocional alrededor del inicio
-    - Identificación de creencias limitantes relacionadas
-    
-    ### 2. Intervención Terapéutica
-    - Técnicas de liberación emocional específicas
-    - Visualización guiada del sistema afectado sanando
-    - Reprogramación de creencias a nivel inconsciente
-    
-    ### 3. Seguimiento
-    - Monitorización de cambios sintomáticos
-    - Ajuste de protocolo según evolución
-    - Integración de aprendizajes emocionales
-    
-    ## 📅 Información de la Sesión
-    **Fecha del diagnóstico:** {datetime.now().strftime('%d/%m/%Y %H:%M')}
-    **Terapeuta responsable:** Sistema MINDGEEKCLINIC
-    **Versión de la plataforma:** {APP_VERSION}
-    """
-    
+## 🧠 Protocolo Sugerido
+
+### 1. Exploración Inicial
+- Diálogo con el síntoma: preguntar qué emoción representa
+- Línea del tiempo emocional alrededor del inicio
+- Identificación de creencias limitantes relacionadas
+
+### 2. Intervención Terapéutica
+- Técnicas de liberación emocional específicas
+- Visualización guiada del sistema afectado sanando
+- Reprogramación de creencias a nivel inconsciente
+
+### 3. Seguimiento
+- Monitorización de cambios sintomáticos
+- Ajuste de protocolo según evolución
+- Integración de aprendizajes emocionales
+
+## 📅 Información de la Sesión
+**Fecha del diagnóstico:** {datetime.now().strftime('%d/%m/%Y %H:%M')}
+**Terapeuta responsable:** Sistema MINDGEEKCLINIC
+**Versión de la plataforma:** {APP_VERSION}
+"""
     return report
 
 # ============================================
@@ -566,73 +538,64 @@ def generate_hypnosis_protocol(system, conflict_type):
     protocols = {
         "ocular": {
             "conflicto_visual": """
-            # Protocolo de Hipnosis para Conflictos Visuales
-            
-            ## Inducción
-            1. Respiración profunda 4-7-8
-            2. Relajación progresiva facial
-            3. Enfoque en la sensación ocular
-            
-            ## Visualización Guiada
-            "Imagina que tus ojos son ventanas hacia tu alma...
-            Visualiza una luz suave que limpia cada capa de tensión...
-            Permite que tu visión interna se aclare..."
-            
-            ## Sugestiones Post-Hipnóticas
-            "Cada día verás con mayor claridad y aceptación...
-            Tu visión se ajusta naturalmente a lo que necesitas experimentar..."
-            """,
+# Protocolo de Hipnosis para Conflictos Visuales
+
+## Inducción
+1. Respiración profunda 4-7-8
+2. Relajación progresiva facial
+3. Enfoque en la sensación ocular
+
+## Visualización Guiada
+"Imagina que tus ojos son ventanas hacia tu alma... Visualiza una luz suave que limpia cada capa de tensión... Permite que tu visión interna se aclare..."
+
+## Sugestiones Post-Hipnóticas
+"Cada día verás con mayor claridad y aceptación... Tu visión se ajusta naturalmente a lo que necesitas experimentar..."
+""",
             "miedo_futuro": """
-            # Protocolo para Miedo al Futuro
-            
-            ## Técnica de Línea del Tiempo
-            1. Visualizar línea del tiempo personal
-            2. Sanar eventos pasados que nublan la visión futura
-            3. Proyectar imágenes positivas del futuro
-            
-            ## Afirmaciones
-            "El futuro es una extensión amorosa del presente...
-            Confío en mi capacidad de ver y adaptarme..."
-            """
+# Protocolo para Miedo al Futuro
+
+## Técnica de Línea del Tiempo
+1. Visualizar línea del tiempo personal
+2. Sanar eventos pasados que nublan la visión futura
+3. Proyectar imágenes positivas del futuro
+
+## Afirmaciones
+"El futuro es una extensión amorosa del presente... Confío en mi capacidad de ver y adaptarme..."
+"""
         },
         "dermatologico": {
             "separacion": """
-            # Protocolo para Conflictos de Separación (Piel)
-            
-            ## Diálogo con la Piel
-            1. Contacto consciente con la zona afectada
-            2. Preguntar: "¿Qué separación representas?"
-            3. Escuchar la respuesta somática
-            
-            ## Visualización Curativa
-            "Imagina una luz dorada sanando cada célula de tu piel...
-            Visualiza límites saludables y porosos que te protegen sin aislarte..."
-            
-            ## Integración
-            "Tu piel es un mapa de tus contactos...
-            Cada célula renueva su capacidad de contacto amoroso..."
-            """
+# Protocolo para Conflictos de Separación (Piel)
+
+## Diálogo con la Piel
+1. Contacto consciente con la zona afectada
+2. Preguntar: "¿Qué separación representas?"
+3. Escuchar la respuesta somática
+
+## Visualización Curativa
+"Imagina una luz dorada sanando cada célula de tu piel... Visualiza límites saludables y porosos que te protegen sin aislarte..."
+
+## Integración
+"Tu piel es un mapa de tus contactos... Cada célula renueva su capacidad de contacto amoroso..."
+"""
         },
         "digestivo": {
             "indigestion_emocional": """
-            # Protocolo para Conflictos Digestivos
-            
-            ## Conexión Estómago-Emoción
-            1. Manos sobre el abdomen
-            2. Respirar hacia la zona tensa
-            3. Identificar la "emoción no digerida"
-            
-            ## Liberación
-            "Visualiza la emoción atrapada transformándose en luz...
-            Permite que tu sistema digestivo procese y suelte..."
-            
-            ## Nuevo Patrón
-            "Digiero fácilmente experiencias y emociones...
-            Mi intestino fluye con la sabiduría de soltar lo innecesario..."
-            """
+# Protocolo para Conflictos Digestivos
+
+## Conexión Estómago-Emoción
+1. Manos sobre el abdomen
+2. Respirar hacia la zona tensa
+3. Identificar la "emoción no digerida"
+
+## Liberación
+"Visualiza la emoción atrapada transformándose en luz... Permite que tu sistema digestivo procese y suelte..."
+
+## Nuevo Patrón
+"Digiero fácilmente experiencias y emociones... Mi intestino fluye con la sabiduría de soltar lo innecesario..."
+"""
         }
     }
-    
     system_protocols = protocols.get(system, protocols["ocular"])
     return system_protocols.get(conflict_type, list(system_protocols.values())[0])
 
@@ -644,21 +607,20 @@ def generate_self_hypnosis_script(protocol_text):
     script = script.replace("Siente", "Puedo sentir")
     
     full_script = f"""
-    # 🧘 Autohipnosis Guiada
-    
-    ## Preparación
-    Encuentra un lugar tranquilo, siéntate o recuéstate cómodamente.
-    Respira profundamente 3 veces antes de comenzar.
-    
-    {script}
-    
-    ## Finalización
-    Poco a poco, voy trayendo mi conciencia de regreso a la habitación.
-    Muevo suavemente dedos de manos y pies.
-    Abro los ojos cuando me sienta listo/a.
-    Me tomo un momento para integrar la experiencia.
-    """
-    
+# 🧘 Autohipnosis Guiada
+
+## Preparación
+Encuentra un lugar tranquilo, siéntate o recuéstate cómodamente.
+Respira profundamente 3 veces antes de comenzar.
+
+{script}
+
+## Finalización
+Poco a poco, voy trayendo mi conciencia de regreso a la habitación.
+Muevo suavemente dedos de manos y pies.
+Abro los ojos cuando me sienta listo/a.
+Me tomo un momento para integrar la experiencia.
+"""
     return full_script
 
 # ============================================
@@ -668,10 +630,7 @@ def generate_self_hypnosis_script(protocol_text):
 def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     """Crea un PDF profesional con el diagnóstico y protocolo."""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, 
-                          rightMargin=72, leftMargin=72,
-                          topMargin=72, bottomMargin=72)
-    
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
@@ -715,7 +674,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     story.append(Spacer(1, 24))
     
     story.append(Paragraph("Análisis de Biodescodificación", heading_style))
-    
     report_lines = diagnosis_report.split('\n')
     for line in report_lines:
         if line.startswith('# '):
@@ -742,6 +700,7 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
             story.append(Spacer(1, 6))
     
     story.append(Spacer(1, 36))
+    
     footer_text = f"""
     <i>Documento generado automáticamente por MINDGEEKCLINIC v{APP_VERSION}<br/>
     Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}<br/>
@@ -755,7 +714,6 @@ def create_pdf_diagnosis(patient_data, diagnosis_report, protocol_text):
     )))
     
     doc.build(story)
-    
     buffer.seek(0)
     return buffer
 
@@ -802,7 +760,6 @@ def display_statistics():
         )
     
     st.subheader("📈 Tendencia de Uso")
-    
     dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
     usage_data = pd.DataFrame({
         'Fecha': dates,
@@ -813,7 +770,6 @@ def display_statistics():
     fig = px.line(usage_data, x='Fecha', y=['Diagnósticos', 'Consultas'],
                   title='Actividad Mensual',
                   labels={'value': 'Cantidad', 'variable': 'Métrica'})
-    
     st.plotly_chart(fig, use_container_width=True)
 
 def backup_data():
@@ -821,7 +777,6 @@ def backup_data():
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = f"backup/mindgeek_backup_{timestamp}.json"
-        
         os.makedirs("backup", exist_ok=True)
         
         if os.path.exists(DATA_FILE):
@@ -841,10 +796,10 @@ def backup_data():
 # ============================================
 
 COUNTRIES_LIST = [
-    "Argentina", "Brasil", "Chile", "Colombia", "Costa Rica", "Ecuador", "El Salvador",
-    "España", "Estados Unidos", "Guatemala", "Honduras", "México", "Nicaragua",
-    "Panamá", "Paraguay", "Perú", "Portugal", "Puerto Rico", "República Dominicana",
-    "Uruguay", "Venezuela", "Otro"
+    "Argentina", "Brasil", "Chile", "Colombia", "Costa Rica", "Ecuador",
+    "El Salvador", "España", "Estados Unidos", "Guatemala", "Honduras",
+    "México", "Nicaragua", "Panamá", "Paraguay", "Perú", "Portugal",
+    "Puerto Rico", "República Dominicana", "Uruguay", "Venezuela", "Otro"
 ]
 
 def generate_affiliate_code():
@@ -875,14 +830,76 @@ def validate_binance_wallet(wallet):
                 re.match(tron_pattern, wallet))
 
 def send_verification_code(email):
-    """Simula el envío de un código de verificación de 6 dígitos."""
-    verification_code = ''.join(random.choices(string.digits, k=6))
-    
-    st.session_state['verification_code'] = verification_code
-    st.session_state['verification_email'] = email
-    st.session_state['verification_time'] = datetime.now()
-    
-    return verification_code
+    """Envía un código de verificación de 6 dígitos por email - CORREGIDO."""
+    try:
+        # Generar código
+        verification_code = ''.join(random.choices(string.digits, k=6))
+        
+        # Guardar en sesión
+        st.session_state['verification_code'] = verification_code
+        st.session_state['verification_email'] = email
+        st.session_state['verification_time'] = datetime.now()
+        
+        # ============================================
+        # ENVÍO REAL DE EMAIL CON SECRETS CORRECTOS
+        # ============================================
+        try:
+            # Obtener configuración de email de secrets (formato TOML)
+            email_config = st.secrets["email"]
+            
+            # Crear mensaje
+            msg = MIMEMultipart()
+            msg['From'] = email_config['sender_email']
+            msg['To'] = email
+            msg['Subject'] = "🔐 Código de Verificación - MINDGEEKCLINIC"
+            
+            html_content = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                    <h2 style="color: #4A90E2;">✅ Verificación de Email</h2>
+                    <p>Tu código de verificación para MINDGEEKCLINIC es:</p>
+                    
+                    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
+                        <h3 style="color: #333; font-size: 32px; letter-spacing: 5px;">{verification_code}</h3>
+                        <p style="color: #666;">Válido por 10 minutos</p>
+                    </div>
+                    
+                    <p>Ingresa este código en la aplicación para completar tu registro como afiliado.</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    
+                    <p style="font-size: 12px; color: #666;">
+                        Si no solicitaste este registro, ignora este email.<br>
+                        Contacto: affiliates@mindgeekclinic.com
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            msg.attach(MIMEText(html_content, "html"))
+            
+            # Enviar usando SMTP (Gmail)
+            with smtplib.SMTP(email_config['smtp_server'], email_config['smtp_port']) as server:
+                server.starttls()
+                server.login(email_config['username'], email_config['password'])
+                server.send_message(msg)
+            
+            # Registrar envío exitoso
+            st.session_state['last_email_sent'] = datetime.now().strftime("%H:%M:%S")
+            st.success(f"✅ Código enviado a {email}")
+            
+        except Exception as email_error:
+            # Si falla el envío real, mostrar modo demo
+            st.warning(f"⚠️ Error al enviar email: {str(email_error)}")
+            st.info(f"**Modo demo:** Tu código es: `{verification_code}`")
+        
+        return verification_code
+        
+    except Exception as e:
+        st.error(f"Error generando código: {str(e)}")
+        return None
 
 def verify_email_code(input_code):
     """Verifica si el código ingresado por el usuario es correcto."""
@@ -916,7 +933,6 @@ def register_affiliate(affiliate_data):
         return False, "Este número de identificación ya está registrado."
     
     affiliate_code = generate_affiliate_code()
-    
     new_affiliate = {
         "id": str(uuid.uuid4()),
         "affiliate_code": affiliate_code,
@@ -992,7 +1008,6 @@ def record_sale(affiliate_code, sale_type, amount_usd):
             }
             
             affiliate['sales'].append(sale_record)
-            
             if len(affiliate['sales']) > 100:
                 affiliate['sales'] = affiliate['sales'][-100:]
             
@@ -1054,7 +1069,6 @@ def send_admin_notification(subject, message):
             "timestamp": datetime.now().isoformat(),
             "admin_email": ADMIN_EMAIL
         })
-        
         st.success(f"📧 Notificación registrada para: {ADMIN_EMAIL}")
         return True
     except Exception as e:
@@ -1065,12 +1079,10 @@ def log_payment_activity(activity_data):
     """Registra actividad de pagos en el log."""
     try:
         log_data = load_payment_log()
-        
         if "activities" not in log_data:
             log_data["activities"] = []
         
         log_data["activities"].append(activity_data)
-        
         if len(log_data["activities"]) > 500:
             log_data["activities"] = log_data["activities"][-500:]
         
@@ -1114,7 +1126,6 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
                     log_data["payments"] = []
                 
                 log_data["payments"].append(payment_data)
-                
                 log_data["summary"]["total_paid"] = log_data["summary"].get("total_paid", 0) + amount
                 log_data["summary"]["payments_count"] = log_data["summary"].get("payments_count", 0) + 1
                 
@@ -1150,6 +1161,7 @@ def mark_as_paid(affiliate_id, amount, tx_hash):
                 return True
         
         return False
+        
     except Exception as e:
         st.error(f"Error al procesar pago: {str(e)}")
         return False
@@ -1183,38 +1195,32 @@ def show_admin_panel():
     st.success(f"Sesión activa: {st.session_state.admin_session_id}")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "💰 Pagos Pendientes", 
-        "👥 Todos los Afiliados", 
-        "📊 Reportes", 
+        "💰 Pagos Pendientes",
+        "👥 Todos los Afiliados",
+        "📊 Reportes",
         "📋 Historial de Pagos",
         "⚙️ Configuración"
     ])
     
     with tab1:
         show_pending_payments()
-    
     with tab2:
         show_all_affiliates()
-    
     with tab3:
         show_admin_reports()
-    
     with tab4:
         show_payment_history()
-    
     with tab5:
         show_admin_settings()
 
 def show_admin_login():
     """Muestra el formulario de login para administrador."""
     st.subheader("🔐 Acceso de Administrador")
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         with st.form("admin_login_form"):
             password = st.text_input("Contraseña de administrador", type="password")
-            
             if st.form_submit_button("Acceder al panel", use_container_width=True):
                 if password == ADMIN_PASSWORD:
                     st.session_state.admin_logged_in = True
@@ -1232,12 +1238,10 @@ def show_admin_login():
 def show_pending_payments():
     """Muestra afiliados con pagos pendientes."""
     st.header("💰 Pagos Pendientes")
-    
     db = load_affiliate_db()
     
     pending_affiliates = [
-        aff for aff in db['affiliates'] 
-        if aff['pending_payout'] > 0
+        aff for aff in db['affiliates'] if aff['pending_payout'] > 0
     ]
     
     total_pending = sum(aff['pending_payout'] for aff in pending_affiliates)
@@ -1258,7 +1262,6 @@ def show_pending_payments():
         return
     
     st.subheader("📋 Lista de Pagos Pendientes")
-    
     pending_affiliates.sort(key=lambda x: x['pending_payout'], reverse=True)
     
     for i, affiliate in enumerate(pending_affiliates):
@@ -1284,12 +1287,11 @@ def show_pending_payments():
             with col4:
                 with st.form(key=f"pay_form_{affiliate['id']}"):
                     tx_hash = st.text_input(
-                        "TX Hash Binance", 
+                        "TX Hash Binance",
                         key=f"tx_{affiliate['id']}",
                         placeholder="0x... o ID transacción",
                         help="Ingresa el hash de la transacción en Binance"
                     )
-                    
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
                         if st.form_submit_button("✅ Marcar como Pagado", use_container_width=True):
@@ -1301,17 +1303,15 @@ def show_pending_payments():
                                     st.rerun()
                                 else:
                                     st.error("Error al registrar el pago")
-                    
                     with col_btn2:
                         if st.form_submit_button("📋 Ver Detalles", use_container_width=True):
                             show_affiliate_details(affiliate['id'])
-            
-            st.markdown("---")
+        
+        st.markdown("---")
 
 def show_all_affiliates():
     """Muestra todos los afiliados registrados."""
     st.header("👥 Todos los Afiliados")
-    
     db = load_affiliate_db()
     
     if not db['affiliates']:
@@ -1331,8 +1331,8 @@ def show_all_affiliates():
     if search_term:
         filtered_affiliates = [
             aff for aff in filtered_affiliates
-            if search_term.lower() in aff['full_name'].lower() 
-            or search_term.lower() in aff['email'].lower()
+            if search_term.lower() in aff['full_name'].lower() or
+               search_term.lower() in aff['email'].lower()
         ]
     
     if country_filter != "Todos":
@@ -1362,8 +1362,8 @@ def show_all_affiliates():
     st.markdown("---")
     
     st.subheader(f"📊 Lista de Afiliados ({len(filtered_affiliates)})")
-    
     affiliate_data = []
+    
     for aff in filtered_affiliates:
         join_date = datetime.fromisoformat(aff['join_date']).strftime('%d/%m/%Y')
         affiliate_data.append({
@@ -1418,7 +1418,6 @@ def show_all_affiliates():
 def show_admin_reports():
     """Muestra reportes administrativos."""
     st.header("📊 Reportes Administrativos")
-    
     db = load_affiliate_db()
     payment_log = load_payment_log()
     
@@ -1441,26 +1440,23 @@ def show_admin_reports():
     st.markdown("---")
     
     st.subheader("📈 Comisiones por Mes")
-    
     months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
     commissions = np.random.uniform(500, 5000, 6)
     
     fig = px.bar(
-        x=months, 
+        x=months,
         y=commissions,
         title="Comisiones Generadas por Mes",
         labels={'x': 'Mes', 'y': 'Comisiones (USD)'},
         color=commissions,
         color_continuous_scale='Blues'
     )
-    
     st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("🏆 Top 10 Afiliados")
-    
     top_affiliates = sorted(
-        db['affiliates'], 
-        key=lambda x: x['total_earned'], 
+        db['affiliates'],
+        key=lambda x: x['total_earned'],
         reverse=True
     )[:10]
     
@@ -1484,14 +1480,13 @@ def show_admin_reports():
         st.dataframe(df_top, hide_index=True, use_container_width=True)
     
     st.subheader("📋 Actividades Recientes")
-    
     payment_log = load_payment_log()
     activities = payment_log.get('activities', [])
     
     if activities:
         recent_activities = sorted(
-            activities, 
-            key=lambda x: x.get('timestamp', ''), 
+            activities,
+            key=lambda x: x.get('timestamp', ''),
             reverse=True
         )[:10]
         
@@ -1507,7 +1502,6 @@ def show_admin_reports():
 def show_payment_history():
     """Muestra el historial completo de pagos."""
     st.header("📋 Historial de Pagos")
-    
     payment_log = load_payment_log()
     payments = payment_log.get('payments', [])
     
@@ -1577,13 +1571,11 @@ def show_payment_history():
 def show_admin_settings():
     """Muestra la configuración del administrador."""
     st.header("⚙️ Configuración del Sistema")
-    
     db = load_affiliate_db()
     settings = db['settings']
     
     with st.form("admin_settings_form"):
         st.subheader("💰 Configuración de Comisiones")
-        
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -1614,7 +1606,6 @@ def show_admin_settings():
             )
         
         st.subheader("⚡ Configuración de Pagos")
-        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -1633,7 +1624,6 @@ def show_admin_settings():
             )
         
         st.subheader("📧 Notificaciones")
-        
         notification_email = st.text_input(
             "Email para notificaciones",
             value=ADMIN_EMAIL,
@@ -1644,7 +1634,6 @@ def show_admin_settings():
             settings['commission_rates']['therapy'] = therapy_rate / 100
             settings['commission_rates']['pdf'] = pdf_rate / 100
             settings['commission_rates']['subscription'] = subscription_rate / 100
-            
             settings['min_withdrawal'] = min_withdrawal
             settings['payout_schedule'] = payout_schedule
             
@@ -1657,7 +1646,6 @@ def show_admin_settings():
     st.markdown("---")
     
     st.subheader("🛠️ Herramientas de Administración")
-    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1687,7 +1675,6 @@ def show_admin_settings():
 def show_affiliate_details(affiliate_id):
     """Muestra detalles completos de un afiliado."""
     affiliate = get_affiliate_by_id(affiliate_id)
-    
     if not affiliate:
         st.error("Afiliado no encontrado")
         return
@@ -1695,7 +1682,6 @@ def show_affiliate_details(affiliate_id):
     st.subheader(f"👤 Detalles del Afiliado: {affiliate['full_name']}")
     
     col1, col2 = st.columns(2)
-    
     with col1:
         st.write(f"**Email:** {affiliate['email']}")
         st.write(f"**Código:** `{affiliate['affiliate_code']}`")
@@ -1712,7 +1698,6 @@ def show_affiliate_details(affiliate_id):
     st.markdown("---")
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
         st.metric("Referidos", affiliate['referrals'])
     with col2:
@@ -1724,7 +1709,6 @@ def show_affiliate_details(affiliate_id):
     
     if affiliate.get('sales'):
         st.subheader("💼 Historial de Ventas")
-        
         sales_df = pd.DataFrame(affiliate['sales'][-20:])
         if not sales_df.empty:
             sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y %H:%M')
@@ -1746,7 +1730,6 @@ def show_affiliate_details(affiliate_id):
     
     if affiliate.get('payment_history'):
         st.subheader("💰 Historial de Pagos")
-        
         payments_df = pd.DataFrame(affiliate['payment_history'])
         if not payments_df.empty:
             payments_df['date'] = pd.to_datetime(payments_df['date']).dt.strftime('%d/%m/%Y')
@@ -1803,9 +1786,7 @@ def main():
         )
         
         st.markdown("---")
-        
         st.subheader("👥 Programa de Afiliados")
-        
         affiliate_menu = st.radio(
             "Opciones para afiliados:",
             ["📋 Registrarse como Afiliado", "📊 Dashboard de Afiliado"]
@@ -1813,7 +1794,6 @@ def main():
         
         query_params = st.query_params
         detected_affiliate_code = query_params.get("affiliate", [""])[0]
-        
         if detected_affiliate_code:
             st.info(f"Código de afiliado detectado: `{detected_affiliate_code}`")
             affiliate = get_affiliate_by_code(detected_affiliate_code)
@@ -1843,7 +1823,6 @@ def main():
                         st.error("Contraseña incorrecta")
         
         st.markdown("---")
-        
         st.caption(f"Versión {APP_VERSION}")
         st.caption(f"Accesos hoy: {random.randint(10, 50)}")
         
@@ -1883,12 +1862,9 @@ def show_homepage():
     with col1:
         st.markdown("""
         ### ¿Qué es la Biodescodificación?
-        
-        La **biodescodificación** es un enfoque terapéutico que busca 
-        identificar el conflicto emocional oculto detrás de los síntomas físicos.
+        La **biodescodificación** es un enfoque terapéutico que busca identificar el conflicto emocional oculto detrás de los síntomas físicos.
         
         ### 🎯 Características de la Plataforma
-        
         1. **Diagnóstico especializado** por sistemas corporales
         2. **Triangulación emocional** entre eventos y síntomas
         3. **Protocolos de hipnosis** personalizados
@@ -1898,7 +1874,6 @@ def show_homepage():
         7. **Panel de administración** para gestión de pagos
         
         ### 📈 Impacto Esperado
-        
         - Reducción del tiempo de diagnóstico en 40%
         - Aumento de efectividad terapéutica en 60%
         - Automatización de procesos administrativos
@@ -1908,43 +1883,31 @@ def show_homepage():
     with col2:
         st.info("""
         **🚀 Novedades:**
-        
-        • **Panel de Administración**  
-          Gestiona pagos y afiliados fácilmente.
-        
-        • **Notificaciones Automáticas**  
-          Recibe alertas de pagos por email.
-        
-        • **Reportes Detallados**  
-          Exporta datos para contabilidad.
-        
-        • **Integración Binance**  
-          Pagos seguros en criptomonedas.
+        • **Panel de Administración** Gestiona pagos y afiliados fácilmente.
+        • **Notificaciones Automáticas** Recibe alertas de pagos por email.
+        • **Reportes Detallados** Exporta datos para contabilidad.
+        • **Integración Binance** Pagos seguros en criptomonedas.
         """)
-        
-        with st.expander("📊 Datos Rápidos"):
-            db = load_affiliate_db()
-            total_affiliates = len(db['affiliates'])
-            pending_payout = sum(aff['pending_payout'] for aff in db['affiliates'])
-            
-            st.metric("Afiliados Activos", total_affiliates)
-            st.metric("Comisiones Pendientes", f"${pending_payout:.2f}")
-            st.metric("Tasa Conversión", "34%")
+    
+    with st.expander("📊 Datos Rápidos"):
+        db = load_affiliate_db()
+        total_affiliates = len(db['affiliates'])
+        pending_payout = sum(aff['pending_payout'] for aff in db['affiliates'])
+        st.metric("Afiliados Activos", total_affiliates)
+        st.metric("Comisiones Pendientes", f"${pending_payout:.2f}")
+        st.metric("Tasa Conversión", "34%")
     
     st.markdown("---")
     
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         if st.button("🎯 Comenzar Diagnóstico", use_container_width=True):
             st.query_params = {"menu": "Nuevo Diagnóstico"}
             st.rerun()
-    
     with col2:
         if st.button("🤝 Unirse como Afiliado", use_container_width=True):
             st.query_params = {"menu": "Registrarse como Afiliado"}
             st.rerun()
-    
     with col3:
         if st.button("👑 Acceso Admin", use_container_width=True):
             st.query_params = {"admin": ADMIN_PASSWORD}
@@ -1966,8 +1929,7 @@ def show_diagnosis_form(data):
         with col2:
             tiempo = st.text_input("Tiempo de padecimiento*", placeholder="Ej: 6 meses, 2 años, desde la infancia...")
             diagnostico_medico = st.text_input("Diagnóstico médico (opcional)", placeholder="Si existe diagnóstico clínico")
-            entorno = st.selectbox("Entorno social predominante*", 
-                                 ["Laboral", "Familiar", "Pareja", "Social", "Soledad", "Mixto"])
+            entorno = st.selectbox("Entorno social predominante*", ["Laboral", "Familiar", "Pareja", "Social", "Soledad", "Mixto"])
         
         st.markdown("---")
         
@@ -1975,16 +1937,13 @@ def show_diagnosis_form(data):
         with col_aff1:
             query_params = st.query_params
             url_affiliate_code = query_params.get("affiliate", [""])[0]
-            
             default_code = url_affiliate_code if url_affiliate_code else st.session_state.affiliate_code_input
-            
             affiliate_code = st.text_input(
                 "Código de afiliado (opcional)",
                 value=default_code,
                 placeholder="Ej: MINDGEEKCLINIC-AFFILIATE-ABC123",
                 help="Si vienes de un enlace de afiliado, este campo se llenará automáticamente."
             )
-            
             if affiliate_code:
                 st.session_state.affiliate_code_input = affiliate_code
         
@@ -2000,7 +1959,6 @@ def show_diagnosis_form(data):
                 st.info("ℹ️ Opcional")
         
         st.markdown("---")
-        
         st.subheader("🎭 Eventos Emocionales Relevantes")
         eventos = st.text_area(
             "Describe eventos significativos alrededor del inicio de los síntomas*",
@@ -2072,7 +2030,6 @@ def show_diagnosis_form(data):
                         "protocol": protocol,
                         "date": datetime.now().isoformat()
                     })
-                    
                     save_data(data)
                     
                     tab1, tab2, tab3, tab4 = st.tabs(["📋 Diagnóstico", "🧠 Protocolo", "🧘 Autohipnosis", "📄 PDF"])
@@ -2082,7 +2039,6 @@ def show_diagnosis_form(data):
                     
                     with tab2:
                         st.markdown(protocol)
-                        
                         autohipnosis = generate_self_hypnosis_script(protocol)
                         if st.button("🔄 Generar Versión Autohipnosis"):
                             st.markdown(autohipnosis)
@@ -2090,16 +2046,12 @@ def show_diagnosis_form(data):
                     with tab3:
                         st.subheader("🧘 Guía de Autohipnosis")
                         st.markdown(autohipnosis)
-                        
                         st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", format="audio/mp3")
                     
                     with tab4:
                         st.subheader("📄 Reporte Profesional en PDF")
-                        
                         pdf_buffer = create_pdf_diagnosis(patient_data, diagnosis, protocol)
-                        
                         st.markdown(get_pdf_download_link(pdf_buffer), unsafe_allow_html=True)
-                        
                         base64_pdf = base64.b64encode(pdf_buffer.read()).decode('utf-8')
                         pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
                         st.markdown(pdf_display, unsafe_allow_html=True)
@@ -2126,7 +2078,6 @@ def show_ai_consultation():
     with col2:
         st.info("""
         **💡 Sugerencias:**
-        
         1. Síntomas específicos
         2. Eventos emocionales
         3. Sistema corporal afectado
@@ -2144,7 +2095,6 @@ def show_ai_consultation():
         else:
             with st.spinner("Consultando base de conocimiento y generando respuesta..."):
                 chroma_client, collection = initialize_chroma_db()
-                
                 knowledge_results = query_knowledge_base(query, collection)
                 
                 knowledge_context = ""
@@ -2152,7 +2102,6 @@ def show_ai_consultation():
                     knowledge_context = "\n".join(knowledge_results['documents'][0][:2])
                 
                 full_context = f"{knowledge_context}\n{context}"
-                
                 response = generate_with_groq(query, full_context)
                 
                 st.success("✅ Respuesta generada:")
@@ -2166,11 +2115,9 @@ def show_ai_consultation():
 def show_statistics_page():
     """Muestra la página de estadísticas."""
     st.subheader("📊 Estadísticas de la Plataforma")
-    
     display_statistics()
     
     st.markdown("---")
-    
     st.subheader("👥 Distribución Demográfica")
     
     col1, col2 = st.columns(2)
@@ -2180,10 +2127,9 @@ def show_statistics_page():
             'Género': ['Mujeres', 'Hombres', 'Otros'],
             'Porcentaje': [52, 45, 3]
         })
-        
         fig_gender = px.pie(gender_data, values='Porcentaje', names='Género',
-                          title='Distribución por Género',
-                          color_discrete_sequence=px.colors.sequential.Blues_r)
+                           title='Distribución por Género',
+                           color_discrete_sequence=px.colors.sequential.Blues_r)
         st.plotly_chart(fig_gender, use_container_width=True)
     
     with col2:
@@ -2191,7 +2137,6 @@ def show_statistics_page():
             'Rango Edad': ['18-25', '26-35', '36-45', '46-55', '56+'],
             'Pacientes': [15, 35, 28, 15, 7]
         })
-        
         fig_age = px.bar(age_data, x='Rango Edad', y='Pacientes',
                         title='Distribución por Edad',
                         color='Pacientes',
@@ -2213,7 +2158,6 @@ def show_statistics_page():
         name='Consultas',
         marker_color='#2E86AB'
     ))
-    
     fig_systems.add_trace(go.Scatter(
         x=systems_data['Sistema'],
         y=systems_data['Efectividad'],
@@ -2240,7 +2184,6 @@ def show_backup_page():
     with col1:
         st.info("""
         **📦 Estado Actual:**
-        
         • Tamaño base de datos: 2.4 MB
         • Último backup: Hoy 08:30
         • Integridad: ✅ Verificada
@@ -2256,7 +2199,6 @@ def show_backup_page():
     with col2:
         st.warning("""
         **⚠️ Precauciones:**
-        
         1. Realiza backup antes de actualizaciones
         2. Verifica integridad periódicamente
         3. Mantén múltiples copias
@@ -2287,14 +2229,12 @@ def show_backup_page():
         
         with col2:
             export_format = st.selectbox("Formato de exportación", ["JSON", "CSV", "Excel"])
-            
             if st.button(f"📤 Exportar Datos ({export_format})"):
                 st.info(f"Exportando datos en formato {export_format}...")
                 progress_bar = st.progress(0)
                 for i in range(100):
                     time.sleep(0.01)
                     progress_bar.progress(i + 1)
-                
                 st.success(f"Datos exportados en formato {export_format}")
 
 # ============================================
@@ -2306,6 +2246,7 @@ def show_affiliate_registration():
     st.subheader("👥 Registro en el Programa de Afiliados")
     st.markdown("""
     Únete como afiliado de **MINDGEEKCLINIC** y gana comisiones recomendando nuestros servicios.
+    
     **Comisiones:** 34.5% en terapias, 33.3% en PDFs, 31.6% en suscripciones.
     **Retiro mínimo:** $50 USD semanales vía Binance.
     """)
@@ -2313,47 +2254,52 @@ def show_affiliate_registration():
     # ============================================
     # SECCIÓN 1: VERIFICACIÓN DE EMAIL (FUERA DEL FORM)
     # ============================================
+    st.markdown("### 📧 Paso 1: Verifica tu Email")
     
-    st.markdown("### 📧 Verificación de Email")
-    
-    col_verify1, col_verify2 = st.columns([2, 1])
+    col_verify1, col_verify2 = st.columns([3, 1])
     
     with col_verify1:
-        email_for_verification = st.text_input("Email para verificación", 
-                                              key="email_verify_input",
-                                              placeholder="Ingresa tu email primero")
+        email_for_verification = st.text_input(
+            "Email para verificación", 
+            key="email_verify_input", 
+            placeholder="tu@email.com",
+            help="Te enviaremos un código de 6 dígitos"
+        )
     
     with col_verify2:
         st.markdown("###")
-        if st.button("📨 Enviar código de verificación", 
-                    key="send_code_btn",
-                    use_container_width=True):
+        if st.button("📨 Enviar código", 
+                    key="send_code_btn", 
+                    use_container_width=True,
+                    type="primary",
+                    disabled=not email_for_verification):
             if email_for_verification:
                 verification_code = send_verification_code(email_for_verification)
-                st.success(f"Código enviado a {email_for_verification}")
-                st.info(f"**DEMO:** Tu código es: `{verification_code}`")
-                st.rerun()
+                if verification_code:
+                    st.success(f"✅ Código enviado a {email_for_verification}")
+                    st.rerun()
             else:
-                st.error("Primero ingresa un email")
+                st.error("Por favor, ingresa un email válido")
     
     # Si hay código pendiente, mostrar campo para ingresarlo
     if 'verification_code' in st.session_state and st.session_state['verification_code']:
-        st.info(f"Código pendiente para: {st.session_state.get('verification_email', '')}")
+        st.info(f"📩 Código pendiente para: {st.session_state.get('verification_email', '')}")
         
-        verification_input = st.text_input("Ingresa el código de 6 dígitos", 
-                                         max_chars=6,
-                                         key="code_input",
-                                         help="Revisa tu email (en demo, código aparece arriba)")
+        verification_input = st.text_input(
+            "Ingresa el código de 6 dígitos", 
+            max_chars=6, 
+            key="code_input",
+            placeholder="123456",
+            help="Revisa tu bandeja de entrada (y carpeta de spam)"
+        )
         
         if verification_input:
             verified, message = verify_email_code(verification_input)
             if verified:
-                st.success(message)
+                st.success(f"✅ {message}")
                 st.session_state['verified_email'] = st.session_state.get('verification_email', '')
             else:
-                st.error(message)
-        
-        st.warning(f"**DEMO:** Código actual: `{st.session_state['verification_code']}`")
+                st.error(f"❌ {message}")
     
     st.markdown("---")
     
@@ -2361,114 +2307,130 @@ def show_affiliate_registration():
     # SECCIÓN 2: FORMULARIO PRINCIPAL DE REGISTRO
     # ============================================
     
-    with st.form("affiliate_registration_form"):
-        st.markdown("### 📝 Información Personal (KYC)")
+    # Solo mostrar formulario si el email está verificado
+    if st.session_state.get('verified_email'):
+        st.markdown("### 📝 Paso 2: Completa tu información")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            full_name = st.text_input("Nombre completo*", key="full_name")
-            email = st.text_input("Email*", 
-                                value=st.session_state.get('verified_email', ''),
-                                disabled=bool(st.session_state.get('verified_email')),
-                                help="Se enviará un código de verificación")
-            id_number = st.text_input("Número de identificación*", key="id_number")
-        
-        with col2:
-            country = st.selectbox("País*", COUNTRIES_LIST, key="country")
-            phone = st.text_input("Teléfono*", key="phone")
-            binance_wallet = st.text_input("Wallet de Binance (USDT)*", 
-                                         key="binance_wallet",
-                                         help="Dirección donde recibirás pagos")
-        
-        # Validación de wallet
-        wallet_valid = False
-        if binance_wallet:
-            if validate_binance_wallet(binance_wallet):
-                st.success("✅ Formato de wallet válido")
-                wallet_valid = True
-            else:
-                st.warning("⚠️ El formato no coincide con direcciones comunes de Binance. Verifica.")
-                wallet_valid = False
-        
-        st.markdown("---")
-        
-        # Términos y condiciones
-        st.markdown("### ✅ Términos y Condiciones")
-        
-        col_terms1, col_terms2 = st.columns(2)
-        
-        with col_terms1:
-            accept_terms = st.checkbox("Acepto los términos y condiciones*", key="accept_terms")
-            accept_privacy = st.checkbox("Acepto la política de privacidad*", key="accept_privacy")
-        
-        with col_terms2:
-            confirm_kyc = st.checkbox("Confirmo que la información es verídica*", key="confirm_kyc")
-            accept_payments = st.checkbox("Acepto recibir pagos vía Binance*", key="accept_payments")
-        
-        # ============================================
-        # BOTÓN DE SUBMIT CORREGIDO
-        # ============================================
-        submitted = st.form_submit_button("🚀 Registrar como Afiliado", 
-                                         use_container_width=True,
-                                         type="primary")
-        
-        # Validación después del submit
-        if submitted:
-            # Verificar email verificado
-            email_verified = bool(st.session_state.get('verified_email'))
-            if not email_verified:
-                st.error("❌ Debes verificar tu email antes de registrar. Usa la sección de verificación arriba.")
-                return
+        with st.form("affiliate_registration_form"):
+            st.markdown("#### 👤 Información Personal (KYC)")
             
-            # Verificar que el email del formulario coincida con el verificado
-            if email != st.session_state.get('verified_email', ''):
-                st.error("❌ El email debe coincidir con el email verificado")
-                return
+            col1, col2 = st.columns(2)
             
-            # Validar otros campos
-            if not all([full_name, email, id_number, country, phone, binance_wallet]):
-                st.error("Por favor, completa todos los campos obligatorios (*)")
-            elif not wallet_valid:
-                st.error("Por favor, ingresa una dirección de Binance válida")
-            elif not all([accept_terms, accept_privacy, confirm_kyc, accept_payments]):
-                st.error("Debes aceptar todos los términos y condiciones")
-            else:
-                with st.spinner("Registrando afiliado..."):
-                    affiliate_data = {
-                        "full_name": full_name,
-                        "email": email,
-                        "id_number": id_number,
-                        "country": country,
-                        "phone": phone,
-                        "binance_wallet": binance_wallet
-                    }
-                    
-                    success, message = register_affiliate(affiliate_data)
-                    
-                    if success:
-                        st.balloons()
-                        st.success(message)
+            with col1:
+                full_name = st.text_input("Nombre completo*", key="full_name", placeholder="Ej: María González")
+                email = st.text_input(
+                    "Email*", 
+                    value=st.session_state.get('verified_email', ''), 
+                    disabled=True,
+                    help="Email verificado"
+                )
+                id_number = st.text_input("Número de identificación*", key="id_number", placeholder="DNI, Pasaporte, etc.")
+            
+            with col2:
+                country = st.selectbox("País*", COUNTRIES_LIST, key="country")
+                phone = st.text_input("Teléfono*", key="phone", placeholder="+34 123 456 789")
+                binance_wallet = st.text_input(
+                    "Wallet de Binance (USDT)*", 
+                    key="binance_wallet", 
+                    placeholder="0x... o dirección de wallet",
+                    help="Dirección donde recibirás pagos"
+                )
+            
+            # Validación de wallet
+            wallet_valid = False
+            if binance_wallet:
+                if validate_binance_wallet(binance_wallet):
+                    st.success("✅ Formato de wallet válido")
+                    wallet_valid = True
+                else:
+                    st.warning("⚠️ El formato no coincide con direcciones comunes de Binance. Verifica.")
+                    wallet_valid = False
+            
+            st.markdown("---")
+            
+            # Términos y condiciones
+            st.markdown("#### ✅ Términos y Condiciones")
+            
+            col_terms1, col_terms2 = st.columns(2)
+            
+            with col_terms1:
+                accept_terms = st.checkbox("Acepto los términos y condiciones*", key="accept_terms")
+                accept_privacy = st.checkbox("Acepto la política de privacidad*", key="accept_privacy")
+            
+            with col_terms2:
+                confirm_kyc = st.checkbox("Confirmo que la información es verídica*", key="confirm_kyc")
+                accept_payments = st.checkbox("Acepto recibir pagos vía Binance*", key="accept_payments")
+            
+            st.markdown("---")
+            
+            # Botón de submit CORREGIDO (dentro del formulario)
+            submitted = st.form_submit_button(
+                "🚀 Registrar como Afiliado", 
+                use_container_width=True, 
+                type="primary"
+            )
+            
+            # Validación después del submit
+            if submitted:
+                # Validar campos
+                if not all([full_name, id_number, country, phone, binance_wallet]):
+                    st.error("❌ Por favor, completa todos los campos obligatorios (*)")
+                elif not wallet_valid:
+                    st.error("❌ Por favor, ingresa una dirección de Binance válida")
+                elif not all([accept_terms, accept_privacy, confirm_kyc, accept_payments]):
+                    st.error("❌ Debes aceptar todos los términos y condiciones")
+                else:
+                    with st.spinner("Registrando afiliado..."):
+                        affiliate_data = {
+                            "full_name": full_name,
+                            "email": st.session_state.get('verified_email', ''),
+                            "id_number": id_number,
+                            "country": country,
+                            "phone": phone,
+                            "binance_wallet": binance_wallet
+                        }
                         
-                        # Limpiar estado de verificación
-                        if 'verified_email' in st.session_state:
-                            del st.session_state['verified_email']
-                        if 'verification_code' in st.session_state:
-                            del st.session_state['verification_code']
+                        success, message = register_affiliate(affiliate_data)
                         
-                        st.markdown("""
-                        ### 🎉 ¡Registro Exitoso!
-                        
-                        **Próximos pasos:**
-                        1. **Guarda tu código de afiliado** (aparece arriba)
-                        2. **Comparte tu link:** `https://tu-app.streamlit.app/?affiliate=TU-CODIGO`
-                        3. **Monitorea** tu dashboard para ver referidos y comisiones
-                        4. **Retira** tus ganancias cada jueves (mínimo $50 USD)
-                        
-                        **Contacto:** affiliates@mindgeekclinic.com
-                        """)
-                    else:
-                        st.error(f"Error en el registro: {message}")
+                        if success:
+                            st.balloons()
+                            st.success(message)
+                            
+                            # Limpiar estado de verificación
+                            keys_to_clear = ['verification_code', 'verification_email', 'verified_email', 'verification_time']
+                            for key in keys_to_clear:
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            
+                            st.markdown("""
+                            ### 🎉 ¡Registro Exitoso!
+                            
+                            **Próximos pasos:**
+                            1. **Guarda tu código de afiliado** (aparece arriba)
+                            2. **Comparte tu link:** `https://tu-app.streamlit.app/?affiliate=TU-CODIGO`
+                            3. **Monitorea** tu dashboard para ver referidos y comisiones
+                            4. **Retira** tus ganancias cada jueves (mínimo $50 USD)
+                            
+                            **Contacto:** affiliates@mindgeekclinic.com
+                            """)
+                        else:
+                            st.error(f"❌ Error en el registro: {message}")
+    else:
+        # Mostrar instrucciones si el email no está verificado
+        st.info("""
+        **👆 Instrucciones para registrarte:**
+        
+        1. **Ingresa tu email** arriba y haz clic en "Enviar código"
+        2. **Revisa tu bandeja de entrada** (incluyendo carpeta de spam)
+        3. **Ingresa el código de 6 dígitos** que recibiste
+        4. **Completa el formulario** que aparecerá automáticamente
+        
+        **📧 ¿No recibes el código?**
+        • Verifica la carpeta de spam/no deseado
+        • Asegúrate de que el email esté correcto
+        • Intenta con otro proveedor de email
+        • Contacta a soporte: affiliates@mindgeekclinic.com
+        """)
 
 def show_affiliate_dashboard():
     """Muestra el dashboard del afiliado."""
@@ -2540,17 +2502,16 @@ def show_affiliate_dashboard():
         st.write(f"**Próximo pago:** {metrics['next_payout']}")
         st.write(f"**Mínimo retiro:** $50.00 USD")
         st.write(f"**Frecuencia:** Semanal (jueves)")
-        
-        if metrics['pending_payout'] >= 50:
-            if st.button("💳 Solicitar Retiro Ahora", use_container_width=True):
-                st.success(f"Retiro de ${metrics['pending_payout']:.2f} USD procesado. Llegará a tu wallet en 24-48h.")
-        else:
-            st.warning(f"Necesitas ${50 - metrics['pending_payout']:.2f} USD más para retirar")
+    
+    if metrics['pending_payout'] >= 50:
+        if st.button("💳 Solicitar Retiro Ahora", use_container_width=True):
+            st.success(f"Retiro de ${metrics['pending_payout']:.2f} USD procesado. Llegará a tu wallet en 24-48h.")
+    else:
+        st.warning(f"Necesitas ${50 - metrics['pending_payout']:.2f} USD más para retirar")
     
     st.markdown("---")
     
     st.markdown("### 🔗 Tu Link de Afiliado")
-    
     base_url = "https://mindgeekclinic.com"
     affiliate_link = f"{base_url}?affiliate={metrics['affiliate_code']}"
     
@@ -2564,17 +2525,16 @@ def show_affiliate_dashboard():
         st.button("📋 Copiar Link", use_container_width=True)
     
     st.markdown(f"""
-    **Comparte este link en:**  
-    • Tu sitio web o blog  
-    • Redes sociales  
-    • Email a tus contactos  
-    • Material promocional  
+    **Comparte este link en:**
+    • Tu sitio web o blog
+    • Redes sociales
+    • Email a tus contactos
+    • Material promocional
     """)
     
     st.markdown("---")
     
     st.markdown("### 📈 Tu Desempeño")
-    
     dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
     referrals_data = pd.DataFrame({
         'Fecha': dates,
@@ -2587,19 +2547,18 @@ def show_affiliate_dashboard():
     
     with col_chart1:
         fig_referrals = px.line(referrals_data, x='Fecha', y=['Referidos', 'Ventas'],
-                              title='Referidos vs Ventas (Últimos 30 días)',
-                              labels={'value': 'Cantidad', 'variable': 'Métrica'})
+                               title='Referidos vs Ventas (Últimos 30 días)',
+                               labels={'value': 'Cantidad', 'variable': 'Métrica'})
         st.plotly_chart(fig_referrals, use_container_width=True)
     
     with col_chart2:
         fig_commissions = px.area(referrals_data, x='Fecha', y='Comisiones',
-                                title='Comisiones Acumuladas (USD)',
-                                labels={'value': 'USD', 'variable': 'Comisiones'})
+                                 title='Comisiones Acumuladas (USD)',
+                                 labels={'value': 'USD', 'variable': 'Comisiones'})
         st.plotly_chart(fig_commissions, use_container_width=True)
     
     if affiliate.get('sales'):
         st.markdown("### 💰 Ventas Recientes")
-        
         sales_df = pd.DataFrame(affiliate['sales'][-10:])
         if not sales_df.empty:
             sales_df['date'] = pd.to_datetime(sales_df['date']).dt.strftime('%d/%m/%Y')
@@ -2614,8 +2573,7 @@ def show_affiliate_dashboard():
                     "amount_usd": "Monto",
                     "commission": "Tu Comisión",
                     "commission_rate": st.column_config.NumberColumn(
-                        "Tasa %",
-                        format="%.1f%%"
+                        "Tasa %", format="%.1f%%"
                     )
                 },
                 hide_index=True,
@@ -2623,8 +2581,8 @@ def show_affiliate_dashboard():
             )
     
     st.markdown("---")
-    st.markdown("### ⚡ Acciones Rápidas")
     
+    st.markdown("### ⚡ Acciones Rápidas")
     col_act1, col_act2, col_act3 = st.columns(3)
     
     with col_act1:
