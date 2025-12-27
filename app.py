@@ -4140,7 +4140,33 @@ class PageRenderer:
         with col_confirm2:
             if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
                 # Registrar afiliado en base de datos
-                success, message, affiliate_record = self.db.add_affiliate(affiliate_data)
+from modules.affiliate_system import AffiliateSystem
+
+# 1. Usar el sistema CORRECTO (no self.db que es Database)
+affiliate_system = AffiliateSystem()
+
+# 2. Mapear los datos (IMPORTANTE: nombres diferentes)
+affiliate_data_mapped = {
+    "nombre": affiliate_data.get("full_name", ""),
+    "email": affiliate_data.get("email", ""),
+    "telefono": affiliate_data.get("phone", ""),
+    "pais": affiliate_data.get("country", ""),
+    "tipo_id": affiliate_data.get("id_type", ""),
+    "numero_id": affiliate_data.get("id_number", ""),
+    "fecha_nacimiento": affiliate_data.get("birth_date", ""),
+    "binance_address": affiliate_data.get("binance_address", ""),
+    "binance": affiliate_data.get("binance_address", "")  # campo requerido duplicado
+}
+
+# 3. Llamar al sistema REAL de afiliados
+success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
+
+# 4. Mostrar resultado simple (opcional, puedes quitarlo después)
+if success:
+    st.success(f"✅ {message}")
+else:
+    st.error(f"❌ {message}")
+# ========== FIN DEL REEMPLAZO ==========
                 
                 if success:
                     # Enviar email de bienvenida
