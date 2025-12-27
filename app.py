@@ -666,7 +666,7 @@ class DatabaseManager:
     """Gestor completo de base de datos"""
     
     def __init__(self):
-        self.affiliates_file = "data/affiliates_db.json"
+        self.affiliates_file = "data/affiliates_db . json"
         self.payments_file = "data/payment_log.json"
         self.diagnostics_file = "data/diagnostics_db.json"
         self.sessions_file = "data/sessions_db.json"
