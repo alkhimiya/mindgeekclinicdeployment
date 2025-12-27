@@ -4232,7 +4232,6 @@ if success:
     st.success(f"✅ {message}")
 else:
     st.error(f"❌ {message}")
-# ========== FIN DEL REEMPLAZO ==========
          if success:
     # Enviar email de bienvenida
     self.email_service.send_welcome_email(
