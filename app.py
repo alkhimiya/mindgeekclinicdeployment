@@ -4233,50 +4233,48 @@ if success:
 else:
     st.error(f"❌ {message}")
 # ========== FIN DEL REEMPLAZO ==========
-                
-                if success:
-                    # Enviar email de bienvenida
-                    self.email_service.send_welcome_email(
-                        affiliate_data['email'],
-                        affiliate_data
-                    )
-                    
-                    # Enviar notificación al administrador
-                    admin_config = ConfigManager().app_config
-                    self.email_service.send_email(
-                        admin_config['admin_email'],
-                        "Nuevo Afiliado Registrado",
-                        f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
-                    )
-                    
-                    # Mostrar éxito
-                    st.balloons()
-                    st.success(f"""
-                    🎉 ¡Registro Exitoso!
-                    
-                    **Tu ID de afiliado:** {affiliate_record['id']}
-                    **Tu código de referido:** {affiliate_record['referral_code']}
-                    
-                    Hemos enviado un email con los detalles de tu cuenta.
-                    Tu cuenta será verificada en las próximas 24-48 horas.
-                    
-                    ¡Bienvenido al programa de afiliados!
-                    """)
-                    
-                    # Guardar ID en sesión
-                    st.session_state.affiliate_id = affiliate_record['id']
-                    
-                    # Limpiar datos temporales
-                    for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    
-                    # Esperar y redirigir
-                    time.sleep(3)
-                    st.rerun()
-                else:
-                    st.error(f"Error en el registro: {message}")
-        
+         if success:
+    # Enviar email de bienvenida
+    self.email_service.send_welcome_email(
+        affiliate_data['email'],
+        affiliate_data
+    )
+    
+    # Enviar notificación al administrador
+    admin_config = ConfigManager().app_config
+    self.email_service.send_email(
+        admin_config['admin_email'],
+        "Nuevo Afiliado Registrado",
+        f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
+    )
+    
+    # Mostrar éxito
+    st.balloons()
+    st.success(f"""
+    🎉 ¡Registro Exitoso!
+    
+    **Tu ID de afiliado:** {affiliate_record['id']}
+    **Tu código de referido:** {affiliate_record['referral_code']}
+    
+    Hemos enviado un email con los detalles de tu cuenta.
+    Tu cuenta será verificada en las próximas 24-48 horas.
+    
+    ¡Bienvenido al programa de afiliados!
+    """)
+    
+    # Guardar ID en sesión
+    st.session_state.affiliate_id = affiliate_record['id']
+    
+    # Limpiar datos temporales
+    for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Esperar y redirigir
+    time.sleep(3)
+    st.rerun()
+else:
+    st.error(f"Error en el registro: {message}")       
         # Botón para volver al paso 2
         if st.button("↩️ Volver al paso 2", type="secondary"):
             st.session_state.affiliate_step = 2
