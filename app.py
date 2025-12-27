@@ -4138,8 +4138,7 @@ class PageRenderer:
         col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 2, 1])
         
         with col_confirm2:
-            if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
-                # Registrar afiliado en base de datos
+            
 if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
     from modules.affiliate_system import AffiliateSystem
     
