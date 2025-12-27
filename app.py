@@ -4137,26 +4137,76 @@ class PageRenderer:
         
         col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 2, 1])
         
-        with col_confirm2:
+    with col_confirm2:
+    if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
+        from modules.affiliate_system import AffiliateSystem
+        
+        # Usar el sistema CORRECTO
+        affiliate_system = AffiliateSystem()
+        
+        # Mapear datos del formulario
+        affiliate_data_mapped = {
+            "nombre": affiliate_data.get("full_name", ""),
+            "email": affiliate_data.get("email", ""),
+            "telefono": affiliate_data.get("phone", ""),
+            "pais": affiliate_data.get("country", ""),
+            "tipo_id": affiliate_data.get("id_type", ""),
+            "numero_id": affiliate_data.get("id_number", ""),
+            "fecha_nacimiento": affiliate_data.get("birth_date", ""),
+            "binance_address": affiliate_data.get("binance_address", ""),
+            "binance": affiliate_data.get("binance_address", "")
+        }
+        
+        # Llamar al sistema REAL
+        success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
+        
+        # Mostrar resultado
+        if success:
+            st.success(f"✅ {message}")
+        else:
+            st.error(f"❌ {message}")
+        
+        # Continuar con el resto del código original
+        if success:
+            # Enviar email de bienvenida
+            self.email_service.send_welcome_email(
+                affiliate_data['email'],
+                affiliate_data
+            )
             
-if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
-    from modules.affiliate_system import AffiliateSystem
-    
-    # Usar el sistema CORRECTO (no self.db que es Database)
-    affiliate_system = AffiliateSystem()
-    
-    # Mapear los datos (IMPORTANTE: nombres diferentes)
-    affiliate_data_mapped = {
-        "nombre": affiliate_data.get("full_name", ""),
-        "email": affiliate_data.get("email", ""),
-        "telefono": affiliate_data.get("phone", ""),
-        "pais": affiliate_data.get("country", ""),
-        "tipo_id": affiliate_data.get("id_type", ""),
-        "numero_id": affiliate_data.get("id_number", ""),
-        "fecha_nacimiento": affiliate_data.get("birth_date", ""),
-        "binance_address": affiliate_data.get("binance_address", ""),
-        "binance": affiliate_data.get("binance_address", "")
-    }
+            # Enviar notificación al administrador
+            admin_config = ConfigManager().app_config
+            self.email_service.send_email(
+                admin_config['admin_email'],
+                "Nuevo Afiliado Registrado",
+                f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
+            )
+            
+            # Mostrar éxito completo
+            st.balloons()
+            st.success(f"""
+            🎉 ¡Registro Exitoso!
+            
+            **Tu ID de afiliado:** {affiliate_record['id']}
+            **Tu código de referido:** {affiliate_record['referral_code']}
+            
+            Hemos enviado un email con los detalles de tu cuenta.
+            Tu cuenta será verificada en las próximas 24-48 horas.
+            
+            ¡Bienvenido al programa de afiliados!
+            """)
+            
+            # Guardar ID en sesión
+            st.session_state.affiliate_id = affiliate_record['id']
+            
+            # Limpiar datos temporales
+            for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            
+            # Esperar y redirigir
+            time.sleep(3)
+            st.rerun()    
     
     # Llamar al sistema REAL de afiliados
     success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
