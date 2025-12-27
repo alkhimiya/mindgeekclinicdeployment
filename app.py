@@ -4140,7 +4140,6 @@ class PageRenderer:
     with col_confirm2:
     if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
         from modules.affiliate_system import AffiliateSystem
-        
         # Usar el sistema CORRECTO
         affiliate_system = AffiliateSystem()
         
