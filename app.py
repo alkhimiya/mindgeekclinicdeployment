@@ -4136,8 +4136,16 @@ class PageRenderer:
         """)
         
         col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 2, 1])
-        
-    with col_confirm2:
+      # AGREGAR esto ANTES de la línea 4140
+import streamlit as st
+
+# Mostrar qué caracteres hay realmente
+st.write("🔍 Debug línea 4140:")
+st.write(f"Línea completa: '{open(__file__).read().splitlines()[4139]}'")
+st.write(f"¿Tiene espacios al inicio?: {open(__file__).read().splitlines()[4139].startswith(' ')}")
+st.write(f"¿Tiene tabs?: {'\\t' in open(__file__).read().splitlines()[4139]}")
+
+with col_confirm2:
     if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
         from modules.affiliate_system import AffiliateSystem
         # Usar el sistema CORRECTO
