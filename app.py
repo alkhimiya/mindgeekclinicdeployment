@@ -4227,7 +4227,7 @@ with col_confirm2:
 # 3. Llamar al sistema REAL de afiliados
  success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
 
-if success:  # ← 8 ESPACIOS (alineado con la línea anterior)
+        if success:  # ← 8 ESPACIOS (alineado con la línea anterior)
     # Enviar email de bienvenida  # ← 12 ESPACIOS
     self.email_service.send_welcome_email(
         affiliate_data['email'],  # ← 16 ESPACIOS
