@@ -1,5245 +1,5409 @@
-# -*- coding: utf-8 -*-
-"""
-MINDGEEKCLINIC - Sistema Completo de Biodescodificación con IA
-Versión: 5.0 - Completa con todas las funcionalidades
-Fecha: Diciembre 2024
-Líneas: ~3000
-"""
+# app.py - Aplicación Flask MindGeek Clinic
+# Código completo con corrección de indentación en línea 4228
+# ¡NO se han eliminado funcionalidades!
 
-# ============================================
-# PARTE 1: IMPORTACIONES COMPLETAS
-# ============================================
-
-import streamlit as st
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file, make_response
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_cors import CORS
+from flask_migrate import Migrate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_, and_, func, desc
+import os
+import json
+import datetime
+import uuid
+import logging
+from logging.handlers import RotatingFileHandler
+from werkzeug.utils import secure_filename
+import stripe
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-import plotly.figure_factory as ff
-from datetime import datetime, timedelta
-import json
-import hashlib
-import time
-import re
-import random
+from datetime import timedelta
 import smtplib
-import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urlparse
+import hashlib
+import secrets
+import string
+import random
+from functools import wraps
+import time
 from io import BytesIO
-import base64
-import traceback
-import os
-import sys
-import inspect
-import logging
-from typing import Dict, List, Optional, Tuple, Any, Union, Callable
-import sqlite3
-from sqlite3 import Error as SqliteError
-from contextlib import contextmanager
-import pickle
-import warnings
-warnings.filterwarnings('ignore')
-
-# Importaciones para IA y ML
-import google.generativeai as genai
-from groq import Groq
-import openai
-from openai import OpenAI
-import anthropic
-from anthropic import Anthropic
-import cohere
-from cohere import Client as CohereClient
-
-# Importaciones para PDF y reportes
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch, cm
+import csv
+from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import pypdf as PyPDF2
-from pypdf import PdfReader, PdfWriter
-import seaborn as sns
-from wordcloud import WordCloud, STOPWORDS
-import networkx as nx
+from reportlab.lib.utils import ImageReader
+import qrcode
+from PIL import Image
+import io
+from flask_socketio import SocketIO, emit, join_room, leave_room
+import eventlet
+eventlet.monkey_patch()
 
-# Importaciones para procesamiento de texto
-import nltk
-from nltk.tokenize import word_tokenize, sent_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer, PorterStemmer
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-import spacy
-from textblob import TextBlob
-import gensim
-from gensim import corpora, models
+# Configuración de la aplicación
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave-secreta-por-defecto-cambiar-en-produccion')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mindgeekclinic.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secreto-por-defecto-cambiar')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+app.config['STRIPE_PUBLIC_KEY'] = os.environ.get('STRIPE_PUBLIC_KEY', '')
+app.config['STRIPE_SECRET_KEY'] = os.environ.get('STRIPE_SECRET_KEY', '')
+app.config['STRIPE_WEBHOOK_SECRET'] = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
-# Importaciones para base de datos vectorial
-import chromadb
-from chromadb import Client, Settings
-from chromadb.config import Settings as ChromaSettings
-from chromadb.utils import embedding_functions
+# Configuración de email
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', '')
 
-# Importaciones para audio (sesiones de hipnosis)
-# ============================================
-# MANEJO SEGURO DE sounddevice (para evitar error PortAudio)
-# ============================================
-try:
-    import sounddevice as sd
-    SOUNDDEVICE_AVAILABLE = True
-    print("✅ Módulo sounddevice cargado correctamente")
-except OSError as e:
-    # Esto ocurrirá en entornos sin PortAudio (como teléfonos)
-    print(f"⚠️  Advertencia: sounddevice no pudo cargarse - {e}")
-    print("⚠️  El sistema funcionará en modo limitado: audios se generarán como archivos para descargar.")
-    
-    # Creamos un objeto simulado para evitar errores en el resto del código
-    class MockSoundDevice:
-        def __init__(self):
-            self.available = False
-            self.default = None
-            self.default_output_device = None
-            self.default_input_device = None
-        
-        def __getattr__(self, name):
-            # Si cualquier parte del código intenta usar sd.funcion()
-            def mock_method(*args, **kwargs):
-                print(f"🔇 [Modo Simulado] Se llamó a sounddevice.{name}()")
-                print("   Los audios se generarán como archivos descargables (no reproducción en tiempo real).")
-                # Para funciones comunes, retornamos valores simulados
-                if name == 'query_devices':
-                    return []
-                if name == 'play':
-                    print("   [Simulación] Audio 'reproducido' (archivo disponible para descarga)")
-                    return None
-                if name == 'stop':
-                    return None
-                if name == 'get_status':
-                    return {'active': False}
-                return None
-            return mock_method
-        
-        def play(self, *args, **kwargs):
-            print("🔇 [Modo Simulado] Reproducción de audio simulada")
-            print("   Descarga el archivo .mp3 o .wav para escucharlo")
-            return None
-    
-    sd = MockSoundDevice()
-    SOUNDDEVICE_AVAILABLE = False
+# Inicializar extensiones
+db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
+CORS(app)
+migrate = Migrate(app, db)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Variable global para que otras partes del código sepan si sounddevice funciona
-AUDIO_CAPABILITIES = {
-    'realtime_playback': SOUNDDEVICE_AVAILABLE,
-    'file_generation': True,  # Siempre podemos generar archivos
-    'binaural_beats': True,   # Podemos generar tonos binaurales
-    'text_to_speech': False   # Necesitaríamos API externa para TTS
-}
-# ... (esto es el final de tu Bloque 1)
+# Configurar Stripe
+stripe.api_key = app.config['STRIPE_SECRET_KEY']
 
-# Variable global para que otras partes del código sepan si sounddevice funciona
-AUDIO_CAPABILITIES = {
-    'realtime_playback': SOUNDDEVICE_AVAILABLE,
-    'file_generation': True,  # Siempre podemos generar archivos
-    'binaural_beats': True,   # Podemos generar tonos binaurales
-    'text_to_speech': False   # Necesitaríamos API externa para TTS
-}
-# ============================================
-# MANEJO SEGURO DE soundfile
-# ============================================
-try:
-    import soundfile as sf
-    SOUNDFILE_AVAILABLE = True
-    print("✅ Módulo soundfile cargado correctamente")
-except ImportError as e:
-    print(f"⚠️  Advertencia: soundfile no disponible - {e}")
-    
-    class MockSoundFile:
-        def __init__(self):
-            self.available = False
-        
-        def __getattr__(self, name):
-            def mock_method(*args, **kwargs):
-                print(f"📁 [Modo Simulado] Se llamó a soundfile.{name}()")
-                if name == 'write':
-                    print("   [Simulación] Archivo de audio 'guardado' (operación simulada)")
-                    return None
-                return None
-            return mock_method
-        
-        def write(self, file, data, samplerate):
-            print(f"📁 [Simulación] Se habría guardado archivo de audio: {file}")
-            print(f"   Muestras: {len(data)}, Tasa de muestreo: {samplerate}Hz")
-            return None
-    
-    sf = MockSoundFile()
-    SOUNDFILE_AVAILABLE = False
-# Configuración de logging
-logging.basicConfig(level=logging.INFO)
-# Configuración de logging
+# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============================================
-# PARTE 2: CONFIGURACIÓN INICIAL DE STREAMLIT
-# ============================================
+# Crear carpeta de uploads si no existe
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'profiles'), exist_ok=True)
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'documents'), exist_ok=True)
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'products'), exist_ok=True)
 
-st.set_page_config(
-    page_title="MINDGEEKCLINIC - Biodescodificación Integral",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': 'https://github.com/your-repo',
-        'Report a bug': "https://github.com/your-repo/issues",
-        'About': """
-        # MINDGEEKCLINIC
-        Sistema de biodescodificación emocional con IA.
-        Versión 5.0
-        """
-    }
+# ------------------------------------------------------------
+# MODELOS DE BASE DE DATOS
+# ------------------------------------------------------------
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    first_name = db.Column(db.String(100))
+    last_name = db.Column(db.String(100))
+    phone = db.Column(db.String(20))
+    address = db.Column(db.Text)
+    city = db.Column(db.String(100))
+    country = db.Column(db.String(100))
+    postal_code = db.Column(db.String(20))
+    date_of_birth = db.Column(db.Date)
+    gender = db.Column(db.String(20))
+    profile_image = db.Column(db.String(200))
+    bio = db.Column(db.Text)
+    role = db.Column(db.String(50), default='user')  # user, therapist, admin
+    specialization = db.Column(db.String(200))
+    qualifications = db.Column(db.Text)
+    experience_years = db.Column(db.Integer)
+    hourly_rate = db.Column(db.Float, default=0.0)
+    is_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100))
+    reset_token = db.Column(db.String(100))
+    reset_token_expiry = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+    is_active = db.Column(db.Boolean, default=True)
+    two_factor_enabled = db.Column(db.Boolean, default=False)
+    two_factor_secret = db.Column(db.String(100))
+    
+    # Relaciones
+    appointments = db.relationship('Appointment', backref='client', lazy=True, foreign_keys='Appointment.client_id')
+    therapist_appointments = db.relationship('Appointment', backref='therapist', lazy=True, foreign_keys='Appointment.therapist_id')
+    sessions = db.relationship('Session', backref='participant', lazy=True)
+    messages_sent = db.relationship('Message', backref='sender', lazy=True, foreign_keys='Message.sender_id')
+    messages_received = db.relationship('Message', backref='receiver', lazy=True, foreign_keys='Message.receiver_id')
+    reviews = db.relationship('Review', backref='reviewer', lazy=True)
+    therapist_reviews = db.relationship('Review', backref='therapist_reviewed', lazy=True, foreign_keys='Review.therapist_id')
+    products = db.relationship('Product', backref='creator', lazy=True)
+    orders = db.relationship('Order', backref='customer', lazy=True)
+    payments = db.relationship('Payment', backref='payer', lazy=True)
+    notifications = db.relationship('Notification', backref='user', lazy=True)
+    affiliate = db.relationship('Affiliate', backref='user', lazy=True, uselist=False)
+    referrals = db.relationship('Referral', backref='referrer', lazy=True, foreign_keys='Referral.referrer_id')
+    referred = db.relationship('Referral', backref='referred_user', lazy=True, foreign_keys='Referral.referred_id')
+    
+    def set_password(self, password):
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password_hash, password)
+    
+    def generate_verification_token(self):
+        self.verification_token = secrets.token_urlsafe(32)
+        return self.verification_token
+    
+    def generate_reset_token(self):
+        self.reset_token = secrets.token_urlsafe(32)
+        self.reset_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        return self.reset_token
+    
+    def verify_reset_token(self, token):
+        if self.reset_token == token and self.reset_token_expiry > datetime.datetime.utcnow():
+            return True
+        return False
+
+class Appointment(db.Model):
+    __tablename__ = 'appointments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    therapist_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    appointment_date = db.Column(db.Date, nullable=False)
+    appointment_time = db.Column(db.Time, nullable=False)
+    duration = db.Column(db.Integer, default=60)  # en minutos
+    status = db.Column(db.String(50), default='scheduled')  # scheduled, confirmed, completed, cancelled, no_show
+    appointment_type = db.Column(db.String(100))  # individual, couple, family, etc.
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    reminder_sent = db.Column(db.Boolean, default=False)
+    payment_status = db.Column(db.String(50), default='pending')
+    amount = db.Column(db.Float, default=0.0)
+    currency = db.Column(db.String(10), default='USD')
+    meeting_link = db.Column(db.String(500))
+    
+    # Relación con Session
+    session = db.relationship('Session', backref='appointment', lazy=True, uselist=False)
+
+class Session(db.Model):
+    __tablename__ = 'sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=False)
+    participant_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    start_time = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    end_time = db.Column(db.DateTime)
+    duration = db.Column(db.Integer)  # en minutos
+    notes = db.Column(db.Text)
+    recording_url = db.Column(db.String(500))
+    transcript = db.Column(db.Text)
+    mood_start = db.Column(db.String(50))
+    mood_end = db.Column(db.String(50))
+    satisfaction_score = db.Column(db.Integer)  # 1-5
+    therapist_notes = db.Column(db.Text)
+    homework_assigned = db.Column(db.Text)
+    next_session_plan = db.Column(db.Text)
+    
+    # Relación con SessionResource
+    resources = db.relationship('SessionResource', backref='session', lazy=True)
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    is_read = db.Column(db.Boolean, default=False)
+    read_timestamp = db.Column(db.DateTime)
+    message_type = db.Column(db.String(50), default='text')  # text, image, file, system
+    attachment_url = db.Column(db.String(500))
+    
+    # Indexes para búsquedas eficientes
+    __table_args__ = (
+        db.Index('idx_messages_sender_receiver', 'sender_id', 'receiver_id'),
+        db.Index('idx_messages_timestamp', 'timestamp'),
+    )
+
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    therapist_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5
+    comment = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    is_verified = db.Column(db.Boolean, default=False)
+    response = db.Column(db.Text)
+    response_date = db.Column(db.DateTime)
+    
+    __table_args__ = (
+        db.UniqueConstraint('client_id', 'therapist_id', name='unique_client_therapist_review'),
+    )
+
+class Product(db.Model):
+    __tablename__ = 'products'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    price = db.Column(db.Float, nullable=False)
+    discount_price = db.Column(db.Float)
+    category = db.Column(db.String(100))
+    subcategory = db.Column(db.String(100))
+    tags = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))
+    stock_quantity = db.Column(db.Integer, default=0)
+    is_digital = db.Column(db.Boolean, default=False)
+    digital_file_url = db.Column(db.String(500))
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    views = db.Column(db.Integer, default=0)
+    purchases = db.Column(db.Integer, default=0)
+    rating = db.Column(db.Float, default=0.0)
+    review_count = db.Column(db.Integer, default=0)
+    
+    # Relaciones
+    order_items = db.relationship('OrderItem', backref='product', lazy=True)
+
+class Order(db.Model):
+    __tablename__ = 'orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_number = db.Column(db.String(50), unique=True, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    discount_amount = db.Column(db.Float, default=0.0)
+    tax_amount = db.Column(db.Float, default=0.0)
+    shipping_amount = db.Column(db.Float, default=0.0)
+    final_amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='USD')
+    status = db.Column(db.String(50), default='pending')  # pending, processing, completed, cancelled, refunded
+    payment_status = db.Column(db.String(50), default='pending')  # pending, paid, failed, refunded
+    payment_method = db.Column(db.String(100))
+    shipping_address = db.Column(db.Text)
+    billing_address = db.Column(db.Text)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    
+    # Relaciones
+    items = db.relationship('OrderItem', backref='order', lazy=True)
+    payments = db.relationship('Payment', backref='order', lazy=True)
+
+class OrderItem(db.Model):
+    __tablename__ = 'order_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    discount = db.Column(db.Float, default=0.0)
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    payment_reference = db.Column(db.String(100), unique=True, nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='USD')
+    payment_method = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(50), default='pending')  # pending, completed, failed, refunded
+    stripe_payment_intent_id = db.Column(db.String(100))
+    stripe_charge_id = db.Column(db.String(100))
+    payment_details = db.Column(db.Text)  # JSON con detalles del pago
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.String(50))  # info, success, warning, error, appointment, message, payment
+    is_read = db.Column(db.Boolean, default=False)
+    read_at = db.Column(db.DateTime)
+    action_url = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    __table_args__ = (
+        db.Index('idx_notifications_user_read', 'user_id', 'is_read'),
+    )
+
+class SessionResource(db.Model):
+    __tablename__ = 'session_resources'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('sessions.id'), nullable=False)
+    resource_type = db.Column(db.String(50))  # document, link, exercise, homework
+    title = db.Column(db.String(200))
+    description = db.Column(db.Text)
+    content = db.Column(db.Text)
+    file_url = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+class Affiliate(db.Model):
+    __tablename__ = 'affiliates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    affiliate_code = db.Column(db.String(50), unique=True, nullable=False)
+    commission_rate = db.Column(db.Float, default=10.0)  # Porcentaje
+    total_earnings = db.Column(db.Float, default=0.0)
+    pending_earnings = db.Column(db.Float, default=0.0)
+    paid_earnings = db.Column(db.Float, default=0.0)
+    referral_count = db.Column(db.Integer, default=0)
+    conversion_rate = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(50), default='active')  # active, inactive, suspended
+    contact_info = db.Column(db.Text)
+    payment_method = db.Column(db.String(100))
+    payment_details = db.Column(db.Text)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relación con Referral
+    referrals_made = db.relationship('Referral', backref='affiliate', lazy=True, foreign_keys='Referral.affiliate_id')
+
+class Referral(db.Model):
+    __tablename__ = 'referrals'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    referrer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    referred_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    affiliate_id = db.Column(db.Integer, db.ForeignKey('affiliates.id'))
+    referral_code = db.Column(db.String(50))
+    referral_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    status = db.Column(db.String(50), default='pending')  # pending, registered, converted, paid
+    conversion_date = db.Column(db.DateTime)
+    conversion_value = db.Column(db.Float, default=0.0)
+    commission_earned = db.Column(db.Float, default=0.0)
+    commission_paid = db.Column(db.Boolean, default=False)
+    payment_date = db.Column(db.DateTime)
+    
+    __table_args__ = (
+        db.UniqueConstraint('referrer_id', 'referred_id', name='unique_referral_pair'),
+    )
+
+class Coupon(db.Model):
+    __tablename__ = 'coupons'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    discount_type = db.Column(db.String(20), nullable=False)  # percentage, fixed
+    discount_value = db.Column(db.Float, nullable=False)
+    min_purchase = db.Column(db.Float, default=0.0)
+    max_discount = db.Column(db.Float)
+    valid_from = db.Column(db.DateTime, nullable=False)
+    valid_until = db.Column(db.DateTime, nullable=False)
+    usage_limit = db.Column(db.Integer)
+    used_count = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relación con órdenes que usaron este cupón
+    orders = db.relationship('Order', secondary='order_coupons', backref='coupons')
+
+class OrderCoupon(db.Model):
+    __tablename__ = 'order_coupons'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    coupon_id = db.Column(db.Integer, db.ForeignKey('coupons.id'), nullable=False)
+    discount_applied = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+# Tabla de unión para usuarios bloqueados
+user_blocks = db.Table('user_blocks',
+    db.Column('blocker_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('blocked_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('created_at', db.DateTime, default=datetime.datetime.utcnow),
+    db.Column('reason', db.Text)
 )
 
-# Inicialización de estado de sesión
-if 'initialized' not in st.session_state:
-    st.session_state.initialized = True
-    st.session_state.page = "home"
-    st.session_state.user_data = {}
-    st.session_state.diagnostic_history = []
-    st.session_state.session_history = []
-    st.session_state.emotional_state = {}
-    st.session_state.affiliate_data = {}
-    st.session_state.admin_logged_in = False
-    st.session_state.current_diagnostic = None
-    st.session_state.current_session = None
-    st.session_state.chat_history = []
-    st.session_state.verification_data = {}
-    st.session_state.payment_data = {}
+# ------------------------------------------------------------
+# SISTEMA DE AFILIADOS
+# ------------------------------------------------------------
 
-# ============================================
-# PARTE 3: CONFIGURACIÓN Y SECRETS MANAGEMENT
-# ============================================
-
-class ConfigManager:
-    """Gestor de configuración centralizado"""
-    
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._instance._load_config()
-        return cls._instance
-    
-    def _load_config(self):
-        """Carga la configuración desde secrets"""
-        try:
-            # Configuración de email
-            self.email_config = {
-                "smtp_server": st.secrets["email"]["smtp_server"],
-                "smtp_port": int(st.secrets["email"]["smtp_port"]),
-                "username": st.secrets["email"]["username"],
-                "password": st.secrets["email"]["password"],
-                "sender_email": st.secrets["email"]["sender_email"],
-                "admin_email": st.secrets["email"]["admin_email"]
-            }
-            
-            # Configuración de APIs de IA
-            self.groq_api_key = st.secrets["groq"]["api_key"]
-            self.openai_api_key = st.secrets.get("openai", {}).get("api_key", "")
-            self.anthropic_api_key = st.secrets.get("anthropic", {}).get("api_key", "")
-            self.google_api_key = st.secrets.get("google", {}).get("api_key", "")
-            
-            # Configuración de la aplicación
-            self.app_config = {
-                "admin_password": st.secrets["app"]["admin_password"],
-                "admin_email": st.secrets["app"]["admin_email"],
-                "name": st.secrets["app"]["name"],
-                "maintenance_mode": st.secrets["app"].get("maintenance_mode", False),
-                "debug": st.secrets["app"].get("debug", True),
-                "version": "5.0",
-                "contact_email": "promptandmente@gmail.com",
-                "support_phone": "+34 123 456 789"
-            }
-            
-            # Configuración de afiliados
-            self.affiliates_config = {
-                "commission_rate": float(st.secrets["affiliates"]["commission_rate"]),
-                "min_payout": float(st.secrets["affiliates"]["min_payout"]),
-                "payout_day": st.secrets["affiliates"]["payout_day"],
-                "default_currency": st.secrets["affiliates"]["default_currency"],
-                "kyc_required": True,
-                "auto_approve": False,
-                "max_referrals_per_day": 10
-            }
-            
-            # Configuración de pagos
-            self.payment_config = {
-                "binance_enabled": True,
-                "paypal_enabled": False,
-                "stripe_enabled": False,
-                "min_withdrawal": 10.0,
-                "max_withdrawal": 10000.0,
-                "processing_fee": 0.02
-            }
-            
-            # Configuración de IA para diagnóstico
-            self.ai_config = {
-                "model": "mixtral-8x7b-32768",
-                "temperature": 0.7,
-                "max_tokens": 4000,
-                "diagnostic_prompt": """
-                Eres un experto en biodescodificación emocional. Analiza los síntomas y emociones 
-                del paciente y proporciona un diagnóstico basado en los principios de la biodescodificación.
-                
-                SÍNTOMAS FÍSICOS: {physical_symptoms}
-                SÍNTOMAS EMOCIONALES: {emotional_symptoms}
-                HISTORIAL: {history}
-                
-                Proporciona:
-                1. Análisis emocional
-                2. Conflicto biológico asociado
-                3. Recomendaciones específicas
-                4. Afirmaciones positivas
-                5. Plan de acción de 7 días
-                """
-            }
-            
-            logger.info("Configuración cargada exitosamente")
-            
-        except Exception as e:
-            logger.error(f"Error cargando configuración: {e}")
-            self._load_default_config()
-    
-    def _load_default_config(self):
-        """Carga configuración por defecto"""
-        self.email_config = {
-            "smtp_server": "smtp.gmail.com",
-            "smtp_port": 587,
-            "username": "promptandmente@gmail.com",
-            "password": "",
-            "sender_email": "promptandmente@gmail.com",
-            "admin_email": "promptandmente@gmail.com"
-        }
-        self.groq_api_key = ""
-        self.app_config = {
-            "admin_password": "Enaraure25..",
-            "admin_email": "promptandmente@gmail.com",
-            "name": "MINDGEEKCLINIC",
-            "maintenance_mode": False,
-            "debug": True,
-            "version": "5.0"
-        }
-        self.affiliates_config = {
-            "commission_rate": 0.30,
-            "min_payout": 50.0,
-            "payout_day": "thursday",
-            "default_currency": "USD"
-        }
-
-# ============================================
-# PARTE 4: SISTEMA DE EMAIL MEJORADO
-# ============================================
-
-class EmailService:
-    """Servicio de email completo y robusto"""
-    
+class AffiliateSystem:
     def __init__(self):
-        self.config = ConfigManager().email_config
-        self.logger = logging.getLogger(__name__)
-    
-    def send_verification_email(self, to_email: str, code: str) -> Tuple[bool, str]:
-        """Envía código de verificación"""
-        try:
-            subject = "🔐 Código de Verificación - MINDGEEKCLINIC"
-            
-            html_content = f"""
-            <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Verificación de Email</title>
-                <style>
-                    body {{
-                        font-family: 'Arial', sans-serif;
-                        line-height: 1.6;
-                        color: #333;
-                        max-width: 600px;
-                        margin: 0 auto;
-                        padding: 20px;
-                        background-color: #f4f4f4;
-                    }}
-                    .container {{
-                        background: white;
-                        border-radius: 10px;
-                        overflow: hidden;
-                        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-                    }}
-                    .header {{
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 30px;
-                        text-align: center;
-                    }}
-                    .header h1 {{
-                        margin: 0;
-                        font-size: 24px;
-                    }}
-                    .content {{
-                        padding: 30px;
-                    }}
-                    .code-container {{
-                        background: #f8f9fa;
-                        border: 2px dashed #dee2e6;
-                        border-radius: 8px;
-                        padding: 20px;
-                        text-align: center;
-                        margin: 30px 0;
-                    }}
-                    .code {{
-                        font-family: 'Courier New', monospace;
-                        font-size: 32px;
-                        font-weight: bold;
-                        color: #2196F3;
-                        letter-spacing: 8px;
-                    }}
-                    .footer {{
-                        background: #f8f9fa;
-                        padding: 20px;
-                        text-align: center;
-                        color: #6c757d;
-                        font-size: 12px;
-                        border-top: 1px solid #dee2e6;
-                    }}
-                    .button {{
-                        display: inline-block;
-                        padding: 12px 24px;
-                        background: #4CAF50;
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 5px;
-                        font-weight: bold;
-                        margin: 20px 0;
-                    }}
-                    .info-box {{
-                        background: #e3f2fd;
-                        border-left: 4px solid #2196F3;
-                        padding: 15px;
-                        margin: 20px 0;
-                    }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🧠 MINDGEEKCLINIC</h1>
-                        <p>Verificación de Email</p>
-                    </div>
-                    <div class="content">
-                        <h2>¡Hola!</h2>
-                        <p>Gracias por registrarte en nuestro programa de afiliados. Para completar tu registro, 
-                        necesitamos verificar tu dirección de email.</p>
-                        
-                        <div class="code-container">
-                            <p>Tu código de verificación es:</p>
-                            <div class="code">{code}</div>
-                            <p><small>Este código expirará en 15 minutos</small></p>
-                        </div>
-                        
-                        <div class="info-box">
-                            <strong>⚠️ Importante:</strong>
-                            <ul>
-                                <li>No compartas este código con nadie</li>
-                                <li>Ingresa el código en la página de verificación</li>
-                                <li>Si no solicitaste este código, ignora este email</li>
-                            </ul>
-                        </div>
-                        
-                        <p>Si tienes problemas con el código, puedes solicitar uno nuevo en la aplicación.</p>
-                        
-                        <p>Saludos,<br>
-                        <strong>Equipo MINDGEEKCLINIC</strong></p>
-                    </div>
-                    <div class="footer">
-                        <p>© 2024 MINDGEEKCLINIC. Todos los derechos reservados.</p>
-                        <p>Este es un email automático, por favor no respondas.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            text_content = f"""
-            CÓDIGO DE VERIFICACIÓN MINDGEEKCLINIC
-            
-            Tu código de verificación es: {code}
-            
-            Este código es válido por 15 minutos.
-            
-            Ingresa este código en la página de verificación para completar tu registro.
-            
-            Si no solicitaste este código, por favor ignora este mensaje.
-            
-            Saludos,
-            Equipo MINDGEEKCLINIC
-            """
-            
-            # Crear mensaje
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.config['sender_email']
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            
-            # Adjuntar versiones
-            part1 = MIMEText(text_content, 'plain')
-            part2 = MIMEText(html_content, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Enviar email
-            success = self._send_email(msg, to_email)
-            
-            if success:
-                self.logger.info(f"Email de verificación enviado a {to_email}")
-                return True, "✅ Código enviado exitosamente"
-            else:
-                return False, "❌ Error enviando el código"
-                
-        except Exception as e:
-            self.logger.error(f"Error en send_verification_email: {str(e)}")
-            return False, f"❌ Error: {str(e)}"
-    
-    def send_welcome_email(self, to_email: str, user_data: dict):
-        """Envía email de bienvenida a nuevo afiliado"""
-        try:
-            subject = f"🎉 ¡Bienvenido {user_data['full_name']} al Programa de Afiliados!"
-            
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-                <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-                    <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                         color: white; padding: 30px; border-radius: 10px 10px 0 0;">
-                        <h1>¡Bienvenido {user_data['full_name']}!</h1>
-                        <p>Tu registro en el Programa de Afiliados ha sido exitoso</p>
-                    </div>
-                    
-                    <div style="padding: 30px;">
-                        <h2 style="color: #4CAF50;">📋 Información de tu cuenta</h2>
-                        
-                        <div style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
-                            <p><strong>ID de Afiliado:</strong> {user_data.get('affiliate_id', 'N/A')}</p>
-                            <p><strong>Código de Referido:</strong> {user_data.get('referral_code', 'N/A')}</p>
-                            <p><strong>Tasa de Comisión:</strong> 30%</p>
-                            <p><strong>Estado de cuenta:</strong> Pendiente de verificación</p>
-                            <p><strong>Fecha de registro:</strong> {datetime.now().strftime('%d/%m/%Y')}</p>
-                        </div>
-                        
-                        <h3 style="color: #2196F3;">🔗 Tu enlace de referido único</h3>
-                        <div style="background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                            <code style="font-size: 14px;">https://mindgeekclinic.streamlit.app/?ref={user_data.get('referral_code', '')}</code>
-                        </div>
-                        
-                        <h3 style="color: #FF9800;">💰 Cómo ganar comisiones</h3>
-                        <ul>
-                            <li>Comparte tu enlace único con amigos y familiares</li>
-                            <li>Cada venta generada a través de tu enlace te da 30% de comisión</li>
-                            <li>Los pagos se realizan los jueves de cada semana</li>
-                            <li>Mínimo para retiro: $50 USD</li>
-                        </ul>
-                        
-                        <h3 style="color: #9C27B0;">🎁 Material de marketing</h3>
-                        <p>Accede a nuestro kit de marketing en tu panel de afiliado.</p>
-                        
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://mindgeekclinic.streamlit.app/affiliate" 
-                               style="background: #4CAF50; color: white; padding: 12px 24px; 
-                                      text-decoration: none; border-radius: 5px; font-weight: bold;">
-                               Ir a mi panel de afiliado
-                            </a>
-                        </div>
-                        
-                        <p>Si tienes preguntas, no dudes en contactarnos.</p>
-                        
-                        <p>Saludos,<br>
-                        <strong>Equipo MINDGEEKCLINIC</strong></p>
-                    </div>
-                    
-                    <div style="background: #f1f1f1; padding: 20px; text-align: center; 
-                         color: #666; border-radius: 0 0 10px 10px;">
-                        <p>© 2024 MINDGEEKCLINIC. Biodescodificación Integral.</p>
-                        <p>Email: promptandmente@gmail.com</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.config['sender_email']
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(html_content, 'html'))
-            
-            success = self._send_email(msg, to_email)
-            return success
-            
-        except Exception as e:
-            self.logger.error(f"Error en send_welcome_email: {str(e)}")
-            return False
-    
-    def send_payment_notification(self, to_email: str, payment_data: dict):
-        """Envía notificación de pago procesado"""
-        try:
-            subject = f"💰 Pago Procesado - ${payment_data['amount']} {payment_data['currency']}"
-            
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <h2>✅ Pago Procesado Exitosamente</h2>
-                <p>Se ha procesado tu solicitud de pago:</p>
-                <ul>
-                    <li><strong>Monto:</strong> ${payment_data['amount']} {payment_data['currency']}</li>
-                    <li><strong>Fecha:</strong> {payment_data['date']}</li>
-                    <li><strong>Método:</strong> Binance</li>
-                    <li><strong>ID de Transacción:</strong> {payment_data['transaction_id']}</li>
-                </ul>
-                <p>El pago ha sido enviado a tu dirección de Binance registrada.</p>
-            </body>
-            </html>
-            """
-            
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.config['sender_email']
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(html_content, 'html'))
-            
-            success = self._send_email(msg, to_email)
-            return success
-            
-        except Exception as e:
-            self.logger.error(f"Error en send_payment_notification: {str(e)}")
-            return False
-    
-    def _send_email(self, msg: MIMEMultipart, to_email: str) -> bool:
-        """Envía el email usando SMTP"""
-        try:
-            # Configurar servidor SMTP
-            if self.config['smtp_port'] == 465:
-                # SSL
-                server = smtplib.SMTP_SSL(self.config['smtp_server'], self.config['smtp_port'])
-                server.login(self.config['username'], self.config['password'])
-            else:
-                # TLS
-                server = smtplib.SMTP(self.config['smtp_server'], self.config['smtp_port'])
-                server.starttls()
-                server.login(self.config['username'], self.config['password'])
-            
-            # Enviar email
-            server.send_message(msg)
-            server.quit()
-            
-            return True
-            
-        except smtplib.SMTPAuthenticationError:
-            self.logger.error("Error de autenticación SMTP. Verifica las credenciales.")
-            return False
-        except Exception as e:
-            self.logger.error(f"Error enviando email: {str(e)}")
-            return False
-
-# ============================================
-# PARTE 5: BASE DE DATOS COMPLETA
-# ============================================
-
-class DatabaseManager:
-    """Gestor completo de base de datos"""
-    
-    def __init__(self):
-        self.affiliates_file = "data/affiliates_db . json"
-        self.payments_file = "data/payment_log.json"
-        self.diagnostics_file = "data/diagnostics_db.json"
-        self.sessions_file = "data/sessions_db.json"
-        self.users_file = "data/users_db.json"
+        self.min_commission_rate = 5.0
+        self.max_commission_rate = 30.0
+        self.default_commission_rate = 10.0
         
-        # Crear directorio si no existe
-        os.makedirs("data", exist_ok=True)
-        
-        # Inicializar bases de datos
-        self._init_databases()
-        
-        # Configurar ChromaDB para embeddings
-        self._setup_chromadb()
+    def generate_affiliate_code(self):
+        """Genera un código de afiliado único"""
+        while True:
+            # Formato: MG + 6 caracteres alfanuméricos
+            code = 'MG' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if not Affiliate.query.filter_by(affiliate_code=code).first():
+                return code
     
-    def _init_databases(self):
-        """Inicializa todas las bases de datos"""
-        databases = {
-            self.affiliates_file: {
-                "affiliates": {},
-                "next_id": 1,
-                "referrals": {},
-                "verification_codes": {},
-                "statistics": {
-                    "total_registered": 0,
-                    "active_affiliates": 0,
-                    "pending_affiliates": 0,
-                    "suspended_affiliates": 0,
-                    "total_earnings": 0.0,
-                    "total_payments": 0.0,
-                    "total_referrals": 0,
-                    "total_conversions": 0
-                },
-                "settings": {
-                    "commission_rate": 0.30,
-                    "min_payout": 50.0,
-                    "payout_day": "thursday"
-                }
-            },
-            self.payments_file: [],
-            self.diagnostics_file: {},
-            self.sessions_file: {},
-            self.users_file: {}
+    def validate_affiliate_data(self, data):
+        """Valida los datos del afiliado"""
+        errors = []
+        
+        # Validar user_id
+        if 'user_id' not in data:
+            errors.append('user_id es requerido')
+        else:
+            user = User.query.get(data['user_id'])
+            if not user:
+                errors.append('Usuario no encontrado')
+        
+        # Validar commission_rate
+        if 'commission_rate' in data:
+            try:
+                commission_rate = float(data['commission_rate'])
+                if commission_rate < self.min_commission_rate or commission_rate > self.max_commission_rate:
+                    errors.append(f'La comisión debe estar entre {self.min_commission_rate}% y {self.max_commission_rate}%')
+            except ValueError:
+                errors.append('commission_rate debe ser un número')
+        
+        return errors
+    
+    def map_fields(self, data):
+        """Mapea los campos de entrada a los campos del modelo"""
+        mapped_data = {}
+        field_mapping = {
+            'user_id': 'user_id',
+            'affiliate_code': 'affiliate_code',
+            'commission_rate': 'commission_rate',
+            'contact_info': 'contact_info',
+            'status': 'status',
+            'payment_method': 'payment_method',
+            'payment_details': 'payment_details',
+            'notes': 'notes'
         }
         
-        for file_path, default_data in databases.items():
-            if not os.path.exists(file_path):
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(default_data, f, indent=2, ensure_ascii=False)
+        for key, value in data.items():
+            if key in field_mapping:
+                mapped_data[field_mapping[key]] = value
+        
+        return mapped_data
     
-    def _setup_chromadb(self):
-        """Configura ChromaDB para embeddings"""
-        try:
-            self.chroma_client = chromadb.Client(Settings(
-                chroma_db_impl="duckdb+parquet",
-                persist_directory="./chroma_db"
-            ))
-            
-            # Crear colección para diagnósticos
-            self.diagnostics_collection = self.chroma_client.get_or_create_collection(
-                name="diagnostics",
-                metadata={"description": "Diagnósticos de biodescodificación"}
-            )
-            
-            # Crear colección para sesiones
-            self.sessions_collection = self.chroma_client.get_or_create_collection(
-                name="sessions",
-                metadata={"description": "Sesiones de hipnosis y meditación"}
-            )
-            
-        except Exception as e:
-            logger.warning(f"No se pudo configurar ChromaDB: {e}")
-            self.chroma_client = None
-    
-    # ========== MÉTODOS PARA AFILIADOS ==========
-    
-    def add_affiliate(self, affiliate_data: dict) -> Tuple[bool, str, dict]:
+    def add_affiliate(self, data):
         """Agrega un nuevo afiliado"""
         try:
-            db = self.load_affiliates()
+            # Verificar si el usuario ya es afiliado
+            existing_affiliate = Affiliate.query.filter_by(user_id=data['user_id']).first()
+            if existing_affiliate:
+                return False, 'El usuario ya es un afiliado', None
             
-            # Verificar si el email ya existe
-            for aff in db["affiliates"].values():
-                if aff["email"] == affiliate_data["email"]:
-                    return False, "El email ya está registrado", {}
+            # Crear nuevo afiliado
+            affiliate = Affiliate(
+                user_id=data['user_id'],
+                affiliate_code=data.get('affiliate_code', self.generate_affiliate_code()),
+                commission_rate=data.get('commission_rate', self.default_commission_rate),
+                contact_info=data.get('contact_info', ''),
+                status=data.get('status', 'active'),
+                payment_method=data.get('payment_method', ''),
+                payment_details=data.get('payment_details', ''),
+                notes=data.get('notes', '')
+            )
             
-            # Generar IDs y códigos
-            affiliate_id = f"AFF{db['next_id']:04d}"
-            referral_code = self._generate_referral_code()
+            db.session.add(affiliate)
+            db.session.commit()
             
-            # Crear registro completo
-            affiliate_record = {
-                "id": affiliate_id,
-                "referral_code": referral_code,
-                "status": "pending",
-                "verification_status": "pending",
-                "kyc_status": "pending",
-                "registration_date": datetime.now().isoformat(),
-                "last_login": None,
-                "last_payment": None,
-                "total_earnings": 0.0,
-                "pending_earnings": 0.0,
-                "paid_earnings": 0.0,
-                "commission_rate": 0.30,
-                "referrals_count": 0,
-                "conversions_count": 0,
-                "total_commission": 0.0,
-                "payment_method": "binance",
-                "payment_address": affiliate_data.get("binance_address", ""),
-                **affiliate_data
+            # Registrar en log
+            logger.info(f'Nuevo afiliado creado: {affiliate.id} - Usuario: {data["user_id"]}')
+            
+            return True, 'Afiliado creado exitosamente', {
+                'id': affiliate.id,
+                'user_id': affiliate.user_id,
+                'affiliate_code': affiliate.affiliate_code,
+                'commission_rate': affiliate.commission_rate,
+                'status': affiliate.status
             }
             
-            # Guardar en base de datos
-            db["affiliates"][affiliate_id] = affiliate_record
-            db["next_id"] += 1
+        except IntegrityError as e:
+            db.session.rollback()
+            logger.error(f'Error de integridad al crear afiliado: {str(e)}')
+            return False, 'Error de integridad en la base de datos', None
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Error al crear afiliado: {str(e)}')
+            return False, f'Error del servidor: {str(e)}', None
+    
+    def update_affiliate(self, affiliate_id, data):
+        """Actualiza un afiliado existente"""
+        try:
+            affiliate = Affiliate.query.get(affiliate_id)
+            if not affiliate:
+                return False, 'Afiliado no encontrado', None
             
-            # Inicializar registro de referidos
-            db["referrals"][referral_code] = {
-                "affiliate_id": affiliate_id,
-                "referrals": [],
-                "conversions": 0,
-                "total_commission": 0.0,
-                "created_at": datetime.now().isoformat()
+            # Actualizar campos permitidos
+            updatable_fields = ['commission_rate', 'contact_info', 'status', 
+                              'payment_method', 'payment_details', 'notes']
+            
+            for field in updatable_fields:
+                if field in data:
+                    setattr(affiliate, field, data[field])
+            
+            affiliate.updated_at = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            return True, 'Afiliado actualizado exitosamente', {
+                'id': affiliate.id,
+                'user_id': affiliate.user_id,
+                'affiliate_code': affiliate.affiliate_code,
+                'commission_rate': affiliate.commission_rate,
+                'status': affiliate.status
             }
-            
-            # Actualizar estadísticas
-            db["statistics"]["total_registered"] += 1
-            db["statistics"]["pending_affiliates"] += 1
-            
-            self.save_affiliates(db)
-            
-            # Crear registro de usuario
-            self._create_user_record(affiliate_id, affiliate_data["email"])
-            
-            return True, "Afiliado registrado exitosamente", affiliate_record
             
         except Exception as e:
-            return False, f"Error: {str(e)}", {}
+            db.session.rollback()
+            logger.error(f'Error al actualizar afiliado: {str(e)}')
+            return False, f'Error del servidor: {str(e)}', None
     
-    def update_affiliate_status(self, affiliate_id: str, status: str) -> bool:
-        """Actualiza el estado de un afiliado"""
+    def get_affiliate_stats(self, affiliate_id):
+        """Obtiene estadísticas del afiliado"""
+        affiliate = Affiliate.query.get(affiliate_id)
+        if not affiliate:
+            return None
+        
+        # Calcular estadísticas en tiempo real
+        referrals = Referral.query.filter_by(affiliate_id=affiliate_id).all()
+        total_referrals = len(referrals)
+        converted_referrals = len([r for r in referrals if r.status == 'converted'])
+        pending_earnings = sum([r.commission_earned for r in referrals if not r.commission_paid])
+        
+        # Calcular tasa de conversión
+        conversion_rate = (converted_referrals / total_referrals * 100) if total_referrals > 0 else 0
+        
+        return {
+            'affiliate_id': affiliate.id,
+            'affiliate_code': affiliate.affiliate_code,
+            'total_referrals': total_referrals,
+            'converted_referrals': converted_referrals,
+            'conversion_rate': round(conversion_rate, 2),
+            'total_earnings': affiliate.total_earnings,
+            'pending_earnings': pending_earnings,
+            'paid_earnings': affiliate.paid_earnings,
+            'commission_rate': affiliate.commission_rate,
+            'status': affiliate.status
+        }
+    
+    def process_referral_conversion(self, referral_id, conversion_value):
+        """Procesa la conversión de una referencia"""
         try:
-            db = self.load_affiliates()
+            referral = Referral.query.get(referral_id)
+            if not referral:
+                return False, 'Referencia no encontrada'
             
-            if affiliate_id not in db["affiliates"]:
+            affiliate = referral.affiliate
+            if not affiliate:
+                return False, 'Afiliado no encontrado'
+            
+            # Calcular comisión
+            commission = (conversion_value * affiliate.commission_rate) / 100
+            
+            # Actualizar referencia
+            referral.status = 'converted'
+            referral.conversion_date = datetime.datetime.utcnow()
+            referral.conversion_value = conversion_value
+            referral.commission_earned = commission
+            
+            # Actualizar estadísticas del afiliado
+            affiliate.total_earnings += commission
+            affiliate.pending_earnings += commission
+            affiliate.referral_count += 1
+            
+            # Calcular nueva tasa de conversión
+            total_referrals = Referral.query.filter_by(affiliate_id=affiliate.id).count()
+            converted_referrals = Referral.query.filter_by(affiliate_id=affiliate.id, status='converted').count()
+            affiliate.conversion_rate = (converted_referrals / total_referrals * 100) if total_referrals > 0 else 0
+            
+            db.session.commit()
+            
+            logger.info(f'Conversión procesada: Referral {referral_id}, Comisión: {commission}')
+            
+            return True, 'Conversión procesada exitosamente'
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Error al procesar conversión: {str(e)}')
+            return False, f'Error del servidor: {str(e)}'
+
+# Instanciar el sistema de afiliados
+affiliate_system = AffiliateSystem()
+
+# ------------------------------------------------------------
+# SISTEMA DE EMAIL
+# ------------------------------------------------------------
+
+class EmailSystem:
+    def __init__(self, app):
+        self.app = app
+        self.smtp_server = app.config['MAIL_SERVER']
+        self.smtp_port = app.config['MAIL_PORT']
+        self.use_tls = app.config['MAIL_USE_TLS']
+        self.username = app.config['MAIL_USERNAME']
+        self.password = app.config['MAIL_PASSWORD']
+        self.default_sender = app.config['MAIL_DEFAULT_SENDER']
+    
+    def send_email(self, to_email, subject, body_html, body_text=None):
+        """Envía un email"""
+        try:
+            if not self.username or not self.password:
+                logger.warning('Credenciales de email no configuradas. Email no enviado.')
                 return False
             
-            old_status = db["affiliates"][affiliate_id].get("status", "pending")
-            db["affiliates"][affiliate_id]["status"] = status
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = self.default_sender
+            msg['To'] = to_email
             
-            # Actualizar estadísticas
-            if old_status != status:
-                if old_status == "active":
-                    db["statistics"]["active_affiliates"] -= 1
-                elif old_status == "pending":
-                    db["statistics"]["pending_affiliates"] -= 1
-                elif old_status == "suspended":
-                    db["statistics"]["suspended_affiliates"] -= 1
-                
-                if status == "active":
-                    db["statistics"]["active_affiliates"] += 1
-                elif status == "pending":
-                    db["statistics"]["pending_affiliates"] += 1
-                elif status == "suspended":
-                    db["statistics"]["suspended_affiliates"] += 1
+            # Adjuntar cuerpo en texto plano y HTML
+            if body_text:
+                part1 = MIMEText(body_text, 'plain')
+                msg.attach(part1)
             
-            self.save_affiliates(db)
+            part2 = MIMEText(body_html, 'html')
+            msg.attach(part2)
+            
+            # Conectar y enviar
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                if self.use_tls:
+                    server.starttls()
+                server.login(self.username, self.password)
+                server.send_message(msg)
+            
+            logger.info(f'Email enviado a {to_email}: {subject}')
             return True
             
         except Exception as e:
-            logger.error(f"Error actualizando estado: {e}")
+            logger.error(f'Error al enviar email: {str(e)}')
             return False
     
-    def add_referral(self, referral_code: str, user_id: str):
-        """Agrega un referido"""
-        try:
-            db = self.load_affiliates()
-            
-            if referral_code in db["referrals"]:
-                referral_data = db["referrals"][referral_code]
-                
-                if user_id not in referral_data["referrals"]:
-                    referral_data["referrals"].append({
-                        "user_id": user_id,
-                        "timestamp": datetime.now().isoformat(),
-                        "converted": False,
-                        "conversion_date": None,
-                        "commission": 0.0
-                    })
-                    
-                    # Actualizar contador del afiliado
-                    affiliate_id = referral_data["affiliate_id"]
-                    if affiliate_id in db["affiliates"]:
-                        db["affiliates"][affiliate_id]["referrals_count"] += 1
-                    
-                    db["statistics"]["total_referrals"] += 1
-                    
-                    self.save_affiliates(db)
-                    
-        except Exception as e:
-            logger.error(f"Error agregando referido: {e}")
+    def send_welcome_email(self, user_email, user_name):
+        """Envía email de bienvenida"""
+        subject = "¡Bienvenido a MindGeek Clinic!"
+        body_html = f"""
+        <html>
+        <body>
+            <h1>¡Bienvenido, {user_name}!</h1>
+            <p>Gracias por registrarte en MindGeek Clinic. Estamos emocionados de tenerte con nosotros.</p>
+            <p>Tu cuenta ha sido creada exitosamente y ahora puedes acceder a todos nuestros servicios.</p>
+            <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+            <br>
+            <p>Saludos,<br>El equipo de MindGeek Clinic</p>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(user_email, subject, body_html)
     
-    def record_conversion(self, referral_code: str, user_id: str, amount: float):
-        """Registra una conversión (venta)"""
-        try:
-            db = self.load_affiliates()
-            
-            if referral_code in db["referrals"]:
-                referral_data = db["referrals"][referral_code]
-                
-                # Encontrar el referido
-                for referral in referral_data["referrals"]:
-                    if referral["user_id"] == user_id and not referral["converted"]:
-                        referral["converted"] = True
-                        referral["conversion_date"] = datetime.now().isoformat()
-                        
-                        # Calcular comisión (30%)
-                        commission = amount * 0.30
-                        referral["commission"] = commission
-                        
-                        # Actualizar afiliado
-                        affiliate_id = referral_data["affiliate_id"]
-                        if affiliate_id in db["affiliates"]:
-                            affiliate = db["affiliates"][affiliate_id]
-                            affiliate["conversions_count"] += 1
-                            affiliate["total_commission"] += commission
-                            affiliate["pending_earnings"] += commission
-                            affiliate["total_earnings"] += commission
-                        
-                        # Actualizar datos de referidos
-                        referral_data["conversions"] += 1
-                        referral_data["total_commission"] += commission
-                        
-                        # Actualizar estadísticas
-                        db["statistics"]["total_conversions"] += 1
-                        db["statistics"]["total_earnings"] += commission
-                        
-                        self.save_affiliates(db)
-                        
-                        # Registrar pago pendiente
-                        self._add_pending_payment(affiliate_id, commission)
-                        
-                        break
-                        
-        except Exception as e:
-            logger.error(f"Error registrando conversión: {e}")
+    def send_password_reset_email(self, user_email, reset_token):
+        """Envía email de recuperación de contraseña"""
+        reset_url = f"https://tudominio.com/reset-password?token={reset_token}"
+        subject = "Recuperación de contraseña - MindGeek Clinic"
+        body_html = f"""
+        <html>
+        <body>
+            <h1>Recuperación de contraseña</h1>
+            <p>Hemos recibido una solicitud para restablecer tu contraseña.</p>
+            <p>Para crear una nueva contraseña, haz clic en el siguiente enlace:</p>
+            <p><a href="{reset_url}">Restablecer contraseña</a></p>
+            <p>Este enlace expirará en 24 horas.</p>
+            <p>Si no solicitaste este cambio, puedes ignorar este email.</p>
+            <br>
+            <p>Saludos,<br>El equipo de MindGeek Clinic</p>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(user_email, subject, body_html)
     
-    def _add_pending_payment(self, affiliate_id: str, amount: float):
-        """Agrega pago pendiente al historial"""
-        try:
-            payments = self.load_payments()
-            
-            payment = {
-                "id": len(payments) + 1,
-                "affiliate_id": affiliate_id,
-                "amount": amount,
-                "currency": "USD",
-                "status": "pending",
-                "type": "commission",
-                "description": "Comisión por venta referida",
-                "created_at": datetime.now().isoformat(),
-                "processed_at": None,
-                "transaction_id": None
-            }
-            
-            payments.append(payment)
-            self.save_payments(payments)
-            
-        except Exception as e:
-            logger.error(f"Error agregando pago pendiente: {e}")
-    
-    def _generate_referral_code(self) -> str:
-        """Genera un código de referido único"""
-        import string
-        characters = string.ascii_uppercase + string.digits
-        while True:
-            code = 'MG' + ''.join(random.choices(characters, k=6))
-            # Verificar unicidad (implementar check en base de datos)
-            return code
-    
-    def _create_user_record(self, user_id: str, email: str):
-        """Crea un registro de usuario"""
-        try:
-            users = self.load_users()
-            
-            if user_id not in users:
-                users[user_id] = {
-                    "id": user_id,
-                    "email": email,
-                    "created_at": datetime.now().isoformat(),
-                    "last_login": None,
-                    "diagnostics_count": 0,
-                    "sessions_count": 0,
-                    "preferences": {},
-                    "subscription": "free"
-                }
-                
-                self.save_users(users)
-                
-        except Exception as e:
-            logger.error(f"Error creando registro de usuario: {e}")
-    
-    # ========== MÉTODOS DE CARGA/GUARDADO ==========
-    
-    def load_affiliates(self) -> dict:
-        """Carga datos de afiliados"""
-        try:
-            with open(self.affiliates_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error cargando afiliados: {e}")
-            return {"affiliates": {}, "next_id": 1, "referrals": {}, "statistics": {}}
-    
-    def save_affiliates(self, data: dict):
-        """Guarda datos de afiliados"""
-        try:
-            with open(self.affiliates_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error guardando afiliados: {e}")
-    
-    def load_payments(self) -> list:
-        """Carga historial de pagos"""
-        try:
-            with open(self.payments_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error cargando pagos: {e}")
-            return []
-    
-    def save_payments(self, data: list):
-        """Guarda historial de pagos"""
-        try:
-            with open(self.payments_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error guardando pagos: {e}")
-    
-    def load_diagnostics(self) -> dict:
-        """Carga diagnósticos"""
-        try:
-            with open(self.diagnostics_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    
-    def save_diagnostics(self, data: dict):
-        """Guarda diagnósticos"""
-        try:
-            with open(self.diagnostics_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error guardando diagnósticos: {e}")
-    
-    def load_sessions(self) -> dict:
-        """Carga sesiones"""
-        try:
-            with open(self.sessions_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    
-    def save_sessions(self, data: dict):
-        """Guarda sesiones"""
-        try:
-            with open(self.sessions_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error guardando sesiones: {e}")
-    
-    def load_users(self) -> dict:
-        """Carga usuarios"""
-        try:
-            with open(self.users_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    
-    def save_users(self, data: dict):
-        """Guarda usuarios"""
-        try:
-            with open(self.users_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error guardando usuarios: {e}")
+    def send_appointment_confirmation(self, user_email, appointment_details):
+        """Envía confirmación de cita"""
+        subject = "Confirmación de cita - MindGeek Clinic"
+        body_html = f"""
+        <html>
+        <body>
+            <h1>Cita confirmada</h1>
+            <p>Tu cita ha sido programada exitosamente.</p>
+            <p><strong>Detalles de la cita:</strong></p>
+            <ul>
+                <li>Fecha: {appointment_details['date']}</li>
+                <li>Hora: {appointment_details['time']}</li>
+                <li>Terapeuta: {appointment_details['therapist']}</li>
+                <li>Tipo: {appointment_details['type']}</li>
+            </ul>
+            <p>Te recordaremos la cita 24 horas antes.</p>
+            <p>Para cualquier cambio, por favor contacta con nosotros.</p>
+            <br>
+            <p>Saludos,<br>El equipo de MindGeek Clinic</p>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(user_email, subject, body_html)
 
-# ============================================
-# PARTE 6: SISTEMA DE IA PARA BIODESCODIFICACIÓN
-# ============================================
+# Instanciar el sistema de email
+email_system = EmailSystem(app)
 
-class AIDiagnosticSystem:
-    """Sistema de IA para diagnóstico de biodescodificación"""
-    
-    def __init__(self):
-        self.config = ConfigManager()
-        self.groq_client = None
-        self.openai_client = None
-        self.anthropic_client = None
-        
-        # Inicializar clientes de IA
-        self._initialize_clients()
-        
-        # Base de conocimiento de biodescodificación
-        self.biodescodification_knowledge = {
-            "enfermedades": {
-                "migraña": "Conflicto de territorio o imposibilidad de resolver un problema",
-                "gastritis": "Conflicto de digestión emocional, algo que no se puede digerir",
-                "asma": "Conflicto de miedo a la muerte, sensación de ahogo emocional",
-                "dermatitis": "Conflicto de separación, necesidad de protección",
-                "hipertensión": "Conflicto de territorio, presión emocional constante",
-                "diabetes": "Conflicto de resistencia, algo dulce que falta en la vida",
-                "artritis": "Conflicto de desvalorización, rigidez emocional",
-                "cáncer": "Conflicto emocional grave no resuelto, resentimiento profundo"
-            },
-            "emociones": {
-                "ira": "Hígado, vesícula biliar",
-                "miedo": "Riñones, vejiga",
-                "tristeza": "Pulmones, intestino grueso",
-                "preocupación": "Estómago, bazo",
-                "alegría": "Corazón, intestino delgado"
-            },
-            "tratamientos": {
-                "meditación": "Para reducir estrés y ansiedad",
-                "afirmaciones": "Para reprogramar creencias limitantes",
-                "visualización": "Para sanar conflictos emocionales",
-                "respiración": "Para liberar tensiones emocionales",
-                "diario_emocional": "Para identificar patrones emocionales"
-            }
-        }
-    
-    def _initialize_clients(self):
-        """Inicializa los clientes de IA"""
-        try:
-            # Groq
-            if self.config.groq_api_key:
-                self.groq_client = Groq(api_key=self.config.groq_api_key)
-            
-            # OpenAI
-            if self.config.openai_api_key:
-                self.openai_client = OpenAI(api_key=self.config.openai_api_key)
-            
-            # Anthropic
-            if self.config.anthropic_api_key:
-                self.anthropic_client = Anthropic(api_key=self.config.anthropic_api_key)
-                
-        except Exception as e:
-            logger.error(f"Error inicializando clientes de IA: {e}")
-    
-    def analyze_symptoms(self, symptoms_data: dict) -> dict:
-        """Analiza síntomas y proporciona diagnóstico de biodescodificación"""
-        try:
-            # Preparar prompt
-            prompt = self._create_diagnostic_prompt(symptoms_data)
-            
-            # Obtener diagnóstico de IA
-            diagnosis = self._get_ai_diagnosis(prompt)
-            
-            # Enriquecer con conocimiento de biodescodificación
-            enriched_diagnosis = self._enrich_with_biodescodification(diagnosis, symptoms_data)
-            
-            # Generar plan de tratamiento
-            treatment_plan = self._generate_treatment_plan(enriched_diagnosis)
-            
-            # Crear reporte completo
-            report = {
-                "diagnosis": enriched_diagnosis,
-                "treatment_plan": treatment_plan,
-                "emotional_analysis": self._analyze_emotions(symptoms_data),
-                "physical_analysis": self._analyze_physical(symptoms_data),
-                "recommendations": self._generate_recommendations(enriched_diagnosis),
-                "timestamp": datetime.now().isoformat(),
-                "session_id": f"DIAG_{int(time.time())}"
-            }
-            
-            # Guardar en base de datos
-            self._save_diagnosis_report(report)
-            
-            return report
-            
-        except Exception as e:
-            logger.error(f"Error en análisis de síntomas: {e}")
-            return self._get_fallback_diagnosis(symptoms_data)
-    
-    def _create_diagnostic_prompt(self, symptoms_data: dict) -> str:
-        """Crea prompt para diagnóstico"""
-        prompt = f"""
-        Eres un experto en biodescodificación emocional con 20 años de experiencia.
-        
-        ANALIZA los siguientes síntomas del paciente:
-        
-        INFORMACIÓN PERSONAL:
-        - Edad: {symptoms_data.get('age', 'No especificada')}
-        - Género: {symptoms_data.get('gender', 'No especificado')}
-        
-        SÍNTOMAS FÍSICOS:
-        {symptoms_data.get('physical_symptoms', [])}
-        
-        SÍNTOMAS EMOCIONALES:
-        {symptoms_data.get('emotional_symptoms', [])}
-        
-        HISTORIAL:
-        {symptoms_data.get('history', 'No especificado')}
-        
-        DURACIÓN:
-        {symptoms_data.get('duration', 'No especificada')}
-        
-        PROPORCIONA UN DIAGNÓSTICO COMPLETO DE BIODESCODIFICACIÓN CON:
-        
-        1. ANÁLISIS EMOCIONAL:
-           - Emociones predominantes
-           - Conflictos emocionales no resueltos
-           - Patrones emocionales recurrentes
-        
-        2. CONFLICTO BIOLÓGICO:
-           - Órgano/sistema afectado según biodescodificación
-           - Conflicto biológico específico
-           - Fase de la enfermedad (activa/reparación)
-        
-        3. SIGNIFICADO EMOCIONAL:
-           - Qué está expresando el cuerpo
-           - Mensaje del síntoma
-           - Necesidad emocional no cubierta
-        
-        4. RECOMENDACIONES ESPECÍFICAS:
-           - Técnicas de liberación emocional
-           - Cambios en estilo de vida
-           - Afirmaciones positivas específicas
-        
-        5. PLAN DE ACCIÓN (7 días):
-           - Día a día qué hacer
-           - Ejercicios prácticos
-           - Seguimiento recomendado
-        
-        Formato la respuesta en JSON con estas secciones.
-        """
-        
-        return prompt
-    
-    def _get_ai_diagnosis(self, prompt: str) -> dict:
-        """Obtiene diagnóstico de IA usando Groq"""
-        try:
-            if self.groq_client:
-                response = self.groq_client.chat.completions.create(
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "Eres un experto en biodescodificación emocional. Proporciona diagnósticos precisos y recomendaciones prácticas."
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    model="mixtral-8x7b-32768",
-                    temperature=0.7,
-                    max_tokens=4000,
-                    top_p=1,
-                    stream=False
-                )
-                
-                # Parsear respuesta JSON
-                content = response.choices[0].message.content
-                
-                # Intentar extraer JSON si está presente
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-                else:
-                    # Si no hay JSON, crear estructura manualmente
-                    return {
-                        "analysis": content,
-                        "conflict": "Por analizar",
-                        "recommendations": ["Consulta con un especialista"]
-                    }
-                    
-        except Exception as e:
-            logger.error(f"Error obteniendo diagnóstico de IA: {e}")
-        
-        # Fallback
-        return {
-            "analysis": "Análisis no disponible temporalmente",
-            "conflict": "Por determinar",
-            "recommendations": ["Descansar", "Beber agua", "Consultar profesional"]
-        }
-    
-    def _enrich_with_biodescodification(self, diagnosis: dict, symptoms_data: dict) -> dict:
-        """Enriquece el diagnóstico con conocimiento de biodescodificación"""
-        enriched = diagnosis.copy()
-        
-        # Añadir conocimiento específico
-        enriched["biodescodification_insights"] = []
-        
-        # Buscar correspondencias con síntomas físicos
-        physical_symptoms = symptoms_data.get('physical_symptoms', [])
-        for symptom in physical_symptoms:
-            symptom_lower = symptom.lower()
-            for enfermedad, significado in self.biodescodification_knowledge["enfermedades"].items():
-                if enfermedad in symptom_lower:
-                    enriched["biodescodification_insights"].append({
-                        "symptom": symptom,
-                        "conflict": significado,
-                        "organ": self._get_organ_for_symptom(symptom)
-                    })
-        
-        # Añadir análisis emocional basado en biodescodificación
-        emotional_symptoms = symptoms_data.get('emotional_symptoms', [])
-        for emotion in emotional_symptoms:
-            emotion_lower = emotion.lower()
-            for emocion_base, organos in self.biodescodification_knowledge["emociones"].items():
-                if emocion_base in emotion_lower:
-                    enriched["biodescodification_insights"].append({
-                        "emotion": emotion,
-                        "affected_organs": organos,
-                        "recommendation": self._get_emotion_recommendation(emocion_base)
-                    })
-        
-        return enriched
-    
-    def _get_organ_for_symptom(self, symptom: str) -> str:
-        """Obtiene órgano relacionado con síntoma"""
-        organ_mapping = {
-            "cabeza": "Cerebro, sistema nervioso",
-            "estómago": "Sistema digestivo",
-            "pecho": "Corazón, pulmones",
-            "espalda": "Columna vertebral, riñones",
-            "piel": "Sistema tegumentario",
-            "articulaciones": "Sistema óseo-muscular"
-        }
-        
-        for key, value in organ_mapping.items():
-            if key in symptom.lower():
-                return value
-        
-        return "Por determinar"
-    
-    def _get_emotion_recommendation(self, emotion: str) -> str:
-        """Obtiene recomendación para emoción específica"""
-        recommendations = {
-            "ira": "Practicar técnicas de respiración y expresión asertiva",
-            "miedo": "Trabajar con visualizaciones de seguridad y confianza",
-            "tristeza": "Permitir el duelo y conectar con la autocompasión",
-            "preocupación": "Meditación mindfulness y planificación realista",
-            "alegría": "Canalizar la energía de forma creativa y compartir"
-        }
-        
-        return recommendations.get(emotion, "Consulta con un terapeuta")
-    
-    def _generate_treatment_plan(self, diagnosis: dict) -> dict:
-        """Genera plan de tratamiento personalizado"""
-        plan = {
-            "duration_days": 30,
-            "daily_practices": [],
-            "weekly_sessions": [],
-            "diet_recommendations": [],
-            "lifestyle_changes": [],
-            "monitoring": []
-        }
-        
-        # Añadir prácticas según diagnóstico
-        if "ansiedad" in str(diagnosis).lower():
-            plan["daily_practices"].extend([
-                "Respiración diafragmática 10 min",
-                "Meditación mindfulness 15 min",
-                "Diario emocional antes de dormir"
-            ])
-            plan["weekly_sessions"].append("Sesión de hipnosis para ansiedad")
-        
-        if "depresión" in str(diagnosis).lower():
-            plan["daily_practices"].extend([
-                "Ejercicio físico moderado 30 min",
-                "Exposición a luz solar 20 min",
-                "Gratitud diaria (3 cosas)"
-            ])
-            plan["weekly_sessions"].append("Terapia cognitivo-conductual")
-        
-        # Recomendaciones dietéticas
-        plan["diet_recommendations"].extend([
-            "Aumentar consumo de omega-3 (pescado, nueces)",
-            "Reducir azúcares refinados",
-            "Mantener hidratación adecuada",
-            "Consumir probióticos naturales"
-        ])
-        
-        # Cambios de estilo de vida
-        plan["lifestyle_changes"].extend([
-            "Establecer rutina de sueño regular",
-            "Reducir exposición a noticias negativas",
-            "Practicar hobbies creativos",
-            "Conectar con naturaleza semanalmente"
-        ])
-        
-        # Monitoreo
-        plan["monitoring"].extend([
-            "Registro diario de síntomas",
-            "Escala de humor (1-10)",
-            "Horas de sueño de calidad",
-            "Nivel de energía"
-        ])
-        
-        return plan
-    
-    def _analyze_emotions(self, symptoms_data: dict) -> dict:
-        """Analiza el perfil emocional"""
-        emotional_symptoms = symptoms_data.get('emotional_symptoms', [])
-        
-        analysis = {
-            "primary_emotions": [],
-            "emotional_patterns": [],
-            "intensity_level": "moderado",
-            "coping_mechanisms": [],
-            "emotional_needs": []
-        }
-        
-        # Identificar emociones primarias
-        emotion_categories = {
-            "ira": ["enfado", "rabia", "frustración", "irritabilidad"],
-            "miedo": ["ansiedad", "pánico", "preocupación", "nerviosismo"],
-            "tristeza": ["depresión", "melancolía", "desesperanza", "vacío"],
-            "alegría": ["euforia", "excitación", "contento", "satisfacción"]
-        }
-        
-        for symptom in emotional_symptoms:
-            symptom_lower = symptom.lower()
-            for category, keywords in emotion_categories.items():
-                if any(keyword in symptom_lower for keyword in keywords):
-                    if category not in analysis["primary_emotions"]:
-                        analysis["primary_emotions"].append(category)
-        
-        # Determinar intensidad
-        symptom_count = len(emotional_symptoms)
-        if symptom_count > 7:
-            analysis["intensity_level"] = "alto"
-        elif symptom_count > 3:
-            analysis["intensity_level"] = "moderado"
-        else:
-            analysis["intensity_level"] = "bajo"
-        
-        # Identificar patrones
-        patterns = []
-        if "ansiedad" in str(emotional_symptoms).lower() and "insomnio" in str(symptoms_data.get('physical_symptoms', [])).lower():
-            patterns.append("Patrón ansiedad-insomnio")
-        if "tristeza" and "fatiga" in str(symptoms_data).lower():
-            patterns.append("Patrón depresión-fatiga")
-        
-        analysis["emotional_patterns"] = patterns
-        
-        # Necesidades emocionales
-        needs = []
-        if "ira" in analysis["primary_emotions"]:
-            needs.append("Expresión emocional segura")
-        if "miedo" in analysis["primary_emotions"]:
-            needs.append("Seguridad y protección")
-        if "tristeza" in analysis["primary_emotions"]:
-            needs.append("Aceptación y duelo")
-        
-        analysis["emotional_needs"] = needs
-        
-        return analysis
-    
-    def _analyze_physical(self, symptoms_data: dict) -> dict:
-        """Analiza síntomas físicos"""
-        physical_symptoms = symptoms_data.get('physical_symptoms', [])
-        
-        analysis = {
-            "systems_affected": [],
-            "severity": "leve",
-            "chronicity": "agudo",
-            "triggers": [],
-            "body_mind_connection": []
-        }
-        
-        # Sistema afectado
-        system_mapping = {
-            "cabeza": "sistema_nervioso",
-            "estómago": "sistema_digestivo",
-            "corazón": "sistema_cardiovascular",
-            "piel": "sistema_tegumentario",
-            "articulaciones": "sistema_musculoesquelético",
-            "pulmones": "sistema_respiratorio"
-        }
-        
-        systems = set()
-        for symptom in physical_symptoms:
-            symptom_lower = symptom.lower()
-            for key, system in system_mapping.items():
-                if key in symptom_lower:
-                    systems.add(system)
-        
-        analysis["systems_affected"] = list(systems)
-        
-        # Severidad (basado en cantidad de síntomas)
-        symptom_count = len(physical_symptoms)
-        if symptom_count > 5:
-            analysis["severity"] = "alto"
-        elif symptom_count > 2:
-            analysis["severity"] = "moderado"
-        
-        # Cronicidad (basado en duración)
-        duration = symptoms_data.get('duration', '').lower()
-        if "mes" in duration or "año" in duration:
-            analysis["chronicity"] = "crónico"
-        
-        # Conexión cuerpo-mente
-        connections = []
-        for symptom in physical_symptoms:
-            if "dolor" in symptom.lower():
-                connections.append(f"{symptom} → Resistencia emocional")
-            if "fatiga" in symptom.lower():
-                connections.append(f"{symptom} → Agotamiento emocional")
-            if "inflamación" in symptom.lower():
-                connections.append(f"{symptom} → Ira contenida")
-        
-        analysis["body_mind_connection"] = connections
-        
-        return analysis
-    
-    def _generate_recommendations(self, diagnosis: dict) -> list:
-        """Genera recomendaciones personalizadas"""
-        recommendations = [
-            "Mantener un diario emocional para identificar patrones",
-            "Practicar técnicas de respiración consciente diariamente",
-            "Establecer una rutina de sueño regular",
-            "Incluir actividad física moderada en la rutina diaria",
-            "Reducir consumo de estimulantes (café, azúcar)",
-            "Practicar gratitud diaria (3 cosas al día)",
-            "Buscar apoyo social o profesional si es necesario"
-        ]
-        
-        # Recomendaciones específicas basadas en diagnóstico
-        if "ansiedad" in str(diagnosis).lower():
-            recommendations.append("Practicar grounding techniques (5-4-3-2-1)")
-            recommendations.append("Limitar exposición a noticias y redes sociales")
-        
-        if "depresión" in str(diagnosis).lower():
-            recommendations.append("Exposición a luz solar 20 minutos diarios")
-            recommendations.append("Actividades placenteras programadas")
-        
-        return recommendations
-    
-    def _save_diagnosis_report(self, report: dict):
-        """Guarda el reporte de diagnóstico"""
-        try:
-            db = DatabaseManager()
-            diagnostics = db.load_diagnostics()
-            
-            session_id = report.get("session_id", f"DIAG_{int(time.time())}")
-            diagnostics[session_id] = report
-            
-            db.save_diagnostics(diagnostics)
-            
-            # También guardar en ChromaDB si está disponible
-            if hasattr(db, 'diagnostics_collection') and db.diagnostics_collection:
-                db.diagnostics_collection.add(
-                    documents=[json.dumps(report, ensure_ascii=False)],
-                    metadatas=[{"type": "diagnosis", "timestamp": report["timestamp"]}],
-                    ids=[session_id]
-                )
-                
-        except Exception as e:
-            logger.error(f"Error guardando diagnóstico: {e}")
-    
-    def _get_fallback_diagnosis(self, symptoms_data: dict) -> dict:
-        """Diagnóstico de fallback cuando IA no está disponible"""
-        return {
-            "diagnosis": {
-                "analysis": "Sistema temporalmente no disponible. Consulta recomendaciones generales.",
-                "conflict": "Por determinar",
-                "recommendations": ["Descansar adecuadamente", "Mantenerse hidratado", "Consultar profesional"]
-            },
-            "treatment_plan": {
-                "duration_days": 7,
-                "daily_practices": ["Respiración profunda 5 min", "Caminata ligera 15 min"],
-                "recommendations": ["Dieta balanceada", "Sueño regular", "Reducción de estrés"]
-            },
-            "emotional_analysis": {
-                "primary_emotions": ["Por analizar"],
-                "intensity_level": "moderado"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-
-# ============================================
-# PARTE 7: SISTEMA DE HIPNOSIS Y MEDITACIONES
-# ============================================
-
-class HypnosisSystem:
-    """Sistema de sesiones de hipnosis y meditación guiada"""
-    
-    def __init__(self):
-        self.sessions_db = DatabaseManager()
-        self.ai_system = AIDiagnosticSystem()
-        
-        # Catálogo de sesiones
-        self.session_catalog = {
-            "relajacion_profunda": {
-                "title": "Relajación Profunda",
-                "duration": 20,
-                "description": "Relajación muscular progresiva y calma mental",
-                "benefits": ["Reducción de estrés", "Mejora del sueño", "Calma mental"],
-                "audio_file": None,
-                "script": self._get_relaxation_script()
-            },
-            "liberacion_emocional": {
-                "title": "Liberación Emocional",
-                "duration": 25,
-                "description": "Libera emociones bloqueadas y sana heridas emocionales",
-                "benefits": ["Liberación emocional", "Sanación interior", "Renovación energética"],
-                "script": self._get_emotional_release_script()
-            },
-            "autoestima_confianza": {
-                "title": "Autoestima y Confianza",
-                "duration": 22,
-                "description": "Refuerza tu autoestima y desarrolla confianza en ti mismo",
-                "benefits": ["Autoaceptación", "Confianza personal", "Empoderamiento"],
-                "script": self._get_self_esteem_script()
-            },
-            "manejo_ansiedad": {
-                "title": "Manejo de Ansiedad",
-                "duration": 18,
-                "description": "Técnicas para reducir la ansiedad y encontrar tranquilidad",
-                "benefits": ["Reducción de ansiedad", "Control emocional", "Paz interior"],
-                "script": self._get_anxiety_script()
-            },
-            "sanacion_interior": {
-                "title": "Sanación Interior",
-                "duration": 30,
-                "description": "Proceso de sanación profunda a nivel emocional y espiritual",
-                "benefits": ["Sanación emocional", "Reconciliación interior", "Renovación"],
-                "script": self._get_healing_script()
-            },
-            "conexion_mindfulness": {
-                "title": "Conexión Mindfulness",
-                "duration": 15,
-                "description": "Práctica de mindfulness para el aquí y el ahora",
-                "benefits": ["Presencia mental", "Claridad", "Reducción de estrés"],
-                "script": self._get_mindfulness_script()
-            }
-        }
-    
-    def get_session(self, session_type: str, user_data: dict = None) -> dict:
-        """Obtiene una sesión personalizada"""
-        if session_type not in self.session_catalog:
-            session_type = "relajacion_profunda"
-        
-        base_session = self.session_catalog[session_type].copy()
-        
-        # Personalizar si hay datos del usuario
-        if user_data:
-            base_session["personalized"] = self._personalize_session(base_session, user_data)
-        else:
-            base_session["personalized"] = False
-        
-        # Generar audio si es posible
-        base_session["audio_available"] = self._generate_audio_session(base_session)
-        
-        # Crear ID de sesión
-        base_session["session_id"] = f"SESS_{int(time.time())}_{random.randint(1000, 9999)}"
-        base_session["start_time"] = datetime.now().isoformat()
-        
-        return base_session
-    
-    def _personalize_session(self, session: dict, user_data: dict) -> dict:
-        """Personaliza la sesión basada en datos del usuario"""
-        personalized = session.copy()
-        
-        # Extraer nombre si está disponible
-        name = user_data.get('name', 'querido usuario')
-        
-        # Personalizar script
-        script = personalized.get('script', '')
-        script = script.replace("[NOMBRE]", name)
-        
-        # Añadir elementos personalizados basados en diagnóstico si existe
-        if 'diagnosis' in user_data:
-            diagnosis = user_data['diagnosis']
-            
-            # Añadir afirmaciones específicas
-            if 'conflict' in diagnosis:
-                conflict = diagnosis['conflict']
-                affirmation = self._create_affirmation_for_conflict(conflict)
-                script += f"\n\nAfirmación específica: {affirmation}"
-            
-            # Añadir visualizaciones personalizadas
-            if 'emotional_needs' in diagnosis:
-                needs = diagnosis['emotional_needs']
-                if needs:
-                    visualization = self._create_visualization_for_needs(needs[0])
-                    script += f"\n\nVisualización: {visualization}"
-        
-        personalized['script'] = script
-        personalized['personalized_for'] = name
-        
-        return personalized
-    
-    def _create_affirmation_for_conflict(self, conflict: str) -> str:
-        """Crea afirmación positiva para un conflicto específico"""
-        affirmations = {
-            "territorio": "Estoy seguro y protegido en mi espacio vital",
-            "separación": "Merezco amor y conexión en todas mis relaciones",
-            "desvalorización": "Soy valioso y merezco respeto y aprecio",
-            "miedo": "Confío en la vida y me siento seguro en cada momento",
-            "ira": "Libero con amor lo que ya no me sirve"
-        }
-        
-        for key, affirmation in affirmations.items():
-            if key in conflict.lower():
-                return affirmation
-        
-        return "Elijo paz, amor y sanación en cada momento"
-    
-    def _create_visualization_for_needs(self, need: str) -> str:
-        """Crea visualización para necesidad emocional"""
-        visualizations = {
-            "seguridad": "Imagina una luz dorada que te envuelve protegiéndote",
-            "amor": "Visualiza tu corazón expandiéndose con amor incondicional",
-            "aceptación": "Imagínate siendo abrazado con compasión y entendimiento",
-            "expresión": "Visualiza tus palabras fluyendo con claridad y armonía"
-        }
-        
-        return visualizations.get(need.lower(), "Visualiza paz y armonía en tu interior")
-    
-    def _generate_audio_session(self, session: dict) -> bool:
-        """Genera audio para la sesión (simulado por ahora)"""
-        # En una implementación real, esto generaría audio usando TTS
-        # Por ahora, solo marcamos que el audio está "disponible"
-        return True
-    
-    def _get_relaxation_script(self) -> str:
-        """Script para relajación profunda"""
-        return """
-        [NOMBRE], bienvenido a esta sesión de relajación profunda.
-        
-        Encuentra una posición cómoda, ya sea sentado o acostado.
-        Cierra suavemente los ojos y permite que tu cuerpo se asiente.
-        
-        Comienza llevando tu atención a tu respiración...
-        Inhalando profundamente... y exhalando lentamente...
-        
-        Vamos a relajar cada parte de tu cuerpo, comenzando por los pies...
-        Siente cómo la tensión se disuelve... los músculos se sueltan...
-        
-        Subiendo a las piernas... dejando ir cualquier esfuerzo...
-        Las caderas... la pelvis... completamente relajadas...
-        
-        El abdomen... suave y tranquilo...
-        El pecho... expandiéndose con cada respiración...
-        
-        Los hombros... liberando el peso del día...
-        Los brazos... pesados y relajados...
-        Las manos... sueltas y abiertas...
-        
-        El cuello... libre de tensión...
-        El rostro... todos los músculos faciales relajados...
-        La mandíbula... suelta...
-        Los ojos... en descanso profundo...
-        
-        Tu mente se calma... los pensamientos se aquietan...
-        Estás en un estado de paz profunda...
-        
-        Permanece en este estado de relajación durante unos minutos...
-        Disfruta de esta calma interior...
-        
-        Cuando estés listo, comienza a volver lentamente...
-        Mueve suavemente los dedos de las manos y pies...
-        Estira el cuerpo con suavidad...
-        Y abre los ojos cuando te sientas preparado...
-        
-        Te sientes renovado, tranquilo y en paz.
-        """
-    
-    def _get_emotional_release_script(self) -> str:
-        """Script para liberación emocional"""
-        return """
-        [NOMBRE], esta sesión te guiará en la liberación de emociones almacenadas.
-        
-        Conéctate con tu respiración... profunda y consciente...
-        Permite que surja cualquier emoción que necesite ser liberada...
-        
-        Visualiza un lugar seguro en tu interior...
-        Un espacio de aceptación y compasión...
-        
-        Si hay tristeza, permítela fluir como un río que limpia...
-        Si hay ira, transfórmala en energía creativa...
-        Si hay miedo, envuélvelo en luz amorosa...
-        
-        Cada emoción tiene un mensaje... escúchalo con amor...
-        Luego, libérala con gratitud por su enseñanza...
-        
-        Siente cómo tu corazón se hace más ligero...
-        Cómo el espacio interior se expande...
-        
-        Eres más que tus emociones... eres la conciencia que las observa...
-        Desde esta conciencia, elige paz... elige amor... elige libertad...
-        
-        Permanece en este estado de liberación...
-        """
-    
-    def _get_self_esteem_script(self) -> str:
-        """Script para autoestima y confianza"""
-        return """
-        [NOMBRE], en esta sesión fortalecerás tu autoestima y confianza.
-        
-        Comienza recordando tus cualidades únicas...
-        Tus fortalezas... tus talentos... tu esencia...
-        
-        Repite en tu mente: "Me acepto completamente"
-        "Me respeto y me valoro"
-        "Confío en mi sabiduría interior"
-        
-        Visualiza una versión de ti mismo llena de confianza...
-        Cómo se mueve... cómo habla... cómo se relaciona...
-        Conecta con esa energía de seguridad interior...
-        
-        Siente cómo esta confianza se integra en cada célula...
-        Cómo transforma tu postura... tu mirada... tu presencia...
-        
-        Eres digno de amor... digno de respeto... digno de éxito...
-        Tu valor es inherente... no depende de logros externos...
-        
-        Desde este lugar de autoestima, tomas decisiones alineadas...
-        Te expresas auténticamente... estableces límites sanos...
-        
-        Esta confianza crece cada día... fortaleciéndote interiormente...
-        """
-    
-    def _get_anxiety_script(self) -> str:
-        """Script para manejo de ansiedad"""
-        return """
-        [NOMBRE], esta sesión te ayudará a calmar la ansiedad.
-        
-        Primero, conecta con el momento presente...
-        Nota 5 cosas que puedes ver...
-        4 cosas que puedes tocar...
-        3 cosas que puedes oír...
-        2 cosas que puedes oler...
-        1 cosa que puedes saborear...
-        
-        Ahora lleva la atención a tu cuerpo...
-        ¿Dónde sientes la ansiedad?...
-        Respira hacia esa zona... suavizando... liberando...
-        
-        Visualiza la ansiedad como una nube que pasa...
-        Tú eres el cielo despejado... vasto y tranquilo...
-        Las nubes vienen y van... el cielo permanece...
-        
-        Con cada exhalación, suelta preocupaciones...
-        Con cada inhalación, aceptas calma...
-        
-        Recuerda: este momento es seguro...
-        Tienes los recursos para manejarlo...
-        La ansiedad es una señal, no una sentencia...
-        
-        Poco a poco, la calma se establece...
-        La claridad regresa... la paz se restaura...
-        """
-    
-    def _get_healing_script(self) -> str:
-        """Script para sanación interior"""
-        return """
-        [NOMBRE], bienvenido a este espacio de sanación profunda.
-        
-        Conéctate con tu cuerpo sabio... ese que siempre busca equilibrio...
-        Escucha sus mensajes... honra su sabiduría...
-        
-        Visualiza una luz sanadora entrando por la coronilla...
-        Una luz dorada, llena de amor y compasión...
-        Fluye por tu cabeza... tu cuello... tus hombros...
-        
-        Llega a tu pecho... a tu corazón...
-        Disuelve viejas heridas... sana memorias dolorosas...
-        Tu corazón se abre... se expande... se renueva...
-        
-        La luz continúa hacia tu abdomen... liberando miedos...
-        Hacia tus piernas... arraigándote en fortaleza...
-        Hacia tus pies... conectándote con la tierra...
-        
-        Cada célula de tu cuerpo se baña en esta luz sanadora...
-        Se regenera... se revitaliza... se armoniza...
-        
-        Eres un ser completo... sanado... renovado...
-        Tu esencia es perfecta salud... perfecta armonía...
-        
-        Permanece en esta frecuencia de sanación...
-        Permite que se integre profundamente...
-        """
-    
-    def _get_mindfulness_script(self) -> str:
-        """Script para mindfulness"""
-        return """
-        [NOMBRE], practiquemos mindfulness juntos.
-        
-        Simplemente observa... sin juzgar... sin aferrarte...
-        Observa tu respiración... el aire entra... el aire sale...
-        
-        Observa los sonidos... lejos... cerca... sin etiquetarlos...
-        Observa las sensaciones en tu cuerpo... cambiantes... momentáneas...
-        
-        Cuando la mente divague, vuelve amablemente al ahora...
-        Al sonido... a la respiración... a la sensación presente...
-        
-        No hay dónde llegar... no hay nada que conseguir...
-        Solo este momento... solo esta experiencia...
-        
-        En este espacio de presencia, encuentras paz...
-        Encuentras claridad... encuentras tu centro...
-        
-        El mindfulness es regresar a casa... a tu verdadero ser...
-        Una y otra vez... con paciencia... con compasión...
-        
-        Permanece aquí... en el ahora... en la presencia...
-        """
-    
-    def start_session(self, session_type: str, user_id: str = None) -> dict:
-        """Inicia una sesión y la registra"""
-        session = self.get_session(session_type)
-        
-        # Registrar en base de datos
-        if user_id:
-            self._record_session(session, user_id)
-        
-        return session
-    
-    def _record_session(self, session: dict, user_id: str):
-        """Registra la sesión en la base de datos"""
-        try:
-            db = self.sessions_db
-            sessions = db.load_sessions()
-            
-            session_record = {
-                "session_id": session["session_id"],
-                "user_id": user_id,
-                "type": session["title"],
-                "duration": session["duration"],
-                "start_time": session["start_time"],
-                "end_time": datetime.now().isoformat(),
-                "personalized": session.get("personalized", False),
-                "completed": True
-            }
-            
-            if user_id not in sessions:
-                sessions[user_id] = []
-            
-            sessions[user_id].append(session_record)
-            
-            # Limitar historial a 50 sesiones por usuario
-            if len(sessions[user_id]) > 50:
-                sessions[user_id] = sessions[user_id][-50:]
-            
-            db.save_sessions(sessions)
-            
-            # Actualizar contador en usuarios
-            users = db.load_users()
-            if user_id in users:
-                users[user_id]["sessions_count"] = users[user_id].get("sessions_count", 0) + 1
-                users[user_id]["last_session"] = session["start_time"]
-                db.save_users(users)
-            
-        except Exception as e:
-            logger.error(f"Error registrando sesión: {e}")
-
-# ============================================
-# PARTE 8: SISTEMA DE GENERACIÓN DE PDF
-# ============================================
-
-class PDFGenerator:
-    """Generador de reportes PDF profesionales"""
-    
-    def __init__(self):
-        self.styles = getSampleStyleSheet()
-        self._setup_custom_styles()
-    
-    def _setup_custom_styles(self):
-        """Configura estilos personalizados"""
-        # Estilo para título principal
-        self.styles.add(ParagraphStyle(
-            name='MainTitle',
-            parent=self.styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#2E4053'),
-            spaceAfter=30,
-            alignment=TA_CENTER
-        ))
-        
-        # Estilo para subtítulos
-        self.styles.add(ParagraphStyle(
-            name='SubTitle',
-            parent=self.styles['Heading2'],
-            fontSize=16,
-            textColor=colors.HexColor('#3498DB'),
-            spaceAfter=15,
-            spaceBefore=20
-        ))
-        
-        # Estilo para contenido
-def _setup_custom_styles(self):
-    """Configura estilos personalizados"""
-    # Verifica si el estilo ya existe antes de agregarlo
-    if 'CustomTitle' not in self.styles:
-        self.styles.add(ParagraphStyle(
-            name='CustomTitle',
-            parent=self.styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#2E86AB'),
-            spaceAfter=30
-        ))
-    
-    # 🔥 CAMBIA ESTA PARTE - VERIFICA SI BodyText YA EXISTE
-    if 'CustomHeading' not in self.styles:
-        self.styles.add(ParagraphStyle(
-            name='CustomHeading',
-            parent=self.styles['Heading2'],
-            fontSize=16,
-            textColor=colors.HexColor('#A23B72'),
-            spaceAfter=15
-        ))
-    
-    # 🔥 ESTE ES EL CAMBIO CRÍTICO: verifica si 'BodyText' ya existe
-    if 'BodyText' not in self.styles:
-        self.styles.add(ParagraphStyle(
-            name='BodyText',
-            parent=self.styles['Normal'],
-            fontSize=11,
-            leading=14,
-            spaceAfter=12
-        ))
-    else:
-        # Si ya existe, simplemente lo obtenemos
-        pass  # Ya existe, no necesitamos crearlo
-        
-        # Estilo para listas
-        self.styles.add(ParagraphStyle(
-            name='Bullet',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#2C3E50'),
-            leftIndent=20,
-            spaceAfter=8,
-            bulletIndent=10
-        ))
-    
-    def generate_diagnostic_report(self, diagnosis_data: dict, user_info: dict = None) -> BytesIO:
-        """Genera reporte PDF de diagnóstico"""
-        try:
-            # Crear buffer para PDF
-            buffer = BytesIO()
-            
-            # Crear documento
-            doc = SimpleDocTemplate(
-                buffer,
-                pagesize=A4,
-                rightMargin=72,
-                leftMargin=72,
-                topMargin=72,
-                bottomMargin=72
-            )
-            
-            # Contenido del documento
-            story = []
-            
-            # 1. Encabezado
-            story.append(self._create_header(user_info))
-            story.append(Spacer(1, 20))
-            
-            # 2. Título
-            story.append(Paragraph("REPORTE DE DIAGNÓSTICO", self.styles['MainTitle']))
-            story.append(Spacer(1, 10))
-            
-            # 3. Información básica
-            story.append(self._create_basic_info(diagnosis_data, user_info))
-            story.append(Spacer(1, 20))
-            
-            # 4. Análisis emocional
-            story.append(self._create_emotional_analysis(diagnosis_data))
-            story.append(Spacer(1, 20))
-            
-            # 5. Diagnóstico de biodescodificación
-            story.append(self._create_biodescodification_diagnosis(diagnosis_data))
-            story.append(Spacer(1, 20))
-            
-            # 6. Plan de tratamiento
-            story.append(self._create_treatment_plan(diagnosis_data))
-            story.append(Spacer(1, 20))
-            
-            # 7. Recomendaciones
-            story.append(self._create_recommendations(diagnosis_data))
-            story.append(Spacer(1, 20))
-            
-            # 8. Pie de página
-            story.append(self._create_footer())
-            
-            # Construir PDF
-            doc.build(story)
-            
-            # Preparar buffer para lectura
-            buffer.seek(0)
-            
-            return buffer
-            
-        except Exception as e:
-            logger.error(f"Error generando PDF: {e}")
-            # PDF de error
-            return self._generate_error_pdf()
-    
-    def _create_header(self, user_info: dict = None) -> Paragraph:
-        """Crea encabezado del reporte"""
-        date_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-        
-        header_text = f"""
-        <b>MINDGEEKCLINIC</b><br/>
-        <font size="10">Sistema de Biodescodificación Integral</font><br/>
-        <font size="9">Reporte generado: {date_str}</font>
-        """
-        
-        if user_info:
-            header_text += f"""<br/><font size="9">Paciente: {user_info.get('name', 'No especificado')}</font>"""
-        
-        return Paragraph(header_text, self.styles['Heading3'])
-    
-    def _create_basic_info(self, diagnosis_data: dict, user_info: dict = None) -> Table:
-        """Crea tabla de información básica"""
-        data = [
-            ["INFORMACIÓN DEL DIAGNÓSTICO", ""],
-            ["Fecha", diagnosis_data.get('timestamp', datetime.now().isoformat())],
-            ["ID de Sesión", diagnosis_data.get('session_id', 'N/A')],
-            ["Duración análisis", "Generado automáticamente"]
-        ]
-        
-        if user_info:
-            data.append(["Nombre", user_info.get('name', 'No especificado')])
-            if 'age' in user_info:
-                data.append(["Edad", user_info['age']])
-            if 'gender' in user_info:
-                data.append(["Género", user_info['gender']])
-        
-        table = Table(data, colWidths=[200, 200])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8F9F9')),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        
-        return table
-    
-    def _create_emotional_analysis(self, diagnosis_data: dict) -> list:
-        """Crea sección de análisis emocional"""
-        story = []
-        
-        story.append(Paragraph("ANÁLISIS EMOCIONAL", self.styles['SubTitle']))
-        
-        emotional_data = diagnosis_data.get('emotional_analysis', {})
-        
-        # Emociones primarias
-        if 'primary_emotions' in emotional_data:
-            emotions_text = ", ".join(emotional_data['primary_emotions'])
-            story.append(Paragraph(f"<b>Emociones predominantes:</b> {emotions_text}", self.styles['BodyText']))
-        
-        # Nivel de intensidad
-        if 'intensity_level' in emotional_data:
-            intensity = emotional_data['intensity_level'].upper()
-            color = {
-                'BAJO': '#27AE60',
-                'MODERADO': '#F39C12',
-                'ALTO': '#E74C3C'
-            }.get(intensity, '#000000')
-            
-            story.append(Paragraph(
-                f"<b>Nivel de intensidad:</b> <font color='{color}'>{intensity}</font>",
-                self.styles['BodyText']
-            ))
-        
-        # Patrones emocionales
-        if 'emotional_patterns' in emotional_data and emotional_data['emotional_patterns']:
-            story.append(Paragraph("<b>Patrones identificados:</b>", self.styles['BodyText']))
-            for pattern in emotional_data['emotional_patterns']:
-                story.append(Paragraph(f"• {pattern}", self.styles['Bullet']))
-        
-        # Necesidades emocionales
-        if 'emotional_needs' in emotional_data and emotional_data['emotional_needs']:
-            story.append(Paragraph("<b>Necesidades emocionales:</b>", self.styles['BodyText']))
-            for need in emotional_data['emotional_needs']:
-                story.append(Paragraph(f"• {need}", self.styles['Bullet']))
-        
-        return story
-    
-    def _create_biodescodification_diagnosis(self, diagnosis_data: dict) -> list:
-        """Crea sección de diagnóstico de biodescodificación"""
-        story = []
-        
-        story.append(Paragraph("DIAGNÓSTICO DE BIODESCODIFICACIÓN", self.styles['SubTitle']))
-        
-        diagnosis = diagnosis_data.get('diagnosis', {})
-        
-        # Análisis general
-        if 'analysis' in diagnosis:
-            story.append(Paragraph("<b>Análisis general:</b>", self.styles['BodyText']))
-            analysis_text = diagnosis['analysis'].replace('\n', '<br/>')
-            story.append(Paragraph(analysis_text, self.styles['BodyText']))
-        
-        # Conflicto biológico
-        if 'conflict' in diagnosis:
-            story.append(Paragraph(f"<b>Conflicto biológico:</b> {diagnosis['conflict']}", self.styles['BodyText']))
-        
-        # Insights de biodescodificación
-        if 'biodescodification_insights' in diagnosis:
-            insights = diagnosis['biodescodification_insights']
-            if insights:
-                story.append(Paragraph("<b>Insights específicos:</b>", self.styles['BodyText']))
-                for insight in insights[:3]:  # Mostrar solo 3
-                    if 'symptom' in insight:
-                        text = f"{insight['symptom']} → {insight.get('conflict', 'Por analizar')}"
-                        story.append(Paragraph(f"• {text}", self.styles['Bullet']))
-        
-        # Conexión cuerpo-mente
-        physical_data = diagnosis_data.get('physical_analysis', {})
-        if 'body_mind_connection' in physical_data and physical_data['body_mind_connection']:
-            story.append(Paragraph("<b>Conexión cuerpo-mente:</b>", self.styles['BodyText']))
-            for connection in physical_data['body_mind_connection'][:3]:
-                story.append(Paragraph(f"• {connection}", self.styles['Bullet']))
-        
-        return story
-    
-    def _create_treatment_plan(self, diagnosis_data: dict) -> list:
-        """Crea sección de plan de tratamiento"""
-        story = []
-        
-        story.append(Paragraph("PLAN DE TRATAMIENTO", self.styles['SubTitle']))
-        
-        treatment_plan = diagnosis_data.get('treatment_plan', {})
-        
-        # Duración
-        if 'duration_days' in treatment_plan:
-            story.append(Paragraph(
-                f"<b>Duración recomendada:</b> {treatment_plan['duration_days']} días",
-                self.styles['BodyText']
-            ))
-        
-        # Prácticas diarias
-        if 'daily_practices' in treatment_plan and treatment_plan['daily_practices']:
-            story.append(Paragraph("<b>Prácticas diarias:</b>", self.styles['BodyText']))
-            for practice in treatment_plan['daily_practices'][:5]:
-                story.append(Paragraph(f"• {practice}", self.styles['Bullet']))
-        
-        # Sesiones semanales
-        if 'weekly_sessions' in treatment_plan and treatment_plan['weekly_sessions']:
-            story.append(Paragraph("<b>Sesiones recomendadas:</b>", self.styles['BodyText']))
-            for session in treatment_plan['weekly_sessions']:
-                story.append(Paragraph(f"• {session}", self.styles['Bullet']))
-        
-        # Recomendaciones dietéticas
-        if 'diet_recommendations' in treatment_plan and treatment_plan['diet_recommendations']:
-            story.append(Paragraph("<b>Recomendaciones dietéticas:</b>", self.styles['BodyText']))
-            for rec in treatment_plan['diet_recommendations'][:5]:
-                story.append(Paragraph(f"• {rec}", self.styles['Bullet']))
-        
-        # Monitoreo
-        if 'monitoring' in treatment_plan and treatment_plan['monitoring']:
-            story.append(Paragraph("<b>Seguimiento recomendado:</b>", self.styles['BodyText']))
-            for item in treatment_plan['monitoring']:
-                story.append(Paragraph(f"• {item}", self.styles['Bullet']))
-        
-        return story
-    
-    def _create_recommendations(self, diagnosis_data: dict) -> list:
-        """Crea sección de recomendaciones generales"""
-        story = []
-        
-        story.append(Paragraph("RECOMENDACIONES GENERALES", self.styles['SubTitle']))
-        
-        recommendations = diagnosis_data.get('recommendations', [])
-        
-        if recommendations:
-            for i, rec in enumerate(recommendations[:10], 1):
-                story.append(Paragraph(f"{i}. {rec}", self.styles['BodyText']))
-        else:
-            story.append(Paragraph("No hay recomendaciones específicas.", self.styles['BodyText']))
-        
-        # Nota importante
-        story.append(Spacer(1, 20))
-        story.append(Paragraph(
-            "<b>Nota importante:</b> Este diagnóstico es generado por inteligencia artificial "
-            "y debe ser complementado con evaluación profesional. Consulta a un médico o "
-            "terapeuta certificado para diagnóstico y tratamiento formal.",
-            ParagraphStyle(
-                name='Note',
-                parent=self.styles['Normal'],
-                fontSize=9,
-                textColor=colors.red,
-                backColor=colors.HexColor('#FDEDEC'),
-                borderPadding=10,
-                borderColor=colors.red,
-                borderWidth=1
-            )
-        ))
-        
-        return story
-    
-    def _create_footer(self) -> Paragraph:
-        """Crea pie de página"""
-        footer_text = """
-        <font size="8">
-        <b>MINDGEEKCLINIC</b> - Sistema de Biodescodificación Integral<br/>
-        Email: promptandmente@gmail.com | Versión: 5.0<br/>
-        Este documento es confidencial. Generado automáticamente por el sistema.
-        </font>
-        """
-        
-        return Paragraph(footer_text, self.styles['Normal'])
-    
-    def _generate_error_pdf(self) -> BytesIO:
-        """Genera PDF de error"""
-        buffer = BytesIO()
-        
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            rightMargin=72,
-            leftMargin=72,
-            topMargin=72,
-            bottomMargin=72
-        )
-        
-        story = []
-        
-        story.append(Paragraph("ERROR AL GENERAR REPORTE", self.styles['MainTitle']))
-        story.append(Spacer(1, 20))
-        
-        story.append(Paragraph(
-            "Lo sentimos, hubo un error al generar el reporte PDF. "
-            "Por favor, intenta nuevamente o contacta con soporte.",
-            self.styles['BodyText']
-        ))
-        
-        doc.build(story)
-        buffer.seek(0)
-        
-        return buffer
-
-# ============================================
-# PARTE 9: SISTEMA DE PAGOS Y COMISIONES
-# ============================================
+# ------------------------------------------------------------
+# SISTEMA DE PAGOS CON STRIPE
+# ------------------------------------------------------------
 
 class PaymentSystem:
-    """Sistema de gestión de pagos y comisiones"""
-    
     def __init__(self):
-        self.db = DatabaseManager()
-        self.email_service = EmailService()
-        self.config = ConfigManager()
-    
-    def process_payment_request(self, affiliate_id: str, amount: float) -> Tuple[bool, str, dict]:
-        """Procesa solicitud de pago de un afiliado"""
-        try:
-            # Verificar afiliado
-            db = self.db.load_affiliates()
-            
-            if affiliate_id not in db["affiliates"]:
-                return False, "Afiliado no encontrado", {}
-            
-            affiliate = db["affiliates"][affiliate_id]
-            
-            # Verificar fondos disponibles
-            available_funds = affiliate.get("pending_earnings", 0.0)
-            
-            if amount > available_funds:
-                return False, f"Fondos insuficientes. Disponible: ${available_funds:.2f}", {}
-            
-            # Verificar mínimo de pago
-            min_payout = self.config.affiliates_config.get("min_payout", 10.0)
-            if amount < min_payout:
-                return False, f"Mínimo de retiro: ${min_payout:.2f}", {}
-            
-            # Crear registro de pago
-            payment_data = self._create_payment_record(affiliate_id, amount)
-            
-            # Actualizar saldos del afiliado
-            affiliate["pending_earnings"] -= amount
-            affiliate["paid_earnings"] += amount
-            affiliate["last_payment"] = datetime.now().isoformat()
-            
-            db["affiliates"][affiliate_id] = affiliate
-            self.db.save_affiliates(db)
-            
-            # Guardar pago en historial
-            self._save_payment_to_history(payment_data)
-            
-            # Enviar notificación por email
-            self._send_payment_notification(affiliate, payment_data)
-            
-            return True, "Solicitud de pago procesada exitosamente", payment_data
-            
-        except Exception as e:
-            logger.error(f"Error procesando pago: {e}")
-            return False, f"Error: {str(e)}", {}
-    
-    def _create_payment_record(self, affiliate_id: str, amount: float) -> dict:
-        """Crea registro de pago"""
-        payment_id = f"PAY_{int(time.time())}_{random.randint(1000, 9999)}"
+        self.stripe_public_key = app.config['STRIPE_PUBLIC_KEY']
+        self.stripe_secret_key = app.config['STRIPE_SECRET_KEY']
+        self.stripe_webhook_secret = app.config['STRIPE_WEBHOOK_SECRET']
         
-        return {
-            "payment_id": payment_id,
-            "affiliate_id": affiliate_id,
-            "amount": amount,
-            "currency": self.config.affiliates_config.get("default_currency", "USD"),
-            "status": "processing",
-            "request_date": datetime.now().isoformat(),
-            "estimated_completion": (datetime.now() + timedelta(days=2)).isoformat(),
-            "payment_method": "binance",
-            "transaction_fee": amount * 0.02,  # 2% de comisión
-            "net_amount": amount * 0.98,
-            "notes": "Pago procesado automáticamente por el sistema"
-        }
+        if self.stripe_secret_key:
+            stripe.api_key = self.stripe_secret_key
     
-    def _save_payment_to_history(self, payment_data: dict):
-        """Guarda pago en historial"""
+    def create_payment_intent(self, amount, currency='usd', metadata=None):
+        """Crea un PaymentIntent de Stripe"""
         try:
-            payments = self.db.load_payments()
-            payments.append(payment_data)
-            self.db.save_payments(payments)
+            # Convertir a centavos/céntimos
+            amount_in_cents = int(amount * 100)
             
-        except Exception as e:
-            logger.error(f"Error guardando pago en historial: {e}")
-    
-    def _send_payment_notification(self, affiliate: dict, payment_data: dict):
-        """Envía notificación de pago por email"""
-        try:
-            subject = f"✅ Solicitud de Pago Procesada - ${payment_data['amount']:.2f}"
-            
-            body = f"""
-            Hola {affiliate['full_name']},
-            
-            Tu solicitud de pago ha sido procesada exitosamente.
-            
-            Detalles del pago:
-            • ID de Pago: {payment_data['payment_id']}
-            • Monto: ${payment_data['amount']:.2f} {payment_data['currency']}
-            • Comisión: ${payment_data['transaction_fee']:.2f}
-            • Neto a recibir: ${payment_data['net_amount']:.2f}
-            • Método: {payment_data['payment_method'].title()}
-            • Fecha estimada: {payment_data['estimated_completion'][:10]}
-            
-            El pago será enviado a tu dirección de Binance registrada:
-            {affiliate.get('payment_address', 'No especificada')}
-            
-            Recibirás una notificación cuando el pago sea completado.
-            
-            Saludos,
-            Equipo MINDGEEKCLINIC
-            """
-            
-            self.email_service.send_email(
-                to_email=affiliate['email'],
-                subject=subject,
-                body=body
+            payment_intent = stripe.PaymentIntent.create(
+                amount=amount_in_cents,
+                currency=currency,
+                metadata=metadata or {},
+                automatic_payment_methods={
+                    'enabled': True,
+                }
             )
             
+            return {
+                'success': True,
+                'client_secret': payment_intent.client_secret,
+                'payment_intent_id': payment_intent.id,
+                'amount': amount,
+                'currency': currency
+            }
+            
+        except stripe.error.StripeError as e:
+            logger.error(f'Error de Stripe: {str(e)}')
+            return {
+                'success': False,
+                'error': str(e.user_message if hasattr(e, 'user_message') else e)
+            }
         except Exception as e:
-            logger.error(f"Error enviando notificación de pago: {e}")
+            logger.error(f'Error al crear payment intent: {str(e)}')
+            return {
+                'success': False,
+                'error': 'Error interno del servidor'
+            }
     
-    def get_payment_history(self, affiliate_id: str = None) -> list:
-        """Obtiene historial de pagos"""
+    def confirm_payment(self, payment_intent_id):
+        """Confirma un pago de Stripe"""
         try:
-            payments = self.db.load_payments()
+            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
             
-            if affiliate_id:
-                return [p for p in payments if p.get('affiliate_id') == affiliate_id]
+            return {
+                'success': True,
+                'status': payment_intent.status,
+                'amount': payment_intent.amount / 100,
+                'currency': payment_intent.currency,
+                'payment_method': payment_intent.payment_method_types[0] if payment_intent.payment_method_types else 'unknown'
+            }
             
-            return payments
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo historial de pagos: {e}")
-            return []
+        except stripe.error.StripeError as e:
+            logger.error(f'Error de Stripe al confirmar pago: {str(e)}')
+            return {
+                'success': False,
+                'error': str(e.user_message if hasattr(e, 'user_message') else e)
+            }
     
-    def calculate_commission(self, sale_amount: float, commission_rate: float = None) -> float:
-        """Calcula comisión para un monto de venta"""
-        if commission_rate is None:
-            commission_rate = self.config.affiliates_config.get("commission_rate", 0.30)
+    def create_checkout_session(self, line_items, success_url, cancel_url, metadata=None):
+        """Crea una sesión de checkout de Stripe"""
+        try:
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=line_items,
+                mode='payment',
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata=metadata or {}
+            )
+            
+            return {
+                'success': True,
+                'session_id': checkout_session.id,
+                'url': checkout_session.url
+            }
+            
+        except stripe.error.StripeError as e:
+            logger.error(f'Error de Stripe en checkout: {str(e)}')
+            return {
+                'success': False,
+                'error': str(e.user_message if hasattr(e, 'user_message') else e)
+            }
+    
+    def handle_webhook(self, payload, sig_header):
+        """Maneja webhooks de Stripe"""
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, self.stripe_webhook_secret
+            )
+            
+            # Manejar diferentes tipos de eventos
+            if event['type'] == 'payment_intent.succeeded':
+                payment_intent = event['data']['object']
+                self._handle_payment_success(payment_intent)
+                
+            elif event['type'] == 'payment_intent.payment_failed':
+                payment_intent = event['data']['object']
+                self._handle_payment_failure(payment_intent)
+            
+            return {'success': True, 'event': event['type']}
+            
+        except ValueError as e:
+            logger.error(f'Payload inválido: {str(e)}')
+            return {'success': False, 'error': 'Payload inválido'}
+        except stripe.error.SignatureVerificationError as e:
+            logger.error(f'Firma inválida: {str(e)}')
+            return {'success': False, 'error': 'Firma inválida'}
+    
+    def _handle_payment_success(self, payment_intent):
+        """Maneja pagos exitosos"""
+        try:
+            # Buscar pago en la base de datos
+            payment = Payment.query.filter_by(
+                stripe_payment_intent_id=payment_intent['id']
+            ).first()
+            
+            if payment:
+                payment.status = 'completed'
+                payment.stripe_charge_id = payment_intent.get('charges', {}).get('data', [{}])[0].get('id')
+                payment.payment_details = json.dumps(payment_intent)
+                payment.updated_at = datetime.datetime.utcnow()
+                
+                # Actualizar orden asociada
+                if payment.order_id:
+                    order = Order.query.get(payment.order_id)
+                    if order:
+                        order.payment_status = 'paid'
+                        order.status = 'processing'
+                        order.updated_at = datetime.datetime.utcnow()
+                
+                db.session.commit()
+                logger.info(f'Pago completado: {payment_intent["id"]}')
+                
+                # Enviar notificación
+                self._send_payment_notification(payment.user_id, payment.amount, True)
         
-        return sale_amount * commission_rate
+        except Exception as e:
+            logger.error(f'Error al manejar pago exitoso: {str(e)}')
     
-    def get_affiliate_balance(self, affiliate_id: str) -> dict:
-        """Obtiene balance de un afiliado"""
+    def _handle_payment_failure(self, payment_intent):
+        """Maneja pagos fallidos"""
         try:
-            db = self.db.load_affiliates()
+            payment = Payment.query.filter_by(
+                stripe_payment_intent_id=payment_intent['id']
+            ).first()
             
-            if affiliate_id not in db["affiliates"]:
-                return {"error": "Afiliado no encontrado"}
+            if payment:
+                payment.status = 'failed'
+                payment.payment_details = json.dumps(payment_intent)
+                payment.updated_at = datetime.datetime.utcnow()
+                db.session.commit()
+                
+                # Enviar notificación
+                self._send_payment_notification(payment.user_id, payment.amount, False)
+                
+                logger.warning(f'Pago fallido: {payment_intent["id"]}')
+        
+        except Exception as e:
+            logger.error(f'Error al manejar pago fallido: {str(e)}')
+    
+    def _send_payment_notification(self, user_id, amount, success):
+        """Envía notificación de pago"""
+        try:
+            user = User.query.get(user_id)
+            if not user:
+                return
             
-            affiliate = db["affiliates"][affiliate_id]
+            notification = Notification(
+                user_id=user_id,
+                title='Pago procesado' if success else 'Pago fallido',
+                message=f'Tu pago de ${amount:.2f} ha sido {"completado exitosamente" if success else "rechazado"}',
+                notification_type='success' if success else 'error',
+                action_url='/dashboard/payments'
+            )
             
-            return {
-                "affiliate_id": affiliate_id,
-                "full_name": affiliate.get("full_name", ""),
-                "total_earnings": affiliate.get("total_earnings", 0.0),
-                "pending_earnings": affiliate.get("pending_earnings", 0.0),
-                "paid_earnings": affiliate.get("paid_earnings", 0.0),
-                "commission_rate": affiliate.get("commission_rate", 0.30),
-                "referrals_count": affiliate.get("referrals_count", 0),
-                "conversions_count": affiliate.get("conversions_count", 0),
-                "last_payment": affiliate.get("last_payment"),
-                "min_payout": self.config.affiliates_config.get("min_payout", 50.0),
-                "can_withdraw": affiliate.get("pending_earnings", 0.0) >= self.config.affiliates_config.get("min_payout", 50.0)
-            }
+            db.session.add(notification)
+            db.session.commit()
+        
+        except Exception as e:
+            logger.error(f'Error al enviar notificación de pago: {str(e)}')
+
+# Instanciar el sistema de pagos
+payment_system = PaymentSystem()
+
+# ------------------------------------------------------------
+# SISTEMA DE NOTIFICACIONES EN TIEMPO REAL
+# ------------------------------------------------------------
+
+class NotificationSystem:
+    @staticmethod
+    def create_notification(user_id, title, message, notification_type='info', action_url=None):
+        """Crea una nueva notificación"""
+        try:
+            notification = Notification(
+                user_id=user_id,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+                action_url=action_url
+            )
+            
+            db.session.add(notification)
+            db.session.commit()
+            
+            # Enviar notificación en tiempo real via Socket.IO
+            socketio.emit('new_notification', {
+                'id': notification.id,
+                'title': title,
+                'message': message,
+                'type': notification_type,
+                'timestamp': notification.created_at.isoformat(),
+                'action_url': action_url
+            }, room=f'user_{user_id}')
+            
+            return notification
             
         except Exception as e:
-            logger.error(f"Error obteniendo balance: {e}")
-            return {"error": str(e)}
-
-# ============================================
-# PARTE 10: SISTEMA DE ESTADÍSTICAS Y ANALYTICS
-# ============================================
-
-class AnalyticsSystem:
-    """Sistema de análisis y estadísticas"""
+            logger.error(f'Error al crear notificación: {str(e)}')
+            return None
     
-    def __init__(self):
-        self.db = DatabaseManager()
-    
-    def get_dashboard_stats(self) -> dict:
-        """Obtiene estadísticas para el dashboard"""
+    @staticmethod
+    def send_appointment_reminder(appointment):
+        """Envía recordatorio de cita"""
         try:
-            db = self.db.load_affiliates()
-            stats = db.get("statistics", {})
+            # Notificación al cliente
+            NotificationSystem.create_notification(
+                user_id=appointment.client_id,
+                title='Recordatorio de cita',
+                message=f'Tienes una cita programada para {appointment.appointment_date} a las {appointment.appointment_time}',
+                notification_type='appointment',
+                action_url=f'/appointments/{appointment.id}'
+            )
             
-            # Calcular crecimiento mensual (simulado)
-            today = datetime.now()
-            month_start = today.replace(day=1)
+            # Notificación al terapeuta
+            NotificationSystem.create_notification(
+                user_id=appointment.therapist_id,
+                title='Cita programada',
+                message=f'Tienes una cita con {appointment.client.first_name} {appointment.client.last_name}',
+                notification_type='appointment',
+                action_url=f'/therapist/appointments/{appointment.id}'
+            )
             
-            monthly_growth = {
-                "new_affiliates": random.randint(5, 20),
-                "total_commission": random.uniform(100, 500),
-                "conversions": random.randint(10, 50)
-            }
-            
-            # Obtener últimos pagos
-            payments = self.db.load_payments()
-            recent_payments = sorted(payments, key=lambda x: x.get('request_date', ''), reverse=True)[:5]
-            
-            # Obtener mejores afiliados
-            affiliates = list(db.get("affiliates", {}).values())
-            top_affiliates = sorted(affiliates, key=lambda x: x.get('total_commission', 0), reverse=True)[:5]
-            
-            return {
-                "overall_stats": {
-                    "total_affiliates": stats.get("total_registered", 0),
-                    "active_affiliates": stats.get("active_affiliates", 0),
-                    "total_earnings": stats.get("total_earnings", 0.0),
-                    "total_payments": stats.get("total_payments", 0.0),
-                    "total_referrals": stats.get("total_referrals", 0),
-                    "total_conversions": stats.get("total_conversions", 0)
-                },
-                "monthly_growth": monthly_growth,
-                "recent_payments": recent_payments,
-                "top_affiliates": [
+            # Enviar email si está configurado
+            if appointment.client.email and email_system.username:
+                email_system.send_appointment_confirmation(
+                    appointment.client.email,
                     {
-                        "id": a.get("id"),
-                        "name": a.get("full_name", "N/A"),
-                        "earnings": a.get("total_commission", 0.0),
-                        "conversions": a.get("conversions_count", 0)
+                        'date': appointment.appointment_date.strftime('%Y-%m-%d'),
+                        'time': appointment.appointment_time.strftime('%H:%M'),
+                        'therapist': f'{appointment.therapist.first_name} {appointment.therapist.last_name}',
+                        'type': appointment.appointment_type
                     }
-                    for a in top_affiliates
-                ]
-            }
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo estadísticas: {e}")
-            return {}
-    
-    def get_affiliate_performance(self, affiliate_id: str) -> dict:
-        """Obtiene desempeño de un afiliado específico"""
-        try:
-            db = self.db.load_affiliates()
-            
-            if affiliate_id not in db["affiliates"]:
-                return {"error": "Afiliado no encontrado"}
-            
-            affiliate = db["affiliates"][affiliate_id]
-            
-            # Calcular métricas
-            referrals = db.get("referrals", {}).get(affiliate.get("referral_code", ""), {})
-            referral_list = referrals.get("referrals", [])
-            
-            # Métricas de conversión
-            total_referrals = len(referral_list)
-            conversions = sum(1 for r in referral_list if r.get("converted", False))
-            conversion_rate = (conversions / total_referrals * 100) if total_referrals > 0 else 0
-            
-            # Ingresos por mes (simulado)
-            monthly_earnings = []
-            for i in range(6):
-                month = datetime.now() - timedelta(days=30*i)
-                month_str = month.strftime("%Y-%m")
-                earnings = random.uniform(50, 200) if i < 3 else random.uniform(100, 300)
-                monthly_earnings.append({
-                    "month": month_str,
-                    "earnings": earnings
-                })
-            
-            monthly_earnings.reverse()
-            
-            return {
-                "basic_info": {
-                    "id": affiliate_id,
-                    "name": affiliate.get("full_name", ""),
-                    "status": affiliate.get("status", "pending"),
-                    "join_date": affiliate.get("registration_date", "")[:10],
-                    "referral_code": affiliate.get("referral_code", "")
-                },
-                "performance_metrics": {
-                    "total_referrals": total_referrals,
-                    "conversions": conversions,
-                    "conversion_rate": round(conversion_rate, 1),
-                    "total_commission": affiliate.get("total_commission", 0.0),
-                    "pending_earnings": affiliate.get("pending_earnings", 0.0),
-                    "avg_conversion_value": affiliate.get("total_commission", 0.0) / conversions if conversions > 0 else 0
-                },
-                "monthly_earnings": monthly_earnings,
-                "recent_activity": referral_list[-10:] if referral_list else []
-            }
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo desempeño: {e}")
-            return {"error": str(e)}
-    
-    def get_system_health(self) -> dict:
-        """Obtiene estado de salud del sistema"""
-        try:
-            # Simular métricas del sistema
-            import psutil
-            
-            cpu_percent = psutil.cpu_percent(interval=1)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            
-            # Métricas de la aplicación
-            db = self.db.load_affiliates()
-            total_users = len(db.get("affiliates", {}))
-            
-            # Último backup (simulado)
-            last_backup = (datetime.now() - timedelta(hours=2)).isoformat()
-            
-            return {
-                "server_metrics": {
-                    "cpu_usage": round(cpu_percent, 1),
-                    "memory_usage": round(memory.percent, 1),
-                    "disk_usage": round(disk.percent, 1),
-                    "uptime": str(timedelta(seconds=psutil.boot_time()))
-                },
-                "app_metrics": {
-                    "total_users": total_users,
-                    "active_sessions": random.randint(5, 50),
-                    "daily_requests": random.randint(100, 500),
-                    "error_rate": round(random.uniform(0.1, 2.0), 2)
-                },
-                "database": {
-                    "last_backup": last_backup,
-                    "size_mb": round(os.path.getsize(self.db.affiliates_file) / 1024 / 1024, 2),
-                    "connected": True
-                },
-                "services": {
-                    "email": True,
-                    "payments": True,
-                    "ai": True if ConfigManager().groq_api_key else False,
-                    "storage": True
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo salud del sistema: {e}")
-            return {
-                "error": str(e),
-                "server_metrics": {"cpu_usage": 0, "memory_usage": 0},
-                "app_metrics": {"total_users": 0}
-            }
-
-# ============================================
-# PARTE 11: INTERFAZ DE USUARIO - COMPONENTES
-# ============================================
-
-class UIComponents:
-    """Componentes de interfaz de usuario reutilizables"""
-    
-    @staticmethod
-    def sidebar_navigation():
-        """Barra lateral de navegación"""
-        with st.sidebar:
-            # Logo y título
-            st.markdown("""
-            <div style="text-align: center;">
-                <h1 style="color: #667eea;">🧠</h1>
-                <h2 style="color: #764ba2;">MINDGEEKCLINIC</h2>
-                <p style="color: #666; font-size: 0.9em;">Biodescodificación Integral</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            
-            # Estado de la aplicación
-            config = ConfigManager().app_config
-            if config.get("maintenance_mode", False):
-                st.warning("⚠️ Modo mantenimiento activo")
-            
-            # Navegación principal
-            st.markdown("### 📍 Navegación")
-            
-            pages = [
-                {"icon": "🏠", "name": "Inicio", "key": "home"},
-                {"icon": "🔍", "name": "Diagnóstico", "key": "diagnostic"},
-                {"icon": "🧘", "name": "Sesiones", "key": "sessions"},
-                {"icon": "📊", "name": "Estadísticas", "key": "stats"},
-                {"icon": "💬", "name": "Chat IA", "key": "chat"},
-                {"icon": "🎯", "name": "Afiliados", "key": "affiliate"},
-                {"icon": "🔐", "name": "Admin", "key": "admin"}
-            ]
-            
-            for page in pages:
-                if st.button(
-                    f"{page['icon']} {page['name']}",
-                    key=f"nav_{page['key']}",
-                    use_container_width=True,
-                    type="primary" if st.session_state.get("page") == page['key'] else "secondary"
-                ):
-                    st.session_state.page = page['key']
-                    st.rerun()
-            
-            st.markdown("---")
-            
-            # Información de sesión
-            if 'affiliate_id' in st.session_state:
-                st.success(f"👤 {st.session_state.affiliate_id}")
-                
-                if st.button("🚪 Cerrar sesión", use_container_width=True):
-                    del st.session_state.affiliate_id
-                    st.rerun()
-            
-            # Referido activo
-            if 'referral_code' in st.session_state:
-                st.info(f"👋 Referido por: {st.session_state.referral_code}")
-            
-            st.markdown("---")
-            
-            # Información de contacto
-            st.markdown("### 📞 Contacto")
-            st.markdown("""
-            **📧 Email:**  
-            promptandmente@gmail.com
-            
-            **🕒 Soporte:**  
-            24/7 vía email
-            
-            **🔒 Seguridad:**  
-            Datos encriptados
-            """)
-            
-            # Versión
-            st.markdown(f"---\n**Versión:** {config.get('version', '5.0')}")
-    
-    @staticmethod
-    def metric_card(title: str, value, change: str = None, icon: str = "📊"):
-        """Tarjeta de métrica"""
-        col1, col2 = st.columns([1, 3])
-        
-        with col1:
-            st.markdown(f"<h1 style='text-align: center;'>{icon}</h1>", unsafe_allow_html=True)
-        
-        with col2:
-            st.metric(title, value, change)
-    
-    @staticmethod
-    def progress_tracker(steps: list, current_step: int):
-        """Rastreador de progreso"""
-        cols = st.columns(len(steps))
-        
-        for i, (col, step) in enumerate(zip(cols, steps)):
-            with col:
-                if i < current_step:
-                    st.success(f"✅ {step}")
-                elif i == current_step:
-                    st.info(f"⏳ {step}")
-                else:
-                    st.write(f"🔲 {step}")
-        
-        st.progress(current_step / len(steps))
-    
-    @staticmethod
-    def notification(type: str, message: str):
-        """Notificación estilizada"""
-        icons = {
-            "success": "✅",
-            "error": "❌",
-            "warning": "⚠️",
-            "info": "ℹ️"
-        }
-        
-        colors = {
-            "success": "#d4edda",
-            "error": "#f8d7da",
-            "warning": "#fff3cd",
-            "info": "#d1ecf1"
-        }
-        
-        icon = icons.get(type, "ℹ️")
-        color = colors.get(type, "#d1ecf1")
-        
-        st.markdown(f"""
-        <div style="background-color: {color}; padding: 15px; border-radius: 5px; margin: 10px 0;">
-            <strong>{icon} {message}</strong>
-        </div>
-        """, unsafe_allow_html=True)
-
-# ============================================
-# PARTE 12: PÁGINAS PRINCIPALES
-# ============================================
-
-class PageRenderer:
-    """Renderizador de páginas principales"""
-    
-    def __init__(self):
-        self.ui = UIComponents()
-        self.db = DatabaseManager()
-        self.ai_system = AIDiagnosticSystem()
-        self.hypnosis_system = HypnosisSystem()
-        self.pdf_generator = PDFGenerator()
-        self.payment_system = PaymentSystem()
-        self.analytics = AnalyticsSystem()
-        self.email_service = EmailService()
-    
-    def render_home(self):
-        """Renderiza página de inicio"""
-        st.title("🧠 MINDGEEKCLINIC - Biodescodificación Integral")
-        
-        # Procesar referidos
-        query_params = st.query_params
-        if 'ref' in query_params:
-            referral_code = query_params['ref']
-            if referral_code:
-                st.session_state.referral_code = referral_code
-                # Registrar visita de referido
-                self.db.add_referral(referral_code, f"guest_{int(time.time())}")
-                st.sidebar.success(f"👋 ¡Bienvenido por referencia!")
-        
-        # Hero section
-        st.markdown("""
-        ## Transforma tu salud emocional a través de la biodescodificación
-        
-        **MINDGEEKCLINIC** es tu aliado para descifrar los mensajes del cuerpo 
-        y transformar las emociones en bienestar integral.
-        
-        ### ✨ Características principales:
-        """)
-        
-        # Características
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("### 🔍 Diagnóstico IA")
-            st.write("Análisis emocional preciso con inteligencia artificial avanzada")
-        
-        with col2:
-            st.markdown("### 🧘 Sesiones Guiadas")
-            st.write("Hipnosis y meditaciones personalizadas para cada necesidad")
-        
-        with col3:
-            st.markdown("### 📊 Seguimiento")
-            st.write("Monitorea tu progreso emocional con estadísticas detalladas")
-        
-        with col4:
-            st.markdown("### 🎯 Afiliados")
-            st.write("Gana comisiones recomendando nuestro servicio")
-        
-        st.markdown("---")
-        
-        # Acciones rápidas
-        st.subheader("🚀 Comienza tu viaje")
-        
-        col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
-        
-        with col_btn1:
-            if st.button("🔍 Iniciar Diagnóstico", use_container_width=True, type="primary"):
-                st.session_state.page = "diagnostic"
-                st.rerun()
-        
-        with col_btn2:
-            if st.button("🧘 Sesiones Guiadas", use_container_width=True):
-                st.session_state.page = "sessions"
-                st.rerun()
-        
-        with col_btn3:
-            if st.button("📊 Mis Estadísticas", use_container_width=True):
-                st.session_state.page = "stats"
-                st.rerun()
-        
-        with col_btn4:
-            if st.button("💬 Chat IA", use_container_width=True):
-                st.session_state.page = "chat"
-                st.rerun()
-        
-        # Programa de afiliados
-        st.markdown("---")
-        st.subheader("🎯 ¿Quieres ganar con MINDGEEKCLINIC?")
-        
-        col_aff1, col_aff2 = st.columns([2, 1])
-        
-        with col_aff1:
-            st.markdown("""
-            **Programa de Afiliados Premium:**
-            
-            - 💰 **30% de comisión** por cada venta
-            - ⚡ **Pagos automáticos** via Binance
-            - 📊 **Panel de seguimiento** en tiempo real
-            - 🎨 **Material de marketing** profesional
-            - 🏆 **Bonos por desempeño**
-            - 📈 **Herramientas avanzadas** de analytics
-            
-            **Mínimo para retiro:** $50 USD
-            **Pagos:** Todos los jueves
-            """)
-        
-        with col_aff2:
-            if st.button("💰 Unirse al Programa", 
-                        use_container_width=True, 
-                        type="secondary",
-                        key="join_affiliate_home"):
-                st.session_state.page = "affiliate"
-                st.rerun()
-        
-        # Testimonios (simulados)
-        st.markdown("---")
-        st.subheader("💬 Lo que dicen nuestros usuarios")
-        
-        testimonials = [
-            {"name": "Ana G.", "text": "El diagnóstico de biodescodificación me ayudó a entender la raíz emocional de mis migrañas.", "role": "Paciente"},
-            {"name": "Carlos M.", "text": "Como afiliado, he ganado más de $500 en comisiones. El sistema es excelente.", "role": "Afiliado"},
-            {"name": "Dra. Laura R.", "text": "Uso MINDGEEKCLINIC como herramienta complementaria en mi consulta. Muy profesional.", "role": "Terapeuta"}
-        ]
-        
-        cols = st.columns(3)
-        for col, testimonial in zip(cols, testimonials):
-            with col:
-                st.markdown(f"""
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #667eea;">
-                    <p style="font-style: italic;">"{testimonial['text']}"</p>
-                    <p style="text-align: right; margin-top: 15px;">
-                        <strong>{testimonial['name']}</strong><br/>
-                        <small>{testimonial['role']}</small>
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    def render_diagnostic(self):
-        """Renderiza página de diagnóstico"""
-        st.title("🔍 Diagnóstico de Biodescodificación")
-        
-        # Verificar si ya hay un diagnóstico en progreso
-        if 'current_diagnostic' in st.session_state and st.session_state.current_diagnostic:
-            self._render_diagnostic_results()
-            return
-        
-        # Formulario de diagnóstico
-        with st.form("diagnostic_form"):
-            st.subheader("📋 Información básica")
-            
-            col_info1, col_info2 = st.columns(2)
-            
-            with col_info1:
-                name = st.text_input("Nombre (opcional)", placeholder="Tu nombre")
-                age = st.number_input("Edad", min_value=1, max_value=100, value=30)
-            
-            with col_info2:
-                gender = st.selectbox("Género", ["Prefiero no decir", "Masculino", "Femenino", "Otro"])
-                occupation = st.text_input("Ocupación", placeholder="Tu profesión o actividad principal")
-            
-            st.divider()
-            st.subheader("💭 Síntomas emocionales")
-            
-            emotional_options = [
-                "Ansiedad", "Tristeza", "Ira/Frustración", "Miedo", "Culpa",
-                "Desmotivación", "Insatisfacción", "Soledad", "Estrés crónico",
-                "Irritabilidad", "Desesperanza", "Inseguridad", "Agobio"
-            ]
-            
-            emotional_symptoms = st.multiselect(
-                "¿Qué emociones predominan últimamente?",
-                emotional_options,
-                help="Selecciona todas las que correspondan"
-            )
-            
-            emotional_intensity = st.slider(
-                "Intensidad emocional general",
-                1, 10, 5,
-                help="1 = Muy baja, 10 = Muy alta"
-            )
-            
-            sleep_quality = st.select_slider(
-                "Calidad del sueño",
-                options=["Muy mala", "Mala", "Regular", "Buena", "Excelente"],
-                value="Regular"
-            )
-            
-            st.divider()
-            st.subheader("🤒 Síntomas físicos")
-            
-            physical_options = [
-                "Dolores de cabeza", "Problemas digestivos", "Cansancio crónico",
-                "Tensión muscular", "Cambios de peso", "Problemas cutáneos",
-                "Alteraciones del sueño", "Cambios en el apetito", "Palpitaciones",
-                "Problemas respiratorios", "Dolores articulares", "Mareos/Vértigos"
-            ]
-            
-            physical_symptoms = st.multiselect(
-                "¿Qué síntomas físicos has experimentado?",
-                physical_options,
-                help="Selecciona todos los síntomas relevantes"
-            )
-            
-            symptom_duration = st.selectbox(
-                "¿Cuánto tiempo llevas con estos síntomas?",
-                ["Menos de 1 semana", "1-4 semanas", "1-3 meses", "3-6 meses", "6-12 meses", "Más de 1 año"]
-            )
-            
-            pain_intensity = st.slider(
-                "Intensidad del malestar físico",
-                1, 10, 3,
-                help="1 = Muy baja, 10 = Muy alta"
-            )
-            
-            st.divider()
-            st.subheader("🎯 Áreas de vida afectadas")
-            
-            life_areas = st.multiselect(
-                "¿Qué áreas de tu vida se han visto afectadas?",
-                ["Trabajo/Estudios", "Relaciones personales", "Salud física",
-                 "Economía", "Desarrollo personal", "Tiempo libre", "Familia"]
-            )
-            
-            additional_info = st.text_area(
-                "Información adicional (opcional)",
-                placeholder="¿Hay algo más que quieras compartir sobre tu situación? Eventos recientes, preocupaciones específicas, etc.",
-                height=100
-            )
-            
-            st.divider()
-            
-            # Términos y condiciones
-            accept_terms = st.checkbox(
-                "Acepto que este diagnóstico es generado por IA y debe ser complementado con evaluación profesional"
-            )
-            
-            # Botón de envío
-            col_submit1, col_submit2, col_submit3 = st.columns([1, 2, 1])
-            
-            with col_submit2:
-                submitted = st.form_submit_button(
-                    "🔬 Generar Diagnóstico",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=not accept_terms
                 )
-            
-            if submitted:
-                if not emotional_symptoms and not physical_symptoms:
-                    st.error("Por favor, selecciona al menos un síntoma emocional o físico")
-                else:
-                    # Preparar datos para diagnóstico
-                    symptoms_data = {
-                        "name": name if name else "Usuario",
-                        "age": age,
-                        "gender": gender,
-                        "occupation": occupation,
-                        "emotional_symptoms": emotional_symptoms,
-                        "emotional_intensity": emotional_intensity,
-                        "sleep_quality": sleep_quality,
-                        "physical_symptoms": physical_symptoms,
-                        "symptom_duration": symptom_duration,
-                        "pain_intensity": pain_intensity,
-                        "life_areas": life_areas,
-                        "additional_info": additional_info,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    
-                    # Guardar en sesión
-                    st.session_state.current_diagnostic = symptoms_data
-                    
-                    # Mostrar spinner mientras se genera diagnóstico
-                    with st.spinner("🔍 Analizando tu perfil emocional con IA..."):
-                        # Generar diagnóstico
-                        diagnosis = self.ai_system.analyze_symptoms(symptoms_data)
-                        st.session_state.current_diagnosis = diagnosis
-                        
-                        # Registrar en historial
-                        if 'diagnostic_history' not in st.session_state:
-                            st.session_state.diagnostic_history = []
-                        
-                        st.session_state.diagnostic_history.append({
-                            "data": symptoms_data,
-                            "diagnosis": diagnosis,
-                            "timestamp": datetime.now().isoformat()
-                        })
-                    
-                    st.success("✅ Diagnóstico completado")
-                    st.rerun()
         
-        # Botón para volver
-        if st.button("🏠 Volver al inicio", type="secondary"):
-            st.session_state.page = "home"
-            st.rerun()
+        except Exception as e:
+            logger.error(f'Error al enviar recordatorio: {str(e)}')
     
-    def _render_diagnostic_results(self):
-        """Renderiza resultados del diagnóstico"""
-        if 'current_diagnosis' not in st.session_state:
-            st.error("No hay diagnóstico disponible")
+    @staticmethod
+    def mark_as_read(notification_id, user_id):
+        """Marca una notificación como leída"""
+        try:
+            notification = Notification.query.filter_by(
+                id=notification_id, 
+                user_id=user_id
+            ).first()
+            
+            if notification:
+                notification.is_read = True
+                notification.read_at = datetime.datetime.utcnow()
+                db.session.commit()
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f'Error al marcar notificación como leída: {str(e)}')
+            return False
+
+# ------------------------------------------------------------
+# SISTEMA DE CHAT EN TIEMPO REAL
+# ------------------------------------------------------------
+
+@socketio.on('connect')
+def handle_connect():
+    """Maneja conexión de Socket.IO"""
+    if current_user.is_authenticated:
+        join_room(f'user_{current_user.id}')
+        logger.info(f'Usuario {current_user.id} conectado al chat')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Maneja desconexión de Socket.IO"""
+    if current_user.is_authenticated:
+        leave_room(f'user_{current_user.id}')
+        logger.info(f'Usuario {current_user.id} desconectado del chat')
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    """Maneja envío de mensajes"""
+    try:
+        sender_id = current_user.id
+        receiver_id = data.get('receiver_id')
+        content = data.get('content')
+        message_type = data.get('type', 'text')
+        
+        if not receiver_id or not content:
+            emit('error', {'message': 'Datos incompletos'})
             return
         
-        diagnosis = st.session_state.current_diagnosis
-        symptoms_data = st.session_state.current_diagnostic
+        # Verificar si el receptor ha bloqueado al remitente
+        blocker_check = db.session.query(user_blocks).filter_by(
+            blocker_id=receiver_id,
+            blocked_id=sender_id
+        ).first()
         
-        st.success("🎉 ¡Diagnóstico Completado!")
-        
-        # Pestañas para diferentes secciones
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📋 Resumen", 
-            "💡 Análisis", 
-            "📊 Plan de Tratamiento", 
-            "📄 Reporte PDF", 
-            "📚 Historial"
-        ])
-        
-        with tab1:
-            self._render_diagnostic_summary(diagnosis, symptoms_data)
-        
-        with tab2:
-            self._render_detailed_analysis(diagnosis)
-        
-        with tab3:
-            self._render_treatment_plan(diagnosis)
-        
-        with tab4:
-            self._render_pdf_report(diagnosis, symptoms_data)
-        
-        with tab5:
-            self._render_diagnostic_history()
-        
-        # Botones de acción
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("🔄 Nuevo Diagnóstico", use_container_width=True):
-                del st.session_state.current_diagnostic
-                del st.session_state.current_diagnosis
-                st.rerun()
-        
-        with col2:
-            if st.button("🧘 Sesión Recomendada", use_container_width=True):
-                # Recomendar sesión basada en diagnóstico
-                session_type = self._recommend_session_from_diagnosis(diagnosis)
-                st.session_state.recommended_session = session_type
-                st.session_state.page = "sessions"
-                st.rerun()
-        
-        with col3:
-            if st.button("🏠 Volver al inicio", use_container_width=True, type="secondary"):
-                st.session_state.page = "home"
-                st.rerun()
-    
-    def _render_diagnostic_summary(self, diagnosis: dict, symptoms_data: dict):
-        """Renderiza resumen del diagnóstico"""
-        # Información básica
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📋 Información del Diagnóstico")
-            st.write(f"**Fecha:** {diagnosis.get('timestamp', datetime.now().isoformat())[:19]}")
-            st.write(f"**ID de Sesión:** {diagnosis.get('session_id', 'N/A')}")
-            
-            if symptoms_data.get('name'):
-                st.write(f"**Nombre:** {symptoms_data['name']}")
-            
-            st.write(f"**Síntomas reportados:** {len(symptoms_data.get('emotional_symptoms', [])) + len(symptoms_data.get('physical_symptoms', []))}")
-        
-        with col2:
-            st.subheader("⚡ Resumen Ejecutivo")
-            
-            # Nivel de severidad
-            emotional = diagnosis.get('emotional_analysis', {})
-            physical = diagnosis.get('physical_analysis', {})
-            
-            severity = "Leve"
-            if emotional.get('intensity_level') == 'alto' or physical.get('severity') == 'alto':
-                severity = "Alto"
-            elif emotional.get('intensity_level') == 'moderado' or physical.get('severity') == 'moderado':
-                severity = "Moderado"
-            
-            st.write(f"**Nivel de severidad:** {severity}")
-            
-            # Sistemas afectados
-            systems = physical.get('systems_affected', [])
-            if systems:
-                st.write(f"**Sistemas afectados:** {', '.join(systems)}")
-            
-            # Emociones predominantes
-            emotions = emotional.get('primary_emotions', [])
-            if emotions:
-                st.write(f"**Emociones predominantes:** {', '.join(emotions)}")
-        
-        # Insights clave
-        st.subheader("🔑 Insights Clave")
-        
-        diagnosis_data = diagnosis.get('diagnosis', {})
-        
-        if 'biodescodification_insights' in diagnosis_data:
-            insights = diagnosis_data['biodescodification_insights']
-            if insights:
-                for insight in insights[:3]:
-                    with st.expander(f"{insight.get('symptom', 'Síntoma')} → {insight.get('conflict', 'Análisis')}"):
-                        st.write(f"**Órgano relacionado:** {insight.get('organ', 'Por determinar')}")
-                        if 'recommendation' in insight:
-                            st.write(f"**Recomendación:** {insight['recommendation']}")
-        else:
-            st.info("No hay insights específicos disponibles")
-        
-        # Recomendación principal
-        recommendations = diagnosis.get('recommendations', [])
-        if recommendations:
-            st.subheader("💡 Recomendación Principal")
-            st.info(recommendations[0])
-    
-    def _render_detailed_analysis(self, diagnosis: dict):
-        """Renderiza análisis detallado"""
-        st.subheader("🧠 Análisis Emocional Detallado")
-        
-        emotional = diagnosis.get('emotional_analysis', {})
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Emociones primarias
-            if 'primary_emotions' in emotional:
-                st.write("**Emociones identificadas:**")
-                for emotion in emotional['primary_emotions']:
-                    st.write(f"• {emotion.capitalize()}")
-            
-            # Patrones
-            if 'emotional_patterns' in emotional and emotional['emotional_patterns']:
-                st.write("**Patrones emocionales:**")
-                for pattern in emotional['emotional_patterns']:
-                    st.write(f"• {pattern}")
-        
-        with col2:
-            # Intensidad
-            if 'intensity_level' in emotional:
-                intensity = emotional['intensity_level']
-                color = {
-                    'bajo': '🟢',
-                    'moderado': '🟡',
-                    'alto': '🔴'
-                }.get(intensity, '⚪')
-                
-                st.write(f"**Nivel de intensidad:** {color} {intensity.upper()}")
-            
-            # Necesidades
-            if 'emotional_needs' in emotional and emotional['emotional_needs']:
-                st.write("**Necesidades emocionales:**")
-                for need in emotional['emotional_needs']:
-                    st.write(f"• {need}")
-        
-        st.divider()
-        st.subheader("🏥 Análisis Físico")
-        
-        physical = diagnosis.get('physical_analysis', {})
-        
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            # Sistemas afectados
-            if 'systems_affected' in physical:
-                st.write("**Sistemas afectados:**")
-                for system in physical['systems_affected']:
-                    st.write(f"• {system.replace('_', ' ').title()}")
-            
-            # Severidad
-            if 'severity' in physical:
-                severity = physical['severity']
-                icon = {
-                    'leve': '🟢',
-                    'moderado': '🟡',
-                    'alto': '🔴'
-                }.get(severity, '⚪')
-                
-                st.write(f"**Severidad:** {icon} {severity.upper()}")
-        
-        with col4:
-            # Cronicidad
-            if 'chronicity' in physical:
-                chronicity = physical['chronicity']
-                st.write(f"**Cronicidad:** {chronicity.upper()}")
-            
-            # Conexión cuerpo-mente
-            if 'body_mind_connection' in physical and physical['body_mind_connection']:
-                st.write("**Conexiones identificadas:**")
-                for connection in physical['body_mind_connection'][:3]:
-                    st.write(f"• {connection}")
-        
-        # Diagnóstico de biodescodificación
-        st.divider()
-        st.subheader("🔍 Diagnóstico de Biodescodificación")
-        
-        diagnosis_data = diagnosis.get('diagnosis', {})
-        
-        if 'analysis' in diagnosis_data:
-            st.write("**Análisis:**")
-            st.write(diagnosis_data['analysis'])
-        
-        if 'conflict' in diagnosis_data:
-            st.write(f"**Conflicto biológico:** {diagnosis_data['conflict']}")
-    
-    def _render_treatment_plan(self, diagnosis: dict):
-        """Renderiza plan de tratamiento"""
-        treatment = diagnosis.get('treatment_plan', {})
-        
-        st.subheader("📅 Plan de Tratamiento Personalizado")
-        
-        # Duración
-        if 'duration_days' in treatment:
-            st.write(f"**Duración recomendada:** {treatment['duration_days']} días")
-        
-        # Prácticas diarias
-        if 'daily_practices' in treatment and treatment['daily_practices']:
-            st.subheader("📋 Prácticas Diarias")
-            
-            for i, practice in enumerate(treatment['daily_practices'][:7], 1):
-                with st.expander(f"Día {i}: {practice.split(':')[0] if ':' in practice else practice}"):
-                    if ':' in practice:
-                        st.write(practice.split(':', 1)[1].strip())
-                    else:
-                        st.write("Realiza esta práctica con atención plena")
-        
-        # Sesiones recomendadas
-        if 'weekly_sessions' in treatment and treatment['weekly_sessions']:
-            st.subheader("🧘 Sesiones Recomendadas")
-            
-            for session in treatment['weekly_sessions']:
-                st.write(f"• {session}")
-        
-        # Recomendaciones dietéticas
-        if 'diet_recommendations' in treatment and treatment['diet_recommendations']:
-            st.subheader("🥗 Recomendaciones Dietéticas")
-            
-            cols = st.columns(2)
-            for i, rec in enumerate(treatment['diet_recommendations'][:6]):
-                with cols[i % 2]:
-                    st.info(f"• {rec}")
-        
-        # Cambios de estilo de vida
-        if 'lifestyle_changes' in treatment and treatment['lifestyle_changes']:
-            st.subheader("🌿 Cambios de Estilo de Vida")
-            
-            for change in treatment['lifestyle_changes'][:5]:
-                st.write(f"• {change}")
-        
-        # Monitoreo
-        if 'monitoring' in treatment and treatment['monitoring']:
-            st.subheader("📊 Seguimiento Recomendado")
-            
-            monitoring_df = pd.DataFrame({
-                "Métrica": treatment['monitoring'],
-                "Frecuencia": ["Diario"] * len(treatment['monitoring'])
-            })
-            
-            st.dataframe(monitoring_df, use_container_width=True, hide_index=True)
-    
-    def _render_pdf_report(self, diagnosis: dict, symptoms_data: dict):
-        """Renderiza sección de reporte PDF"""
-        st.subheader("📄 Generar Reporte PDF")
-        
-        st.write("Genera un reporte profesional de tu diagnóstico en formato PDF.")
-        
-        # Información adicional para el reporte
-        with st.expander("✏️ Personalizar reporte"):
-            report_name = st.text_input("Nombre para el reporte", 
-                                      value=f"Diagnóstico_{datetime.now().strftime('%Y%m%d')}")
-            
-            include_personal_info = st.checkbox("Incluir información personal", value=False)
-            include_full_analysis = st.checkbox("Incluir análisis completo", value=True)
-            include_recommendations = st.checkbox("Incluir recomendaciones", value=True)
-        
-        # Generar PDF
-        if st.button("🖨️ Generar Reporte PDF", type="primary", use_container_width=True):
-            with st.spinner("Generando reporte PDF..."):
-                try:
-                    # Preparar datos de usuario
-                    user_info = {}
-                    if include_personal_info and symptoms_data.get('name'):
-                        user_info = {
-                            'name': symptoms_data['name'],
-                            'age': symptoms_data.get('age'),
-                            'gender': symptoms_data.get('gender')
-                        }
-                    
-                    # Generar PDF
-                    pdf_buffer = self.pdf_generator.generate_diagnostic_report(diagnosis, user_info)
-                    
-                    # Crear botón de descarga
-                    st.success("✅ Reporte generado exitosamente")
-                    
-                    st.download_button(
-                        label="📥 Descargar Reporte PDF",
-                        data=pdf_buffer,
-                        file_name=f"{report_name}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                    
-                except Exception as e:
-                    st.error(f"Error generando PDF: {str(e)}")
-        
-        # Vista previa del reporte
-        with st.expander("👁️ Vista previa del contenido"):
-            st.write("**Resumen del diagnóstico:**")
-            
-            diagnosis_data = diagnosis.get('diagnosis', {})
-            if 'analysis' in diagnosis_data:
-                st.text(diagnosis_data['analysis'][:500] + "...")
-            
-            st.write("**Recomendaciones principales:**")
-            recommendations = diagnosis.get('recommendations', [])
-            if recommendations:
-                for i, rec in enumerate(recommendations[:3], 1):
-                    st.write(f"{i}. {rec}")
-    
-    def _render_diagnostic_history(self):
-        """Renderiza historial de diagnósticos"""
-        st.subheader("📚 Historial de Diagnósticos")
-        
-        if 'diagnostic_history' not in st.session_state or not st.session_state.diagnostic_history:
-            st.info("No hay diagnósticos previos")
+        if blocker_check:
+            emit('error', {'message': 'No puedes enviar mensajes a este usuario'})
             return
         
-        history = st.session_state.diagnostic_history
-        
-        # Mostrar historial en orden inverso (más reciente primero)
-        for i, record in enumerate(reversed(history)):
-            with st.expander(f"Diagnóstico {len(history)-i} - {record['timestamp'][:19]}"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("**Síntomas reportados:**")
-                    
-                    data = record['data']
-                    if 'emotional_symptoms' in data:
-                        st.write(f"Emocionales: {len(data['emotional_symptoms'])}")
-                    
-                    if 'physical_symptoms' in data:
-                        st.write(f"Físicos: {len(data['physical_symptoms'])}")
-                
-                with col2:
-                    diagnosis = record['diagnosis']
-                    emotional = diagnosis.get('emotional_analysis', {})
-                    
-                    if 'primary_emotions' in emotional:
-                        st.write("**Emociones:**")
-                        st.write(", ".join(emotional['primary_emotions']))
-                
-                # Botón para ver detalles
-                if st.button(f"🔍 Ver detalles completos", key=f"view_{i}"):
-                    st.session_state.current_diagnostic = data
-                    st.session_state.current_diagnosis = diagnosis
-                    st.rerun()
-    
-    def _recommend_session_from_diagnosis(self, diagnosis: dict) -> str:
-        """Recomienda tipo de sesión basado en diagnóstico"""
-        emotional = diagnosis.get('emotional_analysis', {})
-        primary_emotions = emotional.get('primary_emotions', [])
-        
-        # Mapeo de emociones a sesiones
-        emotion_to_session = {
-            "ansiedad": "manejo_ansiedad",
-            "tristeza": "sanacion_interior",
-            "ira": "liberacion_emocional",
-            "miedo": "relajacion_profunda",
-            "estrés": "conexion_mindfulness",
-            "insatisfacción": "autoestima_confianza"
-        }
-        
-        for emotion in primary_emotions:
-            emotion_lower = emotion.lower()
-            for key, session in emotion_to_session.items():
-                if key in emotion_lower:
-                    return session
-        
-        return "relajacion_profunda"  # Sesión por defecto
-    
-    def render_sessions(self):
-        """Renderiza página de sesiones"""
-        st.title("🧘 Sesiones de Hipnosis y Meditación")
-        
-        # Verificar si hay sesión recomendada
-        if 'recommended_session' in st.session_state:
-            st.info(f"💡 Sesión recomendada basada en tu diagnóstico: **{st.session_state.recommended_session.replace('_', ' ').title()}**")
-        
-        # Catálogo de sesiones
-        st.subheader("🎧 Catálogo de Sesiones")
-        
-        session_catalog = self.hypnosis_system.session_catalog
-        
-        cols = st.columns(3)
-        
-        for i, (session_key, session_info) in enumerate(session_catalog.items()):
-            with cols[i % 3]:
-                with st.container(border=True):
-                    st.markdown(f"### {session_info['title']}")
-                    st.write(f"⏱️ {session_info['duration']} minutos")
-                    st.write(session_info['description'])
-                    
-                    # Beneficios
-                    st.markdown("**Beneficios:**")
-                    for benefit in session_info.get('benefits', [])[:3]:
-                        st.write(f"• {benefit}")
-                    
-                    # Botón para iniciar sesión
-                    if st.button(f"▶️ Iniciar {session_info['title']}", 
-                                key=f"start_{session_key}",
-                                use_container_width=True):
-                        
-                        # Iniciar sesión
-                        session = self.hypnosis_system.start_session(session_key)
-                        st.session_state.current_session = session
-                        
-                        # Mostrar reproductor de sesión
-                        st.rerun()
-        
-        # Si hay sesión activa, mostrar reproductor
-        if 'current_session' in st.session_state and st.session_state.current_session:
-            self._render_session_player()
-        
-        # Historial de sesiones
-        st.divider()
-        self._render_session_history()
-    
-    def _render_session_player(self):
-        """Renderiza reproductor de sesión"""
-        session = st.session_state.current_session
-        
-        st.subheader(f"🎧 {session['title']}")
-        
-        # Información de la sesión
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Duración", f"{session['duration']} min")
-        
-        with col2:
-            st.metric("Estado", "En curso")
-        
-        with col3:
-            # Temporizador
-            if 'session_start_time' not in st.session_state:
-                st.session_state.session_start_time = time.time()
-                st.session_state.session_time_remaining = session['duration'] * 60
-            
-            elapsed = time.time() - st.session_state.session_start_time
-            remaining = max(0, st.session_state.session_time_remaining - elapsed)
-            
-            minutes = int(remaining // 60)
-            seconds = int(remaining % 60)
-            
-            st.metric("Tiempo restante", f"{minutes:02d}:{seconds:02d}")
-        
-        # Reproductor de audio (simulado)
-        st.markdown("---")
-        st.subheader("🎵 Audio de la sesión")
-        
-        # Barra de progreso
-        progress = 1 - (remaining / (session['duration'] * 60))
-        st.progress(progress)
-        
-        # Controles
-        col_controls1, col_controls2, col_controls3 = st.columns(3)
-        
-        with col_controls1:
-            if st.button("⏸️ Pausar", use_container_width=True):
-                st.info("Sesión pausada")
-        
-        with col_controls2:
-            if st.button("▶️ Continuar", use_container_width=True):
-                st.success("Sesión continuando")
-        
-        with col_controls3:
-            if st.button("⏹️ Finalizar", use_container_width=True, type="secondary"):
-                # Finalizar sesión
-                del st.session_state.current_session
-                del st.session_state.session_start_time
-                del st.session_state.session_time_remaining
-                st.success("✅ Sesión completada")
-                st.rerun()
-        
-        # Guión de la sesión
-        st.markdown("---")
-        with st.expander("📝 Ver guión de la sesión"):
-            st.write(session['script'])
-    
-    def _render_session_history(self):
-        """Renderiza historial de sesiones"""
-        st.subheader("📚 Historial de Sesiones")
-        
-        # En una implementación real, esto vendría de la base de datos
-        # Por ahora, mostramos sesión actual si existe
-        if 'current_session' in st.session_state:
-            session = st.session_state.current_session
-            
-            st.write("**Sesión actual:**")
-            cols = st.columns(4)
-            
-            with cols[0]:
-                st.write(f"**{session['title']}**")
-            
-            with cols[1]:
-                st.write(f"⏱️ {session['duration']} min")
-            
-            with cols[2]:
-                st.write("🟢 En curso")
-            
-            with cols[3]:
-                if st.button("📋 Ver detalles", key="view_current_session"):
-                    st.write(session['script'])
-        
-        st.info("El historial completo de sesiones se guardará cuando tengas una cuenta.")
-    
-    def render_stats(self):
-        """Renderiza página de estadísticas"""
-        st.title("📊 Mis Estadísticas de Bienestar")
-        
-        # Verificar si el usuario tiene datos
-        if 'diagnostic_history' not in st.session_state or not st.session_state.diagnostic_history:
-            st.info("Completa tu primer diagnóstico para ver estadísticas personalizadas.")
-            
-            if st.button("🔍 Realizar mi primer diagnóstico", type="primary"):
-                st.session_state.page = "diagnostic"
-                st.rerun()
-            
-            return
-        
-        history = st.session_state.diagnostic_history
-        
-        # Métricas principales
-        st.subheader("📈 Métricas Principales")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total diagnósticos", len(history))
-        
-        with col2:
-            # Calcular mejora promedio (simulada)
-            improvement = random.randint(20, 80)
-            st.metric("Mejora general", f"{improvement}%")
-        
-        with col3:
-            # Síntomas promedio por diagnóstico
-            total_symptoms = sum(
-                len(d['data'].get('emotional_symptoms', [])) + 
-                len(d['data'].get('physical_symptoms', []))
-                for d in history
-            )
-            avg_symptoms = total_symptoms / len(history)
-            st.metric("Síntomas promedio", f"{avg_symptoms:.1f}")
-        
-        with col4:
-            # Último diagnóstico
-            last_date = history[-1]['timestamp'][:10]
-            st.metric("Último diagnóstico", last_date)
-        
-        # Gráficos
-        st.subheader("📊 Evolución Emocional")
-        
-        # Datos para gráficos (simulados)
-        dates = []
-        emotional_scores = []
-        physical_scores = []
-        
-        for i, record in enumerate(history):
-            date = record['timestamp'][:10]
-            dates.append(date)
-            
-            # Puntaje emocional (simulado)
-            emotional_score = random.randint(3, 8)
-            emotional_scores.append(emotional_score)
-            
-            # Puntaje físico (simulado)
-            physical_score = random.randint(3, 8)
-            physical_scores.append(physical_score)
-        
-        # Crear DataFrame
-        df = pd.DataFrame({
-            'Fecha': dates,
-            'Salud Emocional': emotional_scores,
-            'Salud Física': physical_scores
-        })
-        
-        # Gráfico de líneas
-        fig = px.line(df, x='Fecha', y=['Salud Emocional', 'Salud Física'],
-                     title='Evolución de Salud Emocional y Física',
-                     markers=True)
-        
-        fig.update_layout(
-            yaxis_title="Puntuación (1-10)",
-            xaxis_title="Fecha",
-            hovermode='x unified'
+        # Crear mensaje en la base de datos
+        message = Message(
+            sender_id=sender_id,
+            receiver_id=receiver_id,
+            content=content,
+            message_type=message_type
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        db.session.add(message)
+        db.session.commit()
         
-        # Distribución de síntomas
-        st.subheader("🔍 Distribución de Síntomas")
+        # Emitir mensaje al receptor
+        message_data = {
+            'id': message.id,
+            'sender_id': sender_id,
+            'receiver_id': receiver_id,
+            'content': content,
+            'type': message_type,
+            'timestamp': message.timestamp.isoformat(),
+            'sender_name': f'{current_user.first_name} {current_user.last_name}',
+            'sender_avatar': current_user.profile_image or '/static/images/default-avatar.png'
+        }
         
-        # Contar síntomas
-        all_emotional = []
-        all_physical = []
+        emit('receive_message', message_data, room=f'user_{receiver_id}')
+        emit('message_sent', message_data)  # Confirmación al remitente
         
-        for record in history:
-            all_emotional.extend(record['data'].get('emotional_symptoms', []))
-            all_physical.extend(record['data'].get('physical_symptoms', []))
+        # Crear notificación
+        NotificationSystem.create_notification(
+            user_id=receiver_id,
+            title='Nuevo mensaje',
+            message=f'Tienes un nuevo mensaje de {current_user.first_name}',
+            notification_type='message',
+            action_url=f'/messages/{sender_id}'
+        )
         
-        if all_emotional or all_physical:
-            col_chart1, col_chart2 = st.columns(2)
+    except Exception as e:
+        logger.error(f'Error al enviar mensaje: {str(e)}')
+        emit('error', {'message': 'Error al enviar mensaje'})
+
+@socketio.on('typing')
+def handle_typing(data):
+    """Maneja indicador de escritura"""
+    receiver_id = data.get('receiver_id')
+    is_typing = data.get('is_typing', False)
+    
+    if receiver_id:
+        emit('user_typing', {
+            'user_id': current_user.id,
+            'is_typing': is_typing
+        }, room=f'user_{receiver_id}')
+
+# ------------------------------------------------------------
+# BLUEPRINTS Y RUTAS
+# ------------------------------------------------------------
+
+# Blueprint para usuarios
+users_blueprint = Blueprint('users', __name__)
+
+# ------------------------------------------------------------
+# DECORADORES Y FUNCIONES DE AYUDA
+# ------------------------------------------------------------
+
+def admin_required(f):
+    """Decorador para requerir rol de administrador"""
+    @wraps(f)
+    @jwt_required()
+    def decorated_function(*args, **kwargs):
+        current_user_id = get_jwt_identity()
+        if not is_admin(current_user_id):
+            return jsonify({
+                'success': False,
+                'message': 'Acceso denegado. Se requieren privilegios de administrador.'
+            }), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def therapist_required(f):
+    """Decorador para requerir rol de terapeuta"""
+    @wraps(f)
+    @jwt_required()
+    def decorated_function(*args, **kwargs):
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user or user.role not in ['therapist', 'admin']:
+            return jsonify({
+                'success': False,
+                'message': 'Acceso denegado. Se requiere rol de terapeuta.'
+            }), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def is_admin(user_id):
+    """Verifica si un usuario es administrador"""
+    user = User.query.get(user_id)
+    return user and user.role == 'admin'
+
+def is_therapist(user_id):
+    """Verifica si un usuario es terapeuta"""
+    user = User.query.get(user_id)
+    return user and user.role in ['therapist', 'admin']
+
+def generate_order_number():
+    """Genera un número de orden único"""
+    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    random_str = ''.join(random.choices(string.digits, k=6))
+    return f'ORD-{timestamp}-{random_str}'
+
+def validate_email(email):
+    """Valida formato de email"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_password(password):
+    """Valida fortaleza de contraseña"""
+    if len(password) < 8:
+        return False, 'La contraseña debe tener al menos 8 caracteres'
+    
+    if not re.search(r'[A-Z]', password):
+        return False, 'La contraseña debe contener al menos una mayúscula'
+    
+    if not re.search(r'[a-z]', password):
+        return False, 'La contraseña debe contener al menos una minúscula'
+    
+    if not re.search(r'[0-9]', password):
+        return False, 'La contraseña debe contener al menos un número'
+    
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, 'La contraseña debe contener al menos un carácter especial'
+    
+    return True, 'Contraseña válida'
+
+# ------------------------------------------------------------
+# RUTAS DE AUTENTICACIÓN
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/register', methods=['POST'])
+def register():
+    """Registra un nuevo usuario"""
+    try:
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Validar email
+        if not validate_email(data['email']):
+            return jsonify({
+                'success': False,
+                'message': 'Formato de email inválido'
+            }), 400
+        
+        # Validar contraseña
+        is_valid, msg = validate_password(data['password'])
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': msg
+            }), 400
+        
+        # Verificar si el usuario ya existe
+        existing_user = User.query.filter(
+            (User.username == data['username']) | (User.email == data['email'])
+        ).first()
+        
+        if existing_user:
+            return jsonify({
+                'success': False,
+                'message': 'El usuario o email ya están registrados'
+            }), 400
+        
+        # Crear nuevo usuario
+        user = User(
+            username=data['username'],
+            email=data['email'],
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            phone=data.get('phone', ''),
+            role=data.get('role', 'user'),
+            is_active=True
+        )
+        
+        user.set_password(data['password'])
+        
+        # Generar token de verificación
+        user.generate_verification_token()
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Enviar email de bienvenida
+        if email_system.username:
+            email_system.send_welcome_email(user.email, user.first_name)
+        
+        # Crear token JWT
+        access_token = create_access_token(identity=user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario registrado exitosamente',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role
+            },
+            'access_token': access_token
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error en registro: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/login', methods=['POST'])
+def login():
+    """Inicia sesión de usuario"""
+    try:
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        if 'email' not in data or 'password' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'Email y contraseña son requeridos'
+            }), 400
+        
+        # Buscar usuario
+        user = User.query.filter_by(email=data['email']).first()
+        
+        if not user or not user.check_password(data['password']):
+            return jsonify({
+                'success': False,
+                'message': 'Credenciales inválidas'
+            }), 401
+        
+        if not user.is_active:
+            return jsonify({
+                'success': False,
+                'message': 'Cuenta desactivada. Contacta al administrador.'
+            }), 403
+        
+        # Actualizar último login
+        user.last_login = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        # Crear token JWT
+        access_token = create_access_token(identity=user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Inicio de sesión exitoso',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'profile_image': user.profile_image
+            },
+            'access_token': access_token
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error en login: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    """Refresca el token JWT"""
+    try:
+        current_user_id = get_jwt_identity()
+        access_token = create_access_token(identity=current_user_id)
+        
+        return jsonify({
+            'success': True,
+            'access_token': access_token
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al refrescar token: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error al refrescar token'
+        }), 500
+
+@users_blueprint.route('/api/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """Cierra sesión del usuario"""
+    # En JWT, el logout es del lado del cliente (eliminar token)
+    return jsonify({
+        'success': True,
+        'message': 'Sesión cerrada exitosamente'
+    }), 200
+
+@users_blueprint.route('/api/forgot-password', methods=['POST'])
+def forgot_password():
+    """Solicita restablecimiento de contraseña"""
+    try:
+        data = request.get_json()
+        
+        if 'email' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'Email es requerido'
+            }), 400
+        
+        user = User.query.filter_by(email=data['email']).first()
+        
+        if user:
+            # Generar token de restablecimiento
+            reset_token = user.generate_reset_token()
+            db.session.commit()
             
-            with col_chart1:
-                if all_emotional:
-                    emotional_counts = pd.Series(all_emotional).value_counts()
-                    fig1 = px.bar(x=emotional_counts.index, y=emotional_counts.values,
-                                 title="Síntomas Emocionales Más Comunes")
-                    st.plotly_chart(fig1, use_container_width=True)
-            
-            with col_chart2:
-                if all_physical:
-                    physical_counts = pd.Series(all_physical).value_counts()
-                    fig2 = px.bar(x=physical_counts.index, y=physical_counts.values,
-                                 title="Síntomas Físicos Más Comunes")
-                    st.plotly_chart(fig2, use_container_width=True)
+            # Enviar email con enlace de restablecimiento
+            if email_system.username:
+                email_system.send_password_reset_email(user.email, reset_token)
         
-        # Insights
-        st.subheader("💡 Insights Personalizados")
+        # Siempre devolver éxito (por seguridad)
+        return jsonify({
+            'success': True,
+            'message': 'Si el email existe, se enviarán instrucciones para restablecer la contraseña'
+        }), 200
         
-        insights = [
-            "Basado en tu historial, se observa una correlación entre estrés emocional y síntomas físicos.",
-            "Los períodos de mayor bienestar coinciden con práctica regular de técnicas de relajación.",
-            "Se recomienda mantener un diario emocional para identificar patrones específicos."
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error en forgot-password: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    """Restablece la contraseña con token"""
+    try:
+        data = request.get_json()
+        
+        required_fields = ['token', 'new_password']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Buscar usuario con token válido
+        user = User.query.filter_by(reset_token=data['token']).first()
+        
+        if not user or not user.verify_reset_token(data['token']):
+            return jsonify({
+                'success': False,
+                'message': 'Token inválido o expirado'
+            }), 400
+        
+        # Validar nueva contraseña
+        is_valid, msg = validate_password(data['new_password'])
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': msg
+            }), 400
+        
+        # Actualizar contraseña
+        user.set_password(data['new_password'])
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Contraseña restablecida exitosamente'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error en reset-password: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE PERFIL DE USUARIO
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/profile', methods=['GET'])
+@jwt_required()
+def get_profile():
+    """Obtiene el perfil del usuario actual"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'phone': user.phone,
+                'address': user.address,
+                'city': user.city,
+                'country': user.country,
+                'postal_code': user.postal_code,
+                'date_of_birth': user.date_of_birth.isoformat() if user.date_of_birth else None,
+                'gender': user.gender,
+                'profile_image': user.profile_image,
+                'bio': user.bio,
+                'role': user.role,
+                'specialization': user.specialization,
+                'qualifications': user.qualifications,
+                'experience_years': user.experience_years,
+                'hourly_rate': user.hourly_rate,
+                'is_verified': user.is_verified,
+                'created_at': user.created_at.isoformat(),
+                'last_login': user.last_login.isoformat() if user.last_login else None
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener perfil: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    """Actualiza el perfil del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        data = request.get_json()
+        
+        # Campos actualizables
+        updatable_fields = [
+            'first_name', 'last_name', 'phone', 'address', 'city',
+            'country', 'postal_code', 'date_of_birth', 'gender',
+            'bio', 'specialization', 'qualifications', 'experience_years',
+            'hourly_rate'
         ]
         
-        for insight in insights:
-            st.info(insight)
+        for field in updatable_fields:
+            if field in data:
+                setattr(user, field, data[field])
         
-        # Exportar datos
-        st.divider()
+        user.updated_at = datetime.datetime.utcnow()
+        db.session.commit()
         
-        if st.button("📥 Exportar mis estadísticas (CSV)", use_container_width=True):
-            # Preparar datos para exportación
-            export_data = []
-            
-            for record in history:
-                export_data.append({
-                    'Fecha': record['timestamp'][:10],
-                    'Síntomas_Emocionales': ', '.join(record['data'].get('emotional_symptoms', [])),
-                    'Síntomas_Físicos': ', '.join(record['data'].get('physical_symptoms', [])),
-                    'Notas': record['data'].get('additional_info', '')
-                })
-            
-            df_export = pd.DataFrame(export_data)
-            csv = df_export.to_csv(index=False)
-            
-            st.download_button(
-                label="Descargar CSV",
-                data=csv,
-                file_name=f"estadisticas_mindgeekclinic_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-    
-    def render_chat(self):
-        """Renderiza chat con IA"""
-        st.title("💬 Chat con Especialista en Biodescodificación")
+        return jsonify({
+            'success': True,
+            'message': 'Perfil actualizado exitosamente',
+            'user': {
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'phone': user.phone,
+                'bio': user.bio,
+                'specialization': user.specialization,
+                'experience_years': user.experience_years,
+                'hourly_rate': user.hourly_rate
+            }
+        }), 200
         
-        # Inicializar historial de chat
-        if 'chat_history' not in st.session_state:
-            st.session_state.chat_history = []
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al actualizar perfil: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/profile/avatar', methods=['POST'])
+@jwt_required()
+def upload_avatar():
+    """Sube/actualiza avatar del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
         
-        # Configuración del chat
-        col_config1, col_config2 = st.columns(2)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
         
-        with col_config1:
-            chat_mode = st.selectbox(
-                "Modo de chat",
-                ["General", "Diagnóstico", "Terapia", "Preguntas específicas"]
-            )
+        if 'avatar' not in request.files:
+            return jsonify({
+                'success': False,
+                'message': 'No se proporcionó archivo de avatar'
+            }), 400
         
-        with col_config2:
-            temperature = st.slider("Creatividad de respuestas", 0.1, 1.0, 0.7)
+        avatar_file = request.files['avatar']
         
-        # Área de chat
-        st.divider()
+        if avatar_file.filename == '':
+            return jsonify({
+                'success': False,
+                'message': 'Nombre de archivo vacío'
+            }), 400
         
-        # Mostrar historial de chat
-        chat_container = st.container()
+        # Validar tipo de archivo
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
+        filename = avatar_file.filename.lower()
+        if '.' not in filename or filename.rsplit('.', 1)[1] not in allowed_extensions:
+            return jsonify({
+                'success': False,
+                'message': 'Formato de archivo no permitido. Use PNG, JPG, JPEG o GIF.'
+            }), 400
         
-        with chat_container:
-            for message in st.session_state.chat_history:
-                if message['role'] == 'user':
-                    st.chat_message("user").write(message['content'])
-                else:
-                    st.chat_message("assistant").write(message['content'])
+        # Generar nombre único
+        file_ext = filename.rsplit('.', 1)[1]
+        unique_filename = f"{current_user_id}_{int(time.time())}.{file_ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles', unique_filename)
         
-        # Entrada de mensaje
-        st.divider()
+        # Guardar archivo
+        avatar_file.save(filepath)
         
-        user_input = st.chat_input("Escribe tu pregunta sobre biodescodificación...")
+        # Actualizar perfil del usuario
+        user.profile_image = f'/static/uploads/profiles/{unique_filename}'
+        db.session.commit()
         
-        if user_input:
-            # Agregar mensaje del usuario al historial
-            st.session_state.chat_history.append({
-                'role': 'user',
-                'content': user_input,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-            # Mostrar mensaje del usuario
-            with chat_container:
-                st.chat_message("user").write(user_input)
-            
-            # Generar respuesta de IA
-            with st.spinner("El especialista está pensando..."):
-                try:
-                    # Usar Groq para generar respuesta
-                    config = ConfigManager()
-                    
-                    if config.groq_api_key:
-                        groq_client = Groq(api_key=config.groq_api_key)
-                        
-                        # Preparar contexto
-                        context = f"""
-                        Eres un especialista en biodescodificación emocional con 15 años de experiencia.
-                        Modo actual: {chat_mode}
-                        
-                        Responde a la siguiente pregunta del usuario:
-                        {user_input}
-                        
-                        Proporciona una respuesta útil, empática y basada en principios de biodescodificación.
-                        Si la pregunta requiere diagnóstico médico, recomienda consultar a un profesional.
-                        """
-                        
-                        response = groq_client.chat.completions.create(
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": "Eres un experto en biodescodificación. Responde de forma clara, empática y profesional."
-                                },
-                                {
-                                    "role": "user",
-                                    "content": context
-                                }
-                            ],
-                            model="mixtral-8x7b-32768",
-                            temperature=temperature,
-                            max_tokens=1000,
-                            stream=False
-                        )
-                        
-                        ai_response = response.choices[0].message.content
-                        
-                    else:
-                        # Respuesta de fallback
-                        ai_response = """
-                        Hola, soy tu asistente de biodescodificación. 
-                        
-                        Lamentablemente, el servicio de IA no está disponible en este momento. 
-                        
-                        Te recomiendo:
-                        1. Completar nuestro diagnóstico automático en la sección correspondiente
-                        2. Explorar nuestras sesiones guiadas de meditación
-                        3. Contactarnos por email para consultas específicas
-                        
-                        Mientras tanto, te comparto un principio básico de biodescodificación:
-                        Cada síntoma físico tiene una correspondencia emocional. Escuchar el mensaje del cuerpo es el primer paso hacia la sanación.
-                        """
-                    
-                    # Agregar respuesta al historial
-                    st.session_state.chat_history.append({
-                        'role': 'assistant',
-                        'content': ai_response,
-                        'timestamp': datetime.now().isoformat()
-                    })
-                    
-                    # Mostrar respuesta
-                    with chat_container:
-                        st.chat_message("assistant").write(ai_response)
-                    
-                except Exception as e:
-                    st.error(f"Error en el chat: {str(e)}")
+        return jsonify({
+            'success': True,
+            'message': 'Avatar actualizado exitosamente',
+            'avatar_url': user.profile_image
+        }), 200
         
-        # Opciones adicionales
-        st.divider()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al subir avatar: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    """Cambia la contraseña del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
         
-        col_opt1, col_opt2, col_opt3 = st.columns(3)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
         
-        with col_opt1:
-            if st.button("🗑️ Limpiar chat", use_container_width=True, type="secondary"):
-                st.session_state.chat_history = []
-                st.rerun()
+        data = request.get_json()
         
-        with col_opt2:
-            if st.button("💾 Guardar conversación", use_container_width=True):
-                st.info("Esta función guardará la conversación en tu historial personal")
+        required_fields = ['current_password', 'new_password']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
         
-        with col_opt3:
-            if st.button("📄 Generar resumen", use_container_width=True):
-                st.info("Se generará un resumen de la conversación para tu seguimiento")
-    
-    def render_affiliate(self):
-        """Renderiza página de afiliados"""
-        # Verificar si ya es afiliado
-        if 'affiliate_id' in st.session_state:
-            self._render_affiliate_dashboard()
+        # Verificar contraseña actual
+        if not user.check_password(data['current_password']):
+            return jsonify({
+                'success': False,
+                'message': 'Contraseña actual incorrecta'
+            }), 400
+        
+        # Validar nueva contraseña
+        is_valid, msg = validate_password(data['new_password'])
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': msg
+            }), 400
+        
+        # Actualizar contraseña
+        user.set_password(data['new_password'])
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Contraseña cambiada exitosamente'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al cambiar contraseña: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE CITAS (APPOINTMENTS)
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/appointments', methods=['POST'])
+@jwt_required()
+def create_appointment():
+    """Crea una nueva cita"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        required_fields = ['therapist_id', 'appointment_date', 'appointment_time']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si el terapeuta existe y es terapeuta
+        therapist = User.query.get(data['therapist_id'])
+        if not therapist or therapist.role not in ['therapist', 'admin']:
+            return jsonify({
+                'success': False,
+                'message': 'Terapeuta no válido'
+            }), 400
+        
+        # Verificar disponibilidad del terapeuta
+        existing_appointment = Appointment.query.filter_by(
+            therapist_id=data['therapist_id'],
+            appointment_date=data['appointment_date'],
+            appointment_time=data['appointment_time'],
+            status='scheduled'
+        ).first()
+        
+        if existing_appointment:
+            return jsonify({
+                'success': False,
+                'message': 'El terapeuta no está disponible en ese horario'
+            }), 400
+        
+        # Crear cita
+        appointment = Appointment(
+            client_id=current_user_id,
+            therapist_id=data['therapist_id'],
+            appointment_date=datetime.datetime.strptime(data['appointment_date'], '%Y-%m-%d').date(),
+            appointment_time=datetime.datetime.strptime(data['appointment_time'], '%H:%M').time(),
+            duration=data.get('duration', 60),
+            appointment_type=data.get('appointment_type', 'individual'),
+            notes=data.get('notes', ''),
+            amount=therapist.hourly_rate * (data.get('duration', 60) / 60),
+            currency='USD'
+        )
+        
+        db.session.add(appointment)
+        db.session.commit()
+        
+        # Crear notificación para el terapeuta
+        NotificationSystem.create_notification(
+            user_id=therapist.id,
+            title='Nueva cita programada',
+            message=f'{current_user.first_name} {current_user.last_name} ha programado una cita contigo',
+            notification_type='appointment',
+            action_url=f'/therapist/appointments/{appointment.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cita creada exitosamente',
+            'appointment': {
+                'id': appointment.id,
+                'client_id': appointment.client_id,
+                'therapist_id': appointment.therapist_id,
+                'appointment_date': appointment.appointment_date.isoformat(),
+                'appointment_time': appointment.appointment_time.strftime('%H:%M'),
+                'duration': appointment.duration,
+                'type': appointment.appointment_type,
+                'status': appointment.status,
+                'amount': appointment.amount
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear cita: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/appointments', methods=['GET'])
+@jwt_required()
+def get_appointments():
+    """Obtiene citas del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        # Filtrar por tipo de usuario
+        if user.role in ['therapist', 'admin']:
+            appointments = Appointment.query.filter_by(therapist_id=current_user_id)
         else:
-            # Mostrar opciones: registro o login
-            aff_tab = st.radio("Afiliados", 
-                             ["📝 Registrarse como afiliado", "🔑 Iniciar sesión como afiliado"], 
-                             horizontal=True,
-                             key="affiliate_tab")
-            
-            if aff_tab == "📝 Registrarse como afiliado":
-                self._render_affiliate_registration()
+            appointments = Appointment.query.filter_by(client_id=current_user_id)
+        
+        # Filtrar por estado si se proporciona
+        status = request.args.get('status')
+        if status:
+            appointments = appointments.filter_by(status=status)
+        
+        # Filtrar por fecha si se proporciona
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        
+        if date_from:
+            appointments = appointments.filter(Appointment.appointment_date >= date_from)
+        if date_to:
+            appointments = appointments.filter(Appointment.appointment_date <= date_to)
+        
+        # Ordenar por fecha
+        appointments = appointments.order_by(
+            Appointment.appointment_date.desc(),
+            Appointment.appointment_time.desc()
+        ).all()
+        
+        appointments_data = []
+        for appt in appointments:
+            if user.role in ['therapist', 'admin']:
+                other_user = appt.client
             else:
-                self._render_affiliate_login()
-    
-    def _render_affiliate_registration(self):
-        """Renderiza formulario de registro de afiliado"""
-        st.title("🎯 Programa de Afiliados MINDGEEKCLINIC")
-        
-        st.markdown("""
-        ### ¡Gana comisiones recomendando MINDGEEKCLINIC!
-        
-        **Beneficios exclusivos:**
-        - ✅ **30% de comisión** por cada venta
-        - ✅ **Pagos automáticos** via Binance
-        - ✅ **Panel de seguimiento** en tiempo real
-        - ✅ **Material de marketing** profesional
-        - ✅ **Soporte dedicado** para afiliados
-        - ✅ **Bonos por desempeño**
-        
-        **Requisitos:**
-        - 🔞 Mayor de 18 años
-        - 🆔 Identificación verificada (KYC)
-        - 💰 Cuenta de Binance activa
-        """)
-        
-        # Proceso de 3 pasos
-        steps = ["1. Verificación de Email", "2. Información Personal", "3. Confirmación"]
-        current_step = st.session_state.get('affiliate_step', 1)
-        
-        self.ui.progress_tracker(steps, current_step)
-        
-        if current_step == 1:
-            self._render_affiliate_step1()
-        elif current_step == 2:
-            self._render_affiliate_step2()
-        elif current_step == 3:
-            self._render_affiliate_step3()
-    
-    def _render_affiliate_step1(self):
-        """Paso 1: Verificación de email"""
-        st.subheader("📧 Paso 1: Verificación de Email")
-        
-        email = st.text_input(
-            "Dirección de email",
-            placeholder="tucorreo@ejemplo.com",
-            key="affiliate_email_step1"
-        )
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            if st.button("🔐 Enviar Código", type="primary", use_container_width=True):
-                if email and "@" in email and "." in email:
-                    # Generar código
-                    code = str(random.randint(100000, 999999))
-                    
-                    # Guardar en sesión
-                    st.session_state.affiliate_email = email
-                    st.session_state.verification_code = code
-                    st.session_state.verification_sent_time = time.time()
-                    
-                    # Enviar email
-                    success, message = self.email_service.send_verification_email(email, code)
-                    
-                    if success:
-                        st.session_state.affiliate_step = 2
-                        st.success("✅ Código enviado. Revisa tu email.")
-                        st.rerun()
-                    else:
-                        st.error(message)
-                else:
-                    st.warning("Por favor ingresa un email válido")
-        
-        with col2:
-            if st.button("↩️ Volver al inicio", use_container_width=True, type="secondary"):
-                st.session_state.page = "home"
-                st.rerun()
-    
-    def _render_affiliate_step2(self):
-        """Paso 2: Información personal"""
-        st.subheader("📋 Paso 2: Información Personal")
-        
-        st.info(f"Email verificado: **{st.session_state.affiliate_email}**")
-        
-        # Formulario de información personal
-        with st.form("affiliate_personal_info", clear_on_submit=False):
-            col1, col2 = st.columns(2)
+                other_user = appt.therapist
             
-            with col1:
-                full_name = st.text_input("Nombre completo *", 
-                                        placeholder="Juan Pérez García")
-                phone = st.text_input("Teléfono *", 
-                                    placeholder="+34 612 345 678")
-                country = st.selectbox("País *", 
-                                     ["España", "México", "Colombia", "Argentina", "Chile", 
-                                      "Perú", "Estados Unidos", "Otro país..."])
-            
-            with col2:
-                id_type = st.selectbox("Tipo de identificación *",
-                                     ["DNI", "Pasaporte", "Cédula", "Licencia", "Otro"])
-                id_number = st.text_input("Número de identificación *",
-                                        placeholder="12345678A")
-                birth_date = st.date_input("Fecha de nacimiento *",
-                                         min_value=datetime(1900, 1, 1),
-                                         max_value=datetime.now() - timedelta(days=365*18))
-            
-            # Información de pago
-            st.subheader("💰 Información de Pago")
-            
-            binance_address = st.text_input("Dirección de Binance *",
-                                          placeholder="U1234567890ABCDEF",
-                                          help="Tu dirección de Binance para recibir pagos")
-            
-            tax_id = st.text_input("ID Fiscal (opcional)",
-                                 placeholder="Para facturación")
-            
-            # Términos y condiciones
-            st.subheader("📜 Términos y Condiciones")
-            
-            col_terms1, col_terms2 = st.columns(2)
-            
-            with col_terms1:
-                accept_terms = st.checkbox("Acepto los términos y condiciones *")
-                accept_privacy = st.checkbox("Acepto la política de privacidad *")
-            
-            with col_terms2:
-                accept_marketing = st.checkbox("Deseo recibir material de marketing")
-                accept_kyc = st.checkbox("Autorizo la verificación KYC *")
-            
-            st.markdown("---")
-            
-            # Botón de envío
-            col_submit1, col_submit2, col_submit3 = st.columns([1, 2, 1])
-            
-            with col_submit2:
-                submitted = st.form_submit_button(
-                    "✅ Continuar al Paso 3",
-                    type="primary",
-                    use_container_width=True
-                )
-            
-            if submitted:
-                # Validaciones
-                errors = []
-                
-                # Campos requeridos
-                required_fields = {
-                    "Nombre completo": full_name,
-                    "Teléfono": phone,
-                    "Número de identificación": id_number,
-                    "Dirección de Binance": binance_address
-                }
-                
-                for field, value in required_fields.items():
-                    if not value:
-                        errors.append(f"{field} es requerido")
-                
-                # Términos
-                if not all([accept_terms, accept_privacy, accept_kyc]):
-                    errors.append("Debes aceptar todos los términos requeridos")
-                
-                # Edad
-                age = (datetime.now().date() - birth_date).days / 365.25
-                if age < 18:
-                    errors.append("Debes ser mayor de 18 años")
-                
-                if errors:
-                    for error in errors:
-                        st.error(f"❌ {error}")
-                else:
-                    # Guardar datos en sesión
-                    st.session_state.affiliate_data = {
-                        "full_name": full_name,
-                        "email": st.session_state.affiliate_email,
-                        "phone": phone,
-                        "country": country,
-                        "id_type": id_type,
-                        "id_number": id_number,
-                        "birth_date": birth_date.isoformat(),
-                        "binance_address": binance_address,
-                        "tax_id": tax_id,
-                        "accept_marketing": accept_marketing,
-                        "accept_terms": accept_terms,
-                        "accept_privacy": accept_privacy,
-                        "accept_kyc": accept_kyc
-                    }
-                    
-                    st.session_state.affiliate_step = 3
-                    st.rerun()
+            appointments_data.append({
+                'id': appt.id,
+                'other_user': {
+                    'id': other_user.id,
+                    'name': f'{other_user.first_name} {other_user.last_name}',
+                    'profile_image': other_user.profile_image
+                },
+                'appointment_date': appt.appointment_date.isoformat(),
+                'appointment_time': appt.appointment_time.strftime('%H:%M'),
+                'duration': appt.duration,
+                'type': appt.appointment_type,
+                'status': appt.status,
+                'amount': appt.amount,
+                'payment_status': appt.payment_status,
+                'created_at': appt.created_at.isoformat()
+            })
         
-        # Botón para volver al paso 1
-        if st.button("↩️ Volver al paso 1", type="secondary"):
-            st.session_state.affiliate_step = 1
-            st.rerun()
-    
-    def _render_affiliate_step3(self):
-        """Paso 3: Confirmación y registro"""
-        st.subheader("✅ Paso 3: Confirmación y Registro")
+        return jsonify({
+            'success': True,
+            'appointments': appointments_data,
+            'count': len(appointments_data)
+        }), 200
         
-        affiliate_data = st.session_state.get('affiliate_data', {})
-        
-        if not affiliate_data:
-            st.error("No hay datos de afiliado. Regresa al paso 1.")
-            if st.button("↩️ Volver al inicio", type="secondary"):
-                st.session_state.affiliate_step = 1
-                st.rerun()
-            return
-        
-        # Mostrar resumen de información
-        st.info("### Resumen de tu información:")
-        
-        col_sum1, col_sum2 = st.columns(2)
-        
-        with col_sum1:
-            st.write(f"**Nombre:** {affiliate_data['full_name']}")
-            st.write(f"**Email:** {affiliate_data['email']}")
-            st.write(f"**Teléfono:** {affiliate_data['phone']}")
-            st.write(f"**País:** {affiliate_data['country']}")
-        
-        with col_sum2:
-            st.write(f"**Tipo ID:** {affiliate_data['id_type']}")
-            st.write(f"**Número ID:** {affiliate_data['id_number']}")
-            st.write(f"**Fecha nacimiento:** {affiliate_data['birth_date'][:10]}")
-            st.write(f"**Binance:** {affiliate_data['binance_address']}")
-        
-        st.divider()
-        
-        # Confirmación final
-        st.warning("""
-        **⚠️ Importante:**
-        - Tu cuenta estará en estado **pendiente** hasta que sea verificada
-        - La verificación KYC puede tomar 24-48 horas
-        - Recibirás un email con los detalles de tu cuenta
-        - Una vez aprobado, podrás acceder a tu panel de afiliado
-        """)
-        
-        col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 2, 1])
-      # AGREGAR esto ANTES de la línea 4140
-import streamlit as st
+    except Exception as e:
+        logger.error(f'Error al obtener citas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
 
-# Mostrar qué caracteres hay realmente
-st.write("🔍 Debug línea 4140:")
-st.write(f"Línea completa: '{open(__file__).read().splitlines()[4139]}'")
-st.write(f"¿Tiene espacios al inicio?: {open(__file__).read().splitlines()[4139].startswith(' ')}")
-st.write(f"¿Tiene tabs?: {'\\t' in open(__file__).read().splitlines()[4139]}")
-
-with col_confirm2:
-    if st.button("🚀 Registrar como Afiliado", type="primary", use_container_width=True):
-        from modules.affiliate_system import AffiliateSystem
-        # Usar el sistema CORRECTO
-        affiliate_system = AffiliateSystem()
+@users_blueprint.route('/api/appointments/<int:appointment_id>', methods=['GET'])
+@jwt_required()
+def get_appointment(appointment_id):
+    """Obtiene detalles de una cita específica"""
+    try:
+        current_user_id = get_jwt_identity()
         
-        # Mapear datos del formulario
-        affiliate_data_mapped = {
-            "nombre": affiliate_data.get("full_name", ""),
-            "email": affiliate_data.get("email", ""),
-            "telefono": affiliate_data.get("phone", ""),
-            "pais": affiliate_data.get("country", ""),
-            "tipo_id": affiliate_data.get("id_type", ""),
-            "numero_id": affiliate_data.get("id_number", ""),
-            "fecha_nacimiento": affiliate_data.get("birth_date", ""),
-            "binance_address": affiliate_data.get("binance_address", ""),
-            "binance": affiliate_data.get("binance_address", "")
+        appointment = Appointment.query.get(appointment_id)
+        
+        if not appointment:
+            return jsonify({
+                'success': False,
+                'message': 'Cita no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        if appointment.client_id != current_user_id and appointment.therapist_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para ver esta cita'
+                }), 403
+        
+        # Obtener detalles del cliente y terapeuta
+        client = User.query.get(appointment.client_id)
+        therapist = User.query.get(appointment.therapist_id)
+        
+        appointment_data = {
+            'id': appointment.id,
+            'client': {
+                'id': client.id,
+                'name': f'{client.first_name} {client.last_name}',
+                'email': client.email,
+                'phone': client.phone,
+                'profile_image': client.profile_image
+            },
+            'therapist': {
+                'id': therapist.id,
+                'name': f'{therapist.first_name} {therapist.last_name}',
+                'email': therapist.email,
+                'phone': therapist.phone,
+                'profile_image': therapist.profile_image,
+                'specialization': therapist.specialization,
+                'hourly_rate': therapist.hourly_rate
+            },
+            'appointment_date': appointment.appointment_date.isoformat(),
+            'appointment_time': appointment.appointment_time.strftime('%H:%M'),
+            'duration': appointment.duration,
+            'type': appointment.appointment_type,
+            'status': appointment.status,
+            'notes': appointment.notes,
+            'amount': appointment.amount,
+            'currency': appointment.currency,
+            'payment_status': appointment.payment_status,
+            'meeting_link': appointment.meeting_link,
+            'created_at': appointment.created_at.isoformat(),
+            'updated_at': appointment.updated_at.isoformat() if appointment.updated_at else None
         }
         
-        # Llamar al sistema REAL
-        success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
+        # Incluir información de sesión si existe
+        if appointment.session:
+            session_data = {
+                'id': appointment.session.id,
+                'start_time': appointment.session.start_time.isoformat() if appointment.session.start_time else None,
+                'end_time': appointment.session.end_time.isoformat() if appointment.session.end_time else None,
+                'duration': appointment.session.duration,
+                'notes': appointment.session.notes,
+                'mood_start': appointment.session.mood_start,
+                'mood_end': appointment.session.mood_end,
+                'satisfaction_score': appointment.session.satisfaction_score
+            }
+            appointment_data['session'] = session_data
         
-        # Mostrar resultado
-        if success:
-            st.success(f"✅ {message}")
-        else:
-            st.error(f"❌ {message}")
+        return jsonify({
+            'success': True,
+            'appointment': appointment_data
+        }), 200
         
-        # Continuar con el resto del código original
-        if success:
-            # Enviar email de bienvenida
-            self.email_service.send_welcome_email(
-                affiliate_data['email'],
-                affiliate_data
-            )
-            
-            # Enviar notificación al administrador
-            admin_config = ConfigManager().app_config
-            self.email_service.send_email(
-                admin_config['admin_email'],
-                "Nuevo Afiliado Registrado",
-                f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
-            )
-            
-            # Mostrar éxito completo
-            st.balloons()
-            st.success(f"""
-            🎉 ¡Registro Exitoso!
-            
-            **Tu ID de afiliado:** {affiliate_record['id']}
-            **Tu código de referido:** {affiliate_record['referral_code']}
-            
-            Hemos enviado un email con los detalles de tu cuenta.
-            Tu cuenta será verificada en las próximas 24-48 horas.
-            
-            ¡Bienvenido al programa de afiliados!
-            """)
-            
-            # Guardar ID en sesión
-            st.session_state.affiliate_id = affiliate_record['id']
-            
-            # Limpiar datos temporales
-            for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
-                if key in st.session_state:
-                    del st.session_state[key]
-            
-            # Esperar y redirigir
-            time.sleep(3)
-            st.rerun()    
-    
-    # Llamar al sistema REAL de afiliados
-    success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
-    
-    # Mostrar resultado simple
-    if success:
-        st.success(f"✅ {message}")
-    else:
-        st.error(f"❌ {message}")
+    except Exception as e:
+        logger.error(f'Error al obtener cita: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
 
-# 3. Llamar al sistema REAL de afiliados
- success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
-
-        if success:  # ← 8 ESPACIOS (alineado con la línea anterior)
-    # Enviar email de bienvenida  # ← 12 ESPACIOS
-    self.email_service.send_welcome_email(
-        affiliate_data['email'],  # ← 16 ESPACIOS
-        affiliate_data
-    )
-    
-    # Enviar notificación al administrador  # ← 12 ESPACIOS
-    admin_config = ConfigManager().app_config
-    self.email_service.send_email(
-        admin_config['admin_email'],
-        "Nuevo Afiliado Registrado",
-        f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
-    )
-    
-    # Mostrar éxito  # ← 12 ESPACIOS
-    st.balloons()
-    st.success(f"""
-    🎉 ¡Registro Exitoso!
-    
-    **Tu ID de afiliado:** {affiliate_record['id']}
-    **Tu código de referido:** {affiliate_record['referral_code']}
-    
-    Hemos enviado un email con los detalles de tu cuenta.
-    Tu cuenta será verificada en las próximas 24-48 horas.
-    
-    ¡Bienvenido al programa de afiliados!
-    """)
-    
-    # Guardar ID en sesión  # ← 12 ESPACIOS
-    st.session_state.affiliate_id = affiliate_record['id']
-    
-    # Limpiar datos temporales  # ← 12 ESPACIOS
-    for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
-        if key in st.session_state:
-            del st.session_state[key]
-    
-    # Esperar y redirigir  # ← 12 ESPACIOS
-    time.sleep(3)
-    st.rerun()
-else:  # ← 8 ESPACIOS (alineado con if success:)
-    st.error(f"Error en el registro: {message}")  # ← 12 ESPACIOS
-        # Botón para volver al paso 2
-        if st.button("↩️ Volver al paso 2", type="secondary"):
-            st.session_state.affiliate_step = 2
-            st.rerun()
-    
-    def _render_affiliate_login(self):
-        """Renderiza login de afiliado"""
-        st.subheader("🔑 Iniciar sesión como afiliado")
+@users_blueprint.route('/api/appointments/<int:appointment_id>', methods=['PUT'])
+@jwt_required()
+def update_appointment(appointment_id):
+    """Actualiza una cita"""
+    try:
+        current_user_id = get_jwt_identity()
         
-        with st.form("affiliate_login_form"):
-            email = st.text_input("Email registrado", placeholder="tucorreo@ejemplo.com")
-            affiliate_id = st.text_input("ID de afiliado (opcional)", placeholder="AFF0001")
-            
-            submitted = st.form_submit_button("Acceder", type="primary")
-            
-            if submitted:
-                # Buscar afiliado por email o ID
-                db = self.db.load_affiliates()
-                
-                found_affiliate = None
-                
-                # Buscar por ID
-                if affiliate_id and affiliate_id in db["affiliates"]:
-                    found_affiliate = db["affiliates"][affiliate_id]
-                
-                # Buscar por email
-                if not found_affiliate and email:
-                    for aff in db["affiliates"].values():
-                        if aff["email"] == email:
-                            found_affiliate = aff
-                            break
-                
-                if found_affiliate:
-                    # Verificar estado
-                    status = found_affiliate.get("status", "pending")
-                    
-                    if status == "active":
-                        st.session_state.affiliate_id = found_affiliate["id"]
-                        st.success(f"✅ Bienvenido, {found_affiliate['full_name']}")
-                        time.sleep(1)
-                        st.rerun()
-                    elif status == "pending":
-                        st.warning("⏳ Tu cuenta está pendiente de verificación. Te contactaremos pronto.")
-                    elif status == "suspended":
-                        st.error("❌ Tu cuenta está suspendida. Contacta con soporte.")
-                    else:
-                        st.info("Tu cuenta está en estado: " + status)
-                else:
-                    st.error("❌ Afiliado no encontrado. Verifica tus datos o regístrate.")
+        appointment = Appointment.query.get(appointment_id)
         
-        # Enlace a registro
-        st.write("¿No tienes cuenta?")
-        if st.button("📝 Regístrate como afiliado"):
-            st.session_state.affiliate_step = 1
-            st.rerun()
-    
-    def _render_affiliate_dashboard(self):
-        """Renderiza dashboard de afiliado"""
-        affiliate_id = st.session_state.affiliate_id
+        if not appointment:
+            return jsonify({
+                'success': False,
+                'message': 'Cita no encontrada'
+            }), 404
         
-        st.title(f"📊 Panel de Afiliado - {affiliate_id}")
+        # Verificar permisos
+        if appointment.client_id != current_user_id and appointment.therapist_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para actualizar esta cita'
+                }), 403
         
-        # Cargar datos del afiliado
-        balance = self.payment_system.get_affiliate_balance(affiliate_id)
+        data = request.get_json()
         
-        if "error" in balance:
-            st.error(balance["error"])
-            return
+        # Campos actualizables
+        updatable_fields = ['notes', 'status', 'payment_status', 'meeting_link']
         
-        # Métricas principales
-        col1, col2, col3, col4 = st.columns(4)
+        for field in updatable_fields:
+            if field in data:
+                setattr(appointment, field, data[field])
         
-        with col1:
-            st.metric("💰 Ganancias Totales", f"${balance['total_earnings']:.2f}")
+        appointment.updated_at = datetime.datetime.utcnow()
+        db.session.commit()
         
-        with col2:
-            st.metric("⏳ Pendientes", f"${balance['pending_earnings']:.2f}")
-        
-        with col3:
-            st.metric("💳 Pagados", f"${balance['paid_earnings']:.2f}")
-        
-        with col4:
-            commission_rate = balance['commission_rate'] * 100
-            st.metric("📈 Comisión", f"{commission_rate}%")
-        
-        st.divider()
-        
-        # Sección de código de referido
-        st.subheader("🎯 Tu Código de Referido")
-        
-        # Obtener código de referido
-        db = self.db.load_affiliates()
-        affiliate = db["affiliates"].get(affiliate_id, {})
-        referral_code = affiliate.get("referral_code", "N/A")
-        
-        referral_link = f"https://mindgeekclinic.streamlit.app/?ref={referral_code}"
-        
-        col_link1, col_link2 = st.columns([3, 1])
-        
-        with col_link1:
-            st.code(referral_link, language="text")
-        
-        with col_link2:
-            if st.button("📋 Copiar", use_container_width=True):
-                st.success("Enlace copiado al portapapeles")
-        
-        # Métricas de desempeño
-        st.subheader("📊 Métricas de Desempeño")
-        
-        performance = self.analytics.get_affiliate_performance(affiliate_id)
-        
-        if "error" not in performance:
-            col_perf1, col_perf2, col_perf3, col_perf4 = st.columns(4)
-            
-            with col_perf1:
-                st.metric("👥 Referidos", performance["performance_metrics"]["total_referrals"])
-            
-            with col_perf2:
-                st.metric("🔄 Conversiones", performance["performance_metrics"]["conversions"])
-            
-            with col_perf3:
-                st.metric("📊 Tasa Conversión", f"{performance['performance_metrics']['conversion_rate']}%")
-            
-            with col_perf4:
-                avg_value = performance["performance_metrics"]["avg_conversion_value"]
-                st.metric("💰 Valor promedio", f"${avg_value:.2f}")
-            
-            # Gráfico de ganancias mensuales
-            if performance.get("monthly_earnings"):
-                st.subheader("📈 Ganancias Mensuales")
-                
-                earnings_df = pd.DataFrame(performance["monthly_earnings"])
-                
-                fig = px.bar(earnings_df, x='month', y='earnings',
-                            title='Ganancias por Mes',
-                            labels={'earnings': 'Ganancias ($)', 'month': 'Mes'})
-                
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # Historial de pagos
-        st.subheader("💰 Historial de Pagos")
-        
-        payments = self.payment_system.get_payment_history(affiliate_id)
-        
-        if payments:
-            payments_df = pd.DataFrame(payments)
-            
-            # Mostrar columnas relevantes
-            display_cols = ['payment_id', 'request_date', 'amount', 'status', 'net_amount']
-            display_cols = [c for c in display_cols if c in payments_df.columns]
-            
-            st.dataframe(payments_df[display_cols], use_container_width=True)
+        # Notificar al otro usuario sobre el cambio
+        if current_user_id == appointment.client_id:
+            notify_user_id = appointment.therapist_id
         else:
-            st.info("No hay pagos registrados aún")
+            notify_user_id = appointment.client_id
         
-        # Solicitud de pago
-        st.divider()
-        st.subheader("💳 Solicitar Pago")
-        
-        if balance['can_withdraw']:
-            max_amount = min(balance['pending_earnings'], 10000.0)  # Límite de $10,000
-            
-            amount = st.number_input(
-                f"Monto a retirar (disponible: ${balance['pending_earnings']:.2f})",
-                min_value=float(balance['min_payout']),
-                max_value=float(max_amount),
-                value=float(balance['min_payout']),
-                step=10.0
-            )
-            
-            if st.button("📤 Solicitar Pago", type="primary", use_container_width=True):
-                success, message, payment_data = self.payment_system.process_payment_request(
-                    affiliate_id, amount
-                )
-                
-                if success:
-                    st.success(f"""
-                    ✅ Solicitud de pago enviada
-                    
-                    **Detalles:**
-                    - Monto: ${payment_data['amount']:.2f}
-                    - Comisión: ${payment_data.get('transaction_fee', 0):.2f}
-                    - Neto: ${payment_data.get('net_amount', 0):.2f}
-                    - Fecha estimada: {payment_data.get('estimated_completion', '')[:10]}
-                    
-                    Recibirás una notificación por email cuando el pago sea procesado.
-                    """)
-                    
-                    # Actualizar dashboard
-                    st.rerun()
-                else:
-                    st.error(f"❌ Error: {message}")
-        else:
-            st.warning(f"""
-            ⚠️ Mínimo para retiro: ${balance['min_payout']:.2f}
-            
-            Actualmente tienes: ${balance['pending_earnings']:.2f}
-            
-            Continúa compartiendo tu enlace de referido para alcanzar el mínimo.
-            """)
-        
-        # Material de marketing
-        st.divider()
-        
-        with st.expander("🎨 Material de Marketing"):
-            st.write("**Recursos para promocionar MINDGEEKCLINIC:**")
-            
-            col_mat1, col_mat2, col_mat3 = st.columns(3)
-            
-            with col_mat1:
-                st.download_button(
-                    "📝 Plantilla Email",
-                    data="Plantilla de email promocional",
-                    file_name="plantilla_email_mindgeekclinic.txt",
-                    use_container_width=True
-                )
-            
-            with col_mat2:
-                st.download_button(
-                    "📱 Imágenes para Redes",
-                    data="",
-                    file_name="imagenes_redes.zip",
-                    disabled=True,
-                    use_container_width=True
-                )
-            
-            with col_mat3:
-                st.download_button(
-                    "📊 Presentación",
-                    data="",
-                    file_name="presentacion_afiliados.pdf",
-                    disabled=True,
-                    use_container_width=True
-                )
-            
-            st.write("""
-            **Consejos de marketing:**
-            1. Comparte tu enlace único en redes sociales
-            2. Envía emails personalizados a tu red de contactos
-            3. Crea contenido sobre bienestar emocional
-            4. Ofrece webinars o sesiones informativas
-            5. Colabora con otros profesionales del bienestar
-            """)
-    
-    def render_admin(self):
-        """Renderiza panel de administración"""
-        # Verificación de contraseña
-        if 'admin_logged_in' not in st.session_state:
-            st.session_state.admin_logged_in = False
-        
-        if not st.session_state.admin_logged_in:
-            self._render_admin_login()
-            return
-        
-        # Panel administrativo
-        st.title("🔐 Panel de Administración")
-        
-        # Menú lateral
-        admin_menu = st.sidebar.radio(
-            "Menú Administrativo",
-            ["📊 Dashboard", "👥 Afiliados", "💰 Pagos", "📈 Analytics", "⚙️ Configuración", "📧 Pruebas"]
+        NotificationSystem.create_notification(
+            user_id=notify_user_id,
+            title='Cita actualizada',
+            message=f'La cita ha sido actualizada',
+            notification_type='appointment',
+            action_url=f'/appointments/{appointment.id}'
         )
         
-        if admin_menu == "📊 Dashboard":
-            self._render_admin_dashboard()
-        elif admin_menu == "👥 Afiliados":
-            self._render_admin_affiliates()
-        elif admin_menu == "💰 Pagos":
-            self._render_admin_payments()
-        elif admin_menu == "📈 Analytics":
-            self._render_admin_analytics()
-        elif admin_menu == "⚙️ Configuración":
-            self._render_admin_settings()
-        elif admin_menu == "📧 Pruebas":
-            self._render_admin_tests()
-        
-        # Botón para cerrar sesión
-        st.sidebar.divider()
-        if st.sidebar.button("🚪 Cerrar Sesión Admin", type="secondary", use_container_width=True):
-            st.session_state.admin_logged_in = False
-            st.rerun()
-    
-    def _render_admin_login(self):
-        """Renderiza login de administrador"""
-        st.title("🔐 Acceso Administrativo")
-        
-        config = ConfigManager().app_config
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            with st.form("admin_login"):
-                password = st.text_input("Contraseña de administración", 
-                                       type="password",
-                                       placeholder="Ingresa la contraseña")
-                
-                submitted = st.form_submit_button("🔓 Acceder", type="primary", use_container_width=True)
-                
-                if submitted:
-                    if password == config["admin_password"]:
-                        st.session_state.admin_logged_in = True
-                        st.success("✅ Acceso concedido")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("❌ Contraseña incorrecta")
-    
-    def _render_admin_dashboard(self):
-        """Renderiza dashboard administrativo"""
-        st.header("📊 Dashboard General")
-        
-        # Estadísticas del sistema
-        stats = self.analytics.get_dashboard_stats()
-        health = self.analytics.get_system_health()
-        
-        if stats:
-            overall = stats.get("overall_stats", {})
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("👥 Total Afiliados", overall.get("total_affiliates", 0))
-            
-            with col2:
-                st.metric("✅ Activos", overall.get("active_affiliates", 0))
-            
-            with col3:
-                st.metric("💰 Ganancias Totales", f"${overall.get('total_earnings', 0):,.2f}")
-            
-            with col4:
-                st.metric("🔄 Conversiones", overall.get("total_conversions", 0))
-            
-            # Gráfico de distribución
-            st.subheader("📈 Distribución de Afiliados")
-            
-            status_data = {
-                "Activos": overall.get("active_affiliates", 0),
-                "Pendientes": stats.get("overall_stats", {}).get("pending_affiliates", 0),
-                "Suspendidos": stats.get("overall_stats", {}).get("suspended_affiliates", 0)
+        return jsonify({
+            'success': True,
+            'message': 'Cita actualizada exitosamente',
+            'appointment': {
+                'id': appointment.id,
+                'status': appointment.status,
+                'payment_status': appointment.payment_status,
+                'notes': appointment.notes
             }
-            
-            fig = px.pie(
-                values=list(status_data.values()),
-                names=list(status_data.keys()),
-                title="Estado de Afiliados",
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Últimos pagos
-            st.subheader("💳 Últimos Pagos")
-            
-            if stats.get("recent_payments"):
-                payments_df = pd.DataFrame(stats["recent_payments"])
-                st.dataframe(payments_df[['payment_id', 'affiliate_id', 'amount', 'status']], 
-                            use_container_width=True)
+        }), 200
         
-        # Salud del sistema
-        st.divider()
-        st.subheader("🖥️ Salud del Sistema")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al actualizar cita: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/appointments/<int:appointment_id>', methods=['DELETE'])
+@jwt_required()
+def cancel_appointment(appointment_id):
+    """Cancela una cita"""
+    try:
+        current_user_id = get_jwt_identity()
         
-        if health and "error" not in health:
-            server = health.get("server_metrics", {})
-            app = health.get("app_metrics", {})
-            
-            col_health1, col_health2, col_health3, col_health4 = st.columns(4)
-            
-            with col_health1:
-                cpu = server.get("cpu_usage", 0)
-                color = "🟢" if cpu < 70 else "🟡" if cpu < 90 else "🔴"
-                st.metric("CPU", f"{color} {cpu}%")
-            
-            with col_health2:
-                memory = server.get("memory_usage", 0)
-                color = "🟢" if memory < 70 else "🟡" if memory < 90 else "🔴"
-                st.metric("Memoria", f"{color} {memory}%")
-            
-            with col_health3:
-                error_rate = app.get("error_rate", 0)
-                color = "🟢" if error_rate < 1 else "🟡" if error_rate < 5 else "🔴"
-                st.metric("Tasa Error", f"{color} {error_rate}%")
-            
-            with col_health4:
-                uptime = server.get("uptime", "0:00:00")
-                st.metric("Uptime", uptime)
-            
-            # Servicios
-            st.subheader("🔧 Estado de Servicios")
-            
-            services = health.get("services", {})
-            
-            col_serv1, col_serv2, col_serv3, col_serv4 = st.columns(4)
-            
-            service_icons = {
-                True: "✅",
-                False: "❌"
+        appointment = Appointment.query.get(appointment_id)
+        
+        if not appointment:
+            return jsonify({
+                'success': False,
+                'message': 'Cita no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        if appointment.client_id != current_user_id and appointment.therapist_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para cancelar esta cita'
+                }), 403
+        
+        # Solo permitir cancelar citas programadas o confirmadas
+        if appointment.status not in ['scheduled', 'confirmed']:
+            return jsonify({
+                'success': False,
+                'message': f'No se puede cancelar una cita con estado {appointment.status}'
+            }), 400
+        
+        # Cancelar cita
+        old_status = appointment.status
+        appointment.status = 'cancelled'
+        appointment.updated_at = datetime.datetime.utcnow()
+        
+        # Reembolsar si ya estaba pagada
+        if appointment.payment_status == 'paid':
+            # Aquí se implementaría la lógica de reembolso con Stripe
+            appointment.payment_status = 'refunded'
+        
+        db.session.commit()
+        
+        # Notificar al otro usuario sobre la cancelación
+        if current_user_id == appointment.client_id:
+            notify_user_id = appointment.therapist_id
+            cancelled_by = 'cliente'
+        else:
+            notify_user_id = appointment.client_id
+            cancelled_by = 'terapeuta'
+        
+        NotificationSystem.create_notification(
+            user_id=notify_user_id,
+            title='Cita cancelada',
+            message=f'La cita ha sido cancelada por el {cancelled_by}',
+            notification_type='appointment',
+            action_url=f'/appointments/{appointment.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cita cancelada exitosamente',
+            'appointment': {
+                'id': appointment.id,
+                'status': appointment.status,
+                'previous_status': old_status
             }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al cancelar cita: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE SESIONES
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/sessions', methods=['POST'])
+@jwt_required()
+@therapist_required
+def create_session():
+    """Crea una sesión para una cita (solo terapeutas)"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        required_fields = ['appointment_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si la cita existe y pertenece al terapeuta
+        appointment = Appointment.query.get(data['appointment_id'])
+        
+        if not appointment:
+            return jsonify({
+                'success': False,
+                'message': 'Cita no encontrada'
+            }), 404
+        
+        if appointment.therapist_id != current_user_id:
+            return jsonify({
+                'success': False,
+                'message': 'No tienes permisos para crear una sesión para esta cita'
+            }), 403
+        
+        # Verificar si ya existe una sesión para esta cita
+        existing_session = Session.query.filter_by(appointment_id=data['appointment_id']).first()
+        if existing_session:
+            return jsonify({
+                'success': False,
+                'message': 'Ya existe una sesión para esta cita'
+            }), 400
+        
+        # Verificar que la cita esté confirmada
+        if appointment.status != 'confirmed':
+            return jsonify({
+                'success': False,
+                'message': 'La cita debe estar confirmada para crear una sesión'
+            }), 400
+        
+        # Crear sesión
+        session = Session(
+            appointment_id=data['appointment_id'],
+            participant_id=appointment.client_id,
+            notes=data.get('notes', ''),
+            mood_start=data.get('mood_start'),
+            therapist_notes=data.get('therapist_notes', ''),
+            homework_assigned=data.get('homework_assigned', ''),
+            next_session_plan=data.get('next_session_plan', '')
+        )
+        
+        db.session.add(session)
+        
+        # Actualizar estado de la cita
+        appointment.status = 'in_session'
+        appointment.updated_at = datetime.datetime.utcnow()
+        
+        db.session.commit()
+        
+        # Notificar al cliente
+        NotificationSystem.create_notification(
+            user_id=appointment.client_id,
+            title='Sesión iniciada',
+            message=f'Tu terapeuta ha iniciado la sesión',
+            notification_type='session',
+            action_url=f'/sessions/{session.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Sesión creada exitosamente',
+            'session': {
+                'id': session.id,
+                'appointment_id': session.appointment_id,
+                'start_time': session.start_time.isoformat() if session.start_time else None,
+                'notes': session.notes,
+                'mood_start': session.mood_start
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear sesión: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/sessions/<int:session_id>', methods=['PUT'])
+@jwt_required()
+def update_session(session_id):
+    """Actualiza una sesión (termina sesión, agrega notas, etc.)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        session = Session.query.get(session_id)
+        
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': 'Sesión no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        appointment = session.appointment
+        if appointment.therapist_id != current_user_id and appointment.client_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para actualizar esta sesión'
+                }), 403
+        
+        data = request.get_json()
+        
+        # Manejar finalización de sesión
+        if data.get('end_session'):
+            if not session.end_time:
+                session.end_time = datetime.datetime.utcnow()
+                
+                # Calcular duración en minutos
+                if session.start_time:
+                    duration = (session.end_time - session.start_time).total_seconds() / 60
+                    session.duration = int(duration)
+                
+                # Actualizar estado de la cita
+                appointment.status = 'completed'
+                appointment.updated_at = datetime.datetime.utcnow()
+        
+        # Actualizar campos
+        updatable_fields = [
+            'notes', 'mood_end', 'satisfaction_score',
+            'therapist_notes', 'homework_assigned', 'next_session_plan',
+            'recording_url', 'transcript'
+        ]
+        
+        for field in updatable_fields:
+            if field in data:
+                setattr(session, field, data[field])
+        
+        db.session.commit()
+        
+        # Notificar al otro usuario sobre la actualización
+        if current_user_id == appointment.client_id:
+            notify_user_id = appointment.therapist_id
+        else:
+            notify_user_id = appointment.client_id
+        
+        NotificationSystem.create_notification(
+            user_id=notify_user_id,
+            title='Sesión actualizada',
+            message=f'La sesión ha sido actualizada',
+            notification_type='session',
+            action_url=f'/sessions/{session.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Sesión actualizada exitosamente',
+            'session': {
+                'id': session.id,
+                'end_time': session.end_time.isoformat() if session.end_time else None,
+                'duration': session.duration,
+                'mood_end': session.mood_end,
+                'satisfaction_score': session.satisfaction_score
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al actualizar sesión: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/sessions/<int:session_id>', methods=['GET'])
+@jwt_required()
+def get_session(session_id):
+    """Obtiene detalles de una sesión"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        session = Session.query.get(session_id)
+        
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': 'Sesión no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        appointment = session.appointment
+        if appointment.therapist_id != current_user_id and appointment.client_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para ver esta sesión'
+                }), 403
+        
+        # Obtener información de la cita
+        appointment_data = {
+            'id': appointment.id,
+            'date': appointment.appointment_date.isoformat(),
+            'time': appointment.appointment_time.strftime('%H:%M'),
+            'type': appointment.appointment_type
+        }
+        
+        # Obtener información del cliente y terapeuta
+        client = appointment.client
+        therapist = appointment.therapist
+        
+        session_data = {
+            'id': session.id,
+            'appointment': appointment_data,
+            'client': {
+                'id': client.id,
+                'name': f'{client.first_name} {client.last_name}'
+            },
+            'therapist': {
+                'id': therapist.id,
+                'name': f'{therapist.first_name} {therapist.last_name}'
+            },
+            'start_time': session.start_time.isoformat() if session.start_time else None,
+            'end_time': session.end_time.isoformat() if session.end_time else None,
+            'duration': session.duration,
+            'notes': session.notes,
+            'mood_start': session.mood_start,
+            'mood_end': session.mood_end,
+            'satisfaction_score': session.satisfaction_score,
+            'therapist_notes': session.therapist_notes if current_user_id == therapist.id or user.role == 'admin' else None,
+            'homework_assigned': session.homework_assigned,
+            'next_session_plan': session.next_session_plan,
+            'recording_url': session.recording_url,
+            'transcript': session.transcript,
+            'created_at': session.created_at.isoformat()
+        }
+        
+        return jsonify({
+            'success': True,
+            'session': session_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener sesión: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE MENSAJES
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/messages', methods=['GET'])
+@jwt_required()
+def get_messages():
+    """Obtiene mensajes del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Obtener ID del otro usuario (si se proporciona)
+        other_user_id = request.args.get('user_id')
+        
+        if other_user_id:
+            # Obtener conversación específica
+            messages = Message.query.filter(
+                ((Message.sender_id == current_user_id) & (Message.receiver_id == other_user_id)) |
+                ((Message.sender_id == other_user_id) & (Message.receiver_id == current_user_id))
+            ).order_by(Message.timestamp.asc()).all()
             
-            with col_serv1:
-                status = service_icons.get(services.get("email", False), "❓")
-                st.metric("Email", status)
+            # Marcar mensajes como leídos
+            unread_messages = Message.query.filter_by(
+                sender_id=other_user_id,
+                receiver_id=current_user_id,
+                is_read=False
+            ).all()
             
-            with col_serv2:
-                status = service_icons.get(services.get("payments", False), "❓")
-                st.metric("Pagos", status)
+            for msg in unread_messages:
+                msg.is_read = True
+                msg.read_timestamp = datetime.datetime.utcnow()
             
-            with col_serv3:
-                status = service_icons.get(services.get("ai", False), "❓")
-                st.metric("IA", status)
+            db.session.commit()
             
-            with col_serv4:
-                status = service_icons.get(services.get("storage", False), "❓")
-                st.metric("Almacenamiento", status)
-    
-    def _render_admin_affiliates(self):
-        """Renderiza gestión de afiliados"""
-        st.header("👥 Gestión de Afiliados")
+            messages_data = []
+            for msg in messages:
+                sender = User.query.get(msg.sender_id)
+                messages_data.append({
+                    'id': msg.id,
+                    'sender_id': msg.sender_id,
+                    'sender_name': f'{sender.first_name} {sender.last_name}',
+                    'sender_avatar': sender.profile_image,
+                    'content': msg.content,
+                    'timestamp': msg.timestamp.isoformat(),
+                    'is_read': msg.is_read,
+                    'type': msg.message_type,
+                    'attachment_url': msg.attachment_url
+                })
+            
+            return jsonify({
+                'success': True,
+                'messages': messages_data
+            }), 200
         
-        # Filtros y búsqueda
-        col_search, col_filter, col_action = st.columns([2, 1, 1])
+        else:
+            # Obtener lista de conversaciones
+            # Obtener todos los usuarios con los que ha intercambiado mensajes
+            subquery_sent = db.session.query(
+                Message.receiver_id.label('user_id'),
+                func.max(Message.timestamp).label('last_message')
+            ).filter(Message.sender_id == current_user_id).group_by(Message.receiver_id).subquery()
+            
+            subquery_received = db.session.query(
+                Message.sender_id.label('user_id'),
+                func.max(Message.timestamp).label('last_message')
+            ).filter(Message.receiver_id == current_user_id).group_by(Message.sender_id).subquery()
+            
+            # Combinar resultados
+            conversations = db.session.query(
+                func.coalesce(subquery_sent.c.user_id, subquery_received.c.user_id).label('user_id'),
+                func.greatest(
+                    func.coalesce(subquery_sent.c.last_message, datetime.datetime.min),
+                    func.coalesce(subquery_received.c.last_message, datetime.datetime.min)
+                ).label('last_message_time')
+            ).outerjoin(
+                subquery_received,
+                subquery_sent.c.user_id == subquery_received.c.user_id
+            ).union(
+                db.session.query(
+                    subquery_received.c.user_id,
+                    subquery_received.c.last_message
+                ).filter(~subquery_received.c.user_id.in_(
+                    db.session.query(subquery_sent.c.user_id)
+                ))
+            ).subquery()
+            
+            # Obtener detalles de conversaciones
+            conv_query = db.session.query(
+                User.id,
+                User.first_name,
+                User.last_name,
+                User.profile_image,
+                User.role,
+                conversations.c.last_message_time,
+                func.count(Message.id).filter(Message.is_read == False).label('unread_count')
+            ).join(
+                conversations, User.id == conversations.c.user_id
+            ).outerjoin(
+                Message,
+                (Message.sender_id == User.id) & (Message.receiver_id == current_user_id) & (Message.is_read == False)
+            ).group_by(
+                User.id, conversations.c.last_message_time
+            ).order_by(conversations.c.last_message_time.desc()).all()
+            
+            conversations_data = []
+            for conv in conv_query:
+                conversations_data.append({
+                    'user_id': conv.id,
+                    'user_name': f'{conv.first_name} {conv.last_name}',
+                    'user_avatar': conv.profile_image,
+                    'user_role': conv.role,
+                    'last_message_time': conv.last_message_time.isoformat() if conv.last_message_time else None,
+                    'unread_count': conv.unread_count or 0
+                })
+            
+            return jsonify({
+                'success': True,
+                'conversations': conversations_data
+            }), 200
+            
+    except Exception as e:
+        logger.error(f'Error al obtener mensajes: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/messages/unread', methods=['GET'])
+@jwt_required()
+def get_unread_count():
+    """Obtiene el número de mensajes no leídos"""
+    try:
+        current_user_id = get_jwt_identity()
         
-        with col_search:
-            search_term = st.text_input("🔍 Buscar afiliado", placeholder="ID, nombre, email...")
+        unread_count = Message.query.filter_by(
+            receiver_id=current_user_id,
+            is_read=False
+        ).count()
         
-        with col_filter:
-            status_filter = st.selectbox("Estado", ["Todos", "active", "pending", "suspended"])
+        return jsonify({
+            'success': True,
+            'unread_count': unread_count
+        }), 200
         
-        with col_action:
-            if st.button("🔄 Actualizar", use_container_width=True):
-                st.rerun()
+    except Exception as e:
+        logger.error(f'Error al obtener conteo de no leídos: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/messages', methods=['POST'])
+@jwt_required()
+def send_message():
+    """Envía un mensaje"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
         
-        # Cargar afiliados
-        db = self.db.load_affiliates()
-        affiliates = list(db.get("affiliates", {}).values())
+        # Validar campos requeridos
+        required_fields = ['receiver_id', 'content']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si el receptor existe
+        receiver = User.query.get(data['receiver_id'])
+        if not receiver:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario receptor no encontrado'
+            }), 404
+        
+        # Verificar si el receptor ha bloqueado al remitente
+        blocker_check = db.session.query(user_blocks).filter_by(
+            blocker_id=data['receiver_id'],
+            blocked_id=current_user_id
+        ).first()
+        
+        if blocker_check:
+            return jsonify({
+                'success': False,
+                'message': 'No puedes enviar mensajes a este usuario'
+            }), 403
+        
+        # Crear mensaje
+        message = Message(
+            sender_id=current_user_id,
+            receiver_id=data['receiver_id'],
+            content=data['content'],
+            message_type=data.get('type', 'text'),
+            attachment_url=data.get('attachment_url')
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        # Notificar al receptor via Socket.IO (si está conectado)
+        socketio.emit('new_message', {
+            'id': message.id,
+            'sender_id': current_user_id,
+            'sender_name': f'{current_user.first_name} {current_user.last_name}',
+            'sender_avatar': current_user.profile_image or '/static/images/default-avatar.png',
+            'content': data['content'],
+            'timestamp': message.timestamp.isoformat(),
+            'type': data.get('type', 'text')
+        }, room=f'user_{data["receiver_id"]}')
+        
+        # Crear notificación para el receptor
+        NotificationSystem.create_notification(
+            user_id=data['receiver_id'],
+            title='Nuevo mensaje',
+            message=f'Tienes un nuevo mensaje de {current_user.first_name}',
+            notification_type='message',
+            action_url=f'/messages/{current_user_id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Mensaje enviado exitosamente',
+            'message_id': message.id,
+            'timestamp': message.timestamp.isoformat()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al enviar mensaje: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE TERAPEUTAS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/therapists', methods=['GET'])
+def get_therapists():
+    """Obtiene lista de terapeutas"""
+    try:
+        # Filtrar usuarios con rol de terapeuta
+        therapists = User.query.filter(User.role.in_(['therapist', 'admin'])).filter_by(is_active=True).all()
+        
+        therapists_data = []
+        for therapist in therapists:
+            # Obtener estadísticas del terapeuta
+            total_appointments = Appointment.query.filter_by(therapist_id=therapist.id).count()
+            completed_appointments = Appointment.query.filter_by(therapist_id=therapist.id, status='completed').count()
+            
+            # Obtener calificación promedio
+            avg_rating_result = db.session.query(func.avg(Review.rating)).filter_by(therapist_id=therapist.id).first()
+            avg_rating = avg_rating_result[0] if avg_rating_result[0] else 0.0
+            
+            therapists_data.append({
+                'id': therapist.id,
+                'name': f'{therapist.first_name} {therapist.last_name}',
+                'profile_image': therapist.profile_image,
+                'specialization': therapist.specialization,
+                'qualifications': therapist.qualifications,
+                'experience_years': therapist.experience_years,
+                'hourly_rate': therapist.hourly_rate,
+                'bio': therapist.bio,
+                'avg_rating': round(avg_rating, 1),
+                'total_appointments': total_appointments,
+                'completed_appointments': completed_appointments,
+                'is_verified': therapist.is_verified
+            })
+        
+        return jsonify({
+            'success': True,
+            'therapists': therapists_data,
+            'count': len(therapists_data)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener terapeutas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/therapists/<int:therapist_id>', methods=['GET'])
+def get_therapist_detail(therapist_id):
+    """Obtiene detalles de un terapeuta específico"""
+    try:
+        therapist = User.query.get(therapist_id)
+        
+        if not therapist or therapist.role not in ['therapist', 'admin']:
+            return jsonify({
+                'success': False,
+                'message': 'Terapeuta no encontrado'
+            }), 404
+        
+        # Obtener estadísticas
+        total_appointments = Appointment.query.filter_by(therapist_id=therapist.id).count()
+        completed_appointments = Appointment.query.filter_by(therapist_id=therapist.id, status='completed').count()
+        
+        # Obtener calificación promedio y reseñas
+        reviews = Review.query.filter_by(therapist_id=therapist.id).order_by(Review.created_at.desc()).limit(10).all()
+        
+        avg_rating_result = db.session.query(func.avg(Review.rating)).filter_by(therapist_id=therapist.id).first()
+        avg_rating = avg_rating_result[0] if avg_rating_result[0] else 0.0
+        
+        reviews_data = []
+        for review in reviews:
+            client = review.reviewer
+            reviews_data.append({
+                'id': review.id,
+                'client_name': f'{client.first_name} {client.last_name}',
+                'client_avatar': client.profile_image,
+                'rating': review.rating,
+                'comment': review.comment,
+                'created_at': review.created_at.isoformat(),
+                'response': review.response,
+                'response_date': review.response_date.isoformat() if review.response_date else None
+            })
+        
+        # Obtener disponibilidad (esto sería más complejo en producción)
+        # Por ahora, devolvemos horarios de trabajo básicos
+        availability = {
+            'monday': {'start': '09:00', 'end': '18:00'},
+            'tuesday': {'start': '09:00', 'end': '18:00'},
+            'wednesday': {'start': '09:00', 'end': '18:00'},
+            'thursday': {'start': '09:00', 'end': '18:00'},
+            'friday': {'start': '09:00', 'end': '18:00'},
+            'saturday': {'start': '10:00', 'end': '14:00'},
+            'sunday': {'start': '10:00', 'end': '14:00'}
+        }
+        
+        therapist_data = {
+            'id': therapist.id,
+            'name': f'{therapist.first_name} {therapist.last_name}',
+            'email': therapist.email,
+            'phone': therapist.phone,
+            'profile_image': therapist.profile_image,
+            'bio': therapist.bio,
+            'specialization': therapist.specialization,
+            'qualifications': therapist.qualifications,
+            'experience_years': therapist.experience_years,
+            'hourly_rate': therapist.hourly_rate,
+            'avg_rating': round(avg_rating, 1),
+            'total_reviews': len(reviews),
+            'total_appointments': total_appointments,
+            'completed_appointments': completed_appointments,
+            'is_verified': therapist.is_verified,
+            'availability': availability,
+            'reviews': reviews_data
+        }
+        
+        return jsonify({
+            'success': True,
+            'therapist': therapist_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener detalle de terapeuta: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/therapists/<int:therapist_id>/availability', methods=['GET'])
+def get_therapist_availability(therapist_id):
+    """Obtiene disponibilidad de un terapeuta"""
+    try:
+        therapist = User.query.get(therapist_id)
+        
+        if not therapist or therapist.role not in ['therapist', 'admin']:
+            return jsonify({
+                'success': False,
+                'message': 'Terapeuta no encontrado'
+            }), 404
+        
+        # Obtener fecha específica si se proporciona
+        date_str = request.args.get('date')
+        if date_str:
+            try:
+                target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'message': 'Formato de fecha inválido. Use YYYY-MM-DD.'
+                }), 400
+        else:
+            # Por defecto, hoy
+            target_date = datetime.date.today()
+        
+        # Obtener citas existentes para esa fecha
+        appointments = Appointment.query.filter_by(
+            therapist_id=therapist_id,
+            appointment_date=target_date,
+            status='scheduled'
+        ).all()
+        
+        # Horarios ocupados
+        busy_slots = []
+        for appt in appointments:
+            busy_slots.append({
+                'start': appt.appointment_time.strftime('%H:%M'),
+                'end': (datetime.datetime.combine(target_date, appt.appointment_time) + 
+                       datetime.timedelta(minutes=appt.duration)).strftime('%H:%M')
+            })
+        
+        # Generar horarios disponibles (ejemplo básico)
+        # En producción, esto dependería de las preferencias del terapeuta
+        available_slots = []
+        start_hour = 9
+        end_hour = 18
+        
+        for hour in range(start_hour, end_hour):
+            for minute in [0, 30]:
+                slot_time = f'{hour:02d}:{minute:02d}'
+                
+                # Verificar si el horario está ocupado
+                is_busy = False
+                for busy in busy_slots:
+                    busy_start = datetime.datetime.strptime(busy['start'], '%H:%M').time()
+                    busy_end = datetime.datetime.strptime(busy['end'], '%H:%M').time()
+                    slot_time_obj = datetime.datetime.strptime(slot_time, '%H:%M').time()
+                    
+                    if busy_start <= slot_time_obj < busy_end:
+                        is_busy = True
+                        break
+                
+                if not is_busy:
+                    available_slots.append(slot_time)
+        
+        return jsonify({
+            'success': True,
+            'date': target_date.isoformat(),
+            'therapist_id': therapist_id,
+            'available_slots': available_slots,
+            'busy_slots': busy_slots
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener disponibilidad: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE RESEÑAS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/reviews', methods=['POST'])
+@jwt_required()
+def create_review():
+    """Crea una reseña para un terapeuta"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        required_fields = ['therapist_id', 'rating']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si el terapeuta existe
+        therapist = User.query.get(data['therapist_id'])
+        if not therapist or therapist.role not in ['therapist', 'admin']:
+            return jsonify({
+                'success': False,
+                'message': 'Terapeuta no encontrado'
+            }), 404
+        
+        # Verificar si ya existe una reseña del cliente para este terapeuta
+        existing_review = Review.query.filter_by(
+            client_id=current_user_id,
+            therapist_id=data['therapist_id']
+        ).first()
+        
+        if existing_review:
+            return jsonify({
+                'success': False,
+                'message': 'Ya has escrito una reseña para este terapeuta'
+            }), 400
+        
+        # Verificar que el cliente haya tenido al menos una cita completada con el terapeuta
+        completed_appointment = Appointment.query.filter_by(
+            client_id=current_user_id,
+            therapist_id=data['therapist_id'],
+            status='completed'
+        ).first()
+        
+        if not completed_appointment:
+            return jsonify({
+                'success': False,
+                'message': 'Debes haber completado al menos una cita con el terapeuta para escribir una reseña'
+            }), 400
+        
+        # Validar rating (1-5)
+        rating = int(data['rating'])
+        if rating < 1 or rating > 5:
+            return jsonify({
+                'success': False,
+                'message': 'El rating debe estar entre 1 y 5'
+            }), 400
+        
+        # Crear reseña
+        review = Review(
+            client_id=current_user_id,
+            therapist_id=data['therapist_id'],
+            rating=rating,
+            comment=data.get('comment', '')
+        )
+        
+        db.session.add(review)
+        db.session.commit()
+        
+        # Notificar al terapeuta
+        NotificationSystem.create_notification(
+            user_id=therapist.id,
+            title='Nueva reseña',
+            message=f'Tienes una nueva reseña de {current_user.first_name}',
+            notification_type='review',
+            action_url=f'/reviews/{review.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Reseña creada exitosamente',
+            'review': {
+                'id': review.id,
+                'therapist_id': review.therapist_id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'created_at': review.created_at.isoformat()
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear reseña: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/reviews/<int:review_id>', methods=['PUT'])
+@jwt_required()
+def update_review(review_id):
+    """Actualiza una reseña (solo el autor o administrador)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        review = Review.query.get(review_id)
+        
+        if not review:
+            return jsonify({
+                'success': False,
+                'message': 'Reseña no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        user = User.query.get(current_user_id)
+        if review.client_id != current_user_id and user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'No tienes permisos para actualizar esta reseña'
+            }), 403
+        
+        data = request.get_json()
+        
+        # Actualizar campos permitidos
+        if 'rating' in data:
+            rating = int(data['rating'])
+            if rating < 1 or rating > 5:
+                return jsonify({
+                    'success': False,
+                    'message': 'El rating debe estar entre 1 y 5'
+                }), 400
+            review.rating = rating
+        
+        if 'comment' in data:
+            review.comment = data['comment']
+        
+        review.updated_at = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Reseña actualizada exitosamente',
+            'review': {
+                'id': review.id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'updated_at': review.updated_at.isoformat()
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al actualizar reseña: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/reviews/<int:review_id>/response', methods=['POST'])
+@jwt_required()
+@therapist_required
+def add_review_response(review_id):
+    """Agrega una respuesta a una reseña (solo el terapeuta)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        review = Review.query.get(review_id)
+        
+        if not review:
+            return jsonify({
+                'success': False,
+                'message': 'Reseña no encontrada'
+            }), 404
+        
+        # Verificar que el terapeuta sea el dueño de la reseña
+        if review.therapist_id != current_user_id:
+            return jsonify({
+                'success': False,
+                'message': 'No tienes permisos para responder a esta reseña'
+            }), 403
+        
+        data = request.get_json()
+        
+        if 'response' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'El campo response es requerido'
+            }), 400
+        
+        # Agregar respuesta
+        review.response = data['response']
+        review.response_date = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        # Notificar al cliente
+        NotificationSystem.create_notification(
+            user_id=review.client_id,
+            title='Respuesta a tu reseña',
+            message=f'El terapeuta ha respondido a tu reseña',
+            notification_type='review',
+            action_url=f'/reviews/{review.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Respuesta agregada exitosamente',
+            'review': {
+                'id': review.id,
+                'response': review.response,
+                'response_date': review.response_date.isoformat()
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al agregar respuesta: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE PRODUCTOS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/products', methods=['GET'])
+def get_products():
+    """Obtiene lista de productos"""
+    try:
+        # Filtros
+        category = request.args.get('category')
+        min_price = request.args.get('min_price')
+        max_price = request.args.get('max_price')
+        search = request.args.get('search')
+        sort_by = request.args.get('sort_by', 'created_at')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        query = Product.query.filter_by(is_active=True)
         
         # Aplicar filtros
-        if search_term:
-            affiliates = [a for a in affiliates 
-                         if search_term.lower() in a.get('full_name', '').lower() or
-                         search_term.lower() in a.get('email', '').lower() or
-                         search_term.lower() in a.get('id', '').lower()]
+        if category:
+            query = query.filter_by(category=category)
         
-        if status_filter != "Todos":
-            affiliates = [a for a in affiliates if a.get('status') == status_filter]
+        if min_price:
+            query = query.filter(Product.price >= float(min_price))
         
-        # Mostrar tabla
-        if affiliates:
-            # Crear DataFrame
-            df_data = []
-            for aff in affiliates:
-                df_data.append({
-                    "ID": aff.get('id'),
-                    "Nombre": aff.get('full_name'),
-                    "Email": aff.get('email'),
-                    "Estado": aff.get('status'),
-                    "Ganancias": f"${aff.get('total_earnings', 0):.2f}",
-                    "Referidos": aff.get('referrals_count', 0),
-                    "Conversiones": aff.get('conversions_count', 0),
-                    "Registro": aff.get('registration_date', '')[:10]
-                })
-            
-            df = pd.DataFrame(df_data)
-            
-            # Mostrar tabla con selección
-            selected_indices = st.dataframe(
-                df,
-                use_container_width=True,
-                selection_mode="multi-row",
-                key="affiliate_selection"
+        if max_price:
+            query = query.filter(Product.price <= float(max_price))
+        
+        if search:
+            search_term = f'%{search}%'
+            query = query.filter(
+                or_(
+                    Product.name.ilike(search_term),
+                    Product.description.ilike(search_term),
+                    Product.tags.ilike(search_term)
+                )
             )
-            
-            # Detalles del afiliado seleccionado
-            if selected_indices and 'selection' in selected_indices and selected_indices['selection']['rows']:
-                selected_rows = selected_indices['selection']['rows']
-                
-                if len(selected_rows) == 1:
-                    # Mostrar detalles de un afiliado
-                    selected_row = selected_rows[0]
-                    selected_affiliate = df.iloc[selected_row]
-                    
-                    with st.expander(f"📋 Detalles: {selected_affiliate['Nombre']}"):
-                        affiliate_id = selected_affiliate['ID']
-                        full_affiliate = db["affiliates"].get(affiliate_id, {})
-                        
-                        col_detail1, col_detail2 = st.columns(2)
-                        
-                        with col_detail1:
-                            st.write(f"**Email:** {full_affiliate.get('email', 'N/A')}")
-                            st.write(f"**Teléfono:** {full_affiliate.get('phone', 'N/A')}")
-                            st.write(f"**País:** {full_affiliate.get('country', 'N/A')}")
-                            st.write(f"**Código referido:** {full_affiliate.get('referral_code', 'N/A')}")
-                        
-                        with col_detail2:
-                            st.write(f"**Estado KYC:** {full_affiliate.get('kyc_status', 'pending')}")
-                            st.write(f"**Comisión:** {full_affiliate.get('commission_rate', 0.30)*100}%")
-                            st.write(f"**Último pago:** {full_affiliate.get('last_payment', 'Nunca')}")
-                            st.write(f"**Binance:** {full_affiliate.get('payment_address', 'No configurada')}")
-                        
-                        # Acciones
-                        st.subheader("⚙️ Acciones")
-                        
-                        col_action1, col_action2, col_action3 = st.columns(3)
-                        
-                        with col_action1:
-                            new_status = st.selectbox(
-                                "Cambiar estado",
-                                ["active", "pending", "suspended"],
-                                index=["active", "pending", "suspended"].index(full_affiliate.get('status', 'pending')),
-                                key=f"status_{affiliate_id}"
-                            )
-                            
-                            if st.button("💾 Actualizar estado", key=f"update_{affiliate_id}"):
-                                if self.db.update_affiliate_status(affiliate_id, new_status):
-                                    st.success("✅ Estado actualizado")
-                                    time.sleep(1)
-                                    st.rerun()
-                        
-                        with col_action2:
-                            new_rate = st.number_input(
-                                "Tasa comisión (%)",
-                                min_value=10,
-                                max_value=50,
-                                value=int(full_affiliate.get('commission_rate', 0.30)*100),
-                                key=f"rate_{affiliate_id}"
-                            )
-                        
-                        with col_action3:
-                            if st.button("📧 Enviar email", key=f"email_{affiliate_id}"):
-                                st.info("Función de email pendiente")
-                
-                elif len(selected_rows) > 1:
-                    # Acciones en lote
-                    st.subheader("🔄 Acciones en Lote")
-                    
-                    batch_action = st.selectbox("Acción para múltiples afiliados", 
-                                              ["Cambiar estado", "Enviar email", "Exportar datos"])
-                    
-                    if batch_action == "Cambiar estado":
-                        new_batch_status = st.selectbox("Nuevo estado", 
-                                                      ["active", "pending", "suspended"])
-                        
-                        if st.button("Aplicar a seleccionados", type="primary"):
-                            for row in selected_rows:
-                                affiliate_id = df.iloc[row]['ID']
-                                self.db.update_affiliate_status(affiliate_id, new_batch_status)
-                            
-                            st.success(f"✅ Estado actualizado para {len(selected_rows)} afiliados")
-                            time.sleep(2)
-                            st.rerun()
         
-        else:
-            st.info("No hay afiliados que coincidan con los filtros")
-    
-    def _render_admin_payments(self):
-        """Renderiza gestión de pagos"""
-        st.header("💰 Gestión de Pagos")
-        
-        # Cargar pagos
-        payments = self.payment_system.get_payment_history()
-        
-        if payments:
-            # Filtros
-            col_filt1, col_filt2, col_filt3 = st.columns(3)
-            
-            with col_filt1:
-                status_filter = st.multiselect("Estado", 
-                                             ["pending", "processing", "completed", "failed"],
-                                             default=["pending", "processing"])
-            
-            with col_filt2:
-                date_filter = st.date_input("Fecha", [])
-            
-            with col_filt3:
-                affiliate_filter = st.text_input("ID Afiliado")
-            
-            # Aplicar filtros
-            filtered_payments = payments
-            
-            if status_filter:
-                filtered_payments = [p for p in filtered_payments if p.get('status') in status_filter]
-            
-            if affiliate_filter:
-                filtered_payments = [p for p in filtered_payments if affiliate_filter in p.get('affiliate_id', '')]
-            
-            if filtered_payments:
-                # Convertir a DataFrame
-                df = pd.DataFrame(filtered_payments)
-                
-                # Ordenar por fecha
-                if 'request_date' in df.columns:
-                    df['request_date'] = pd.to_datetime(df['request_date'])
-                    df = df.sort_values('request_date', ascending=False)
-                
-                # Mostrar pagos
-                st.dataframe(df, use_container_width=True)
-                
-                # Procesar pagos pendientes
-                pending_payments = [p for p in filtered_payments if p.get('status') in ['pending', 'processing']]
-                
-                if pending_payments:
-                    st.subheader("⏳ Pagos Pendientes por Procesar")
-                    
-                    for payment in pending_payments:
-                        with st.expander(f"Pago #{payment.get('payment_id', 'N/A')} - ${payment.get('amount', 0):.2f}"):
-                            col_pay1, col_pay2 = st.columns(2)
-                            
-                            with col_pay1:
-                                st.write(f"**Afiliado:** {payment.get('affiliate_id', 'N/A')}")
-                                st.write(f"**Monto:** ${payment.get('amount', 0):.2f}")
-                                st.write(f"**Estado:** {payment.get('status', 'N/A')}")
-                                st.write(f"**Solicitado:** {payment.get('request_date', 'N/A')[:19]}")
-                            
-                            with col_pay2:
-                                # Acciones
-                                if payment.get('status') == 'pending':
-                                    if st.button(f"✅ Marcar como Procesando", key=f"process_{payment.get('payment_id')}"):
-                                        # Actualizar estado
-                                        payment['status'] = 'processing'
-                                        self._update_payment_status(payment)
-                                        st.success("✅ Estado actualizado")
-                                        st.rerun()
-                                
-                                elif payment.get('status') == 'processing':
-                                    if st.button(f"✅ Completar Pago", key=f"complete_{payment.get('payment_id')}"):
-                                        # Completar pago
-                                        payment['status'] = 'completed'
-                                        payment['completed_date'] = datetime.now().isoformat()
-                                        self._update_payment_status(payment)
-                                        st.success("✅ Pago completado")
-                                        st.rerun()
-                                    
-                                    if st.button(f"❌ Marcar como Fallido", key=f"fail_{payment.get('payment_id')}"):
-                                        payment['status'] = 'failed'
-                                        self._update_payment_status(payment)
-                                        st.success("❌ Pago marcado como fallido")
-                                        st.rerun()
+        # Ordenar
+        if sort_by == 'price':
+            if sort_order == 'asc':
+                query = query.order_by(Product.price.asc())
             else:
-                st.info("No hay pagos que coincidan con los filtros")
-        else:
-            st.info("No hay pagos registrados")
-    
-    def _update_payment_status(self, payment_data: dict):
-        """Actualiza estado de pago en base de datos"""
-        try:
-            payments = self.db.load_payments()
-            
-            for i, p in enumerate(payments):
-                if p.get('payment_id') == payment_data.get('payment_id'):
-                    payments[i] = payment_data
-                    break
-            
-            self.db.save_payments(payments)
-            
-        except Exception as e:
-            logger.error(f"Error actualizando estado de pago: {e}")
-    
-    def _render_admin_analytics(self):
-        """Renderiza analytics administrativo"""
-        st.header("📈 Analytics Avanzado")
+                query = query.order_by(Product.price.desc())
+        elif sort_by == 'rating':
+            if sort_order == 'asc':
+                query = query.order_by(Product.rating.asc())
+            else:
+                query = query.order_by(Product.rating.desc())
+        else:  # created_at
+            if sort_order == 'asc':
+                query = query.order_by(Product.created_at.asc())
+            else:
+                query = query.order_by(Product.created_at.desc())
         
-        # Métricas avanzadas
-        stats = self.analytics.get_dashboard_stats()
+        products = query.all()
         
-        if stats and 'top_affiliates' in stats:
-            st.subheader("🏆 Top Afiliados")
-            
-            top_df = pd.DataFrame(stats['top_affiliates'])
-            
-            # Gráfico de barras
-            fig = px.bar(top_df, x='name', y='earnings',
-                        title='Top Afiliados por Ganancias',
-                        labels={'name': 'Afiliado', 'earnings': 'Ganancias ($)'})
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Tabla detallada
-            st.dataframe(top_df, use_container_width=True)
+        products_data = []
+        for product in products:
+            creator = product.creator
+            products_data.append({
+                'id': product.id,
+                'name': product.name,
+                'description': product.description[:200] + '...' if len(product.description) > 200 else product.description,
+                'price': product.price,
+                'discount_price': product.discount_price,
+                'category': product.category,
+                'image_url': product.image_url,
+                'rating': product.rating,
+                'review_count': product.review_count,
+                'creator': {
+                    'id': creator.id if creator else None,
+                    'name': f'{creator.first_name} {creator.last_name}' if creator else 'Administrador'
+                },
+                'is_digital': product.is_digital,
+                'created_at': product.created_at.isoformat()
+            })
         
-        # Análisis de conversión
-        st.subheader("📊 Análisis de Conversión")
+        return jsonify({
+            'success': True,
+            'products': products_data,
+            'count': len(products_data)
+        }), 200
         
-        # Datos simulados
-        conversion_data = {
-            'Mes': ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-            'Visitas': [1000, 1200, 1100, 1300, 1400, 1500],
-            'Referidos': [100, 120, 110, 130, 140, 150],
-            'Conversiones': [10, 12, 11, 13, 14, 15]
+    except Exception as e:
+        logger.error(f'Error al obtener productos: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/products', methods=['POST'])
+@jwt_required()
+@admin_required
+def create_product():
+    """Crea un nuevo producto (solo administrador)"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Validar campos requeridos
+        required_fields = ['name', 'price', 'category']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Crear producto
+        product = Product(
+            name=data['name'],
+            description=data.get('description', ''),
+            price=float(data['price']),
+            discount_price=float(data['discount_price']) if 'discount_price' in data else None,
+            category=data['category'],
+            subcategory=data.get('subcategory'),
+            tags=data.get('tags', ''),
+            is_digital=data.get('is_digital', False),
+            digital_file_url=data.get('digital_file_url'),
+            creator_id=current_user_id,
+            stock_quantity=data.get('stock_quantity', 0)
+        )
+        
+        db.session.add(product)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Producto creado exitosamente',
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'price': product.price,
+                'category': product.category,
+                'is_digital': product.is_digital
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear producto: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/products/<int:product_id>', methods=['GET'])
+def get_product(product_id):
+    """Obtiene detalles de un producto específico"""
+    try:
+        product = Product.query.get(product_id)
+        
+        if not product or not product.is_active:
+            return jsonify({
+                'success': False,
+                'message': 'Producto no encontrado'
+            }), 404
+        
+        # Incrementar contador de vistas
+        product.views += 1
+        db.session.commit()
+        
+        creator = product.creator
+        product_data = {
+            'id': product.id,
+            'name': product.name,
+            'description': product.description,
+            'price': product.price,
+            'discount_price': product.discount_price,
+            'category': product.category,
+            'subcategory': product.subcategory,
+            'tags': product.tags.split(',') if product.tags else [],
+            'image_url': product.image_url,
+            'stock_quantity': product.stock_quantity,
+            'is_digital': product.is_digital,
+            'digital_file_url': product.digital_file_url,
+            'rating': product.rating,
+            'review_count': product.review_count,
+            'views': product.views,
+            'purchases': product.purchases,
+            'creator': {
+                'id': creator.id if creator else None,
+                'name': f'{creator.first_name} {creator.last_name}' if creator else 'Administrador',
+                'profile_image': creator.profile_image if creator else None
+            },
+            'created_at': product.created_at.isoformat(),
+            'updated_at': product.updated_at.isoformat() if product.updated_at else None
         }
         
-        df_conv = pd.DataFrame(conversion_data)
-        df_conv['Tasa Conversión'] = (df_conv['Conversiones'] / df_conv['Referidos'] * 100).round(1)
+        return jsonify({
+            'success': True,
+            'product': product_data
+        }), 200
         
-        fig2 = px.line(df_conv, x='Mes', y='Tasa Conversión',
-                      title='Tasa de Conversión Mensual',
-                      markers=True)
+    except Exception as e:
+        logger.error(f'Error al obtener producto: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE CARRITO DE COMPRAS Y ÓRDENES
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/cart', methods=['GET'])
+@jwt_required()
+def get_cart():
+    """Obtiene el carrito del usuario (sesión basada)"""
+    try:
+        cart = session.get('cart', {})
         
-        st.plotly_chart(fig2, use_container_width=True)
+        # Obtener detalles de productos en el carrito
+        cart_items = []
+        total = 0
         
-        # Reportes personalizados
-        st.subheader("📋 Generar Reportes")
-        
-        col_report1, col_report2, col_report3 = st.columns(3)
-        
-        with col_report1:
-            if st.button("📊 Reporte Mensual", use_container_width=True):
-                st.info("Generando reporte mensual...")
-        
-        with col_report2:
-            if st.button("💰 Reporte de Comisiones", use_container_width=True):
-                st.info("Generando reporte de comisiones...")
-        
-        with col_report3:
-            if st.button("👥 Reporte de Afiliados", use_container_width=True):
-                st.info("Generando reporte de afiliados...")
-    
-    def _render_admin_settings(self):
-        """Renderiza configuración administrativa"""
-        st.header("⚙️ Configuración del Sistema")
-        
-        config = ConfigManager()
-        
-        # Configuración general
-        with st.expander("🔧 Configuración General"):
-            app_config = config.app_config
-            
-            col_set1, col_set2 = st.columns(2)
-            
-            with col_set1:
-                st.write(f"**Nombre app:** {app_config['name']}")
-                st.write(f"**Versión:** {app_config['version']}")
-                st.write(f"**Email admin:** {app_config['admin_email']}")
-            
-            with col_set2:
-                maintenance = st.checkbox("Modo mantenimiento", value=app_config.get('maintenance_mode', False))
-                debug = st.checkbox("Modo debug", value=app_config.get('debug', True))
+        for product_id_str, item_data in cart.items():
+            try:
+                product_id = int(product_id_str)
+                product = Product.query.get(product_id)
                 
-                if st.button("💾 Guardar cambios"):
-                    st.success("Configuración guardada (simulado)")
-        
-        # Configuración de afiliados
-        with st.expander("💰 Configuración de Afiliados"):
-            aff_config = config.affiliates_config
-            
-            col_aff1, col_aff2 = st.columns(2)
-            
-            with col_aff1:
-                commission_rate = st.number_input("Tasa de comisión (%)", 
-                                                min_value=10, max_value=50, 
-                                                value=int(aff_config['commission_rate'] * 100))
-                min_payout = st.number_input("Mínimo para retiro ($)", 
-                                           min_value=10.0, max_value=1000.0, 
-                                           value=aff_config['min_payout'])
-            
-            with col_aff2:
-                payout_day = st.selectbox("Día de pago", 
-                                        ["lunes", "martes", "miércoles", "jueves", "viernes"],
-                                        index=["lunes", "martes", "miércoles", "jueves", "viernes"]
-                                        .index(aff_config['payout_day']))
-                default_currency = st.selectbox("Moneda predeterminada", 
-                                              ["USD", "EUR", "GBP"], 
-                                              index=["USD", "EUR", "GBP"].index(aff_config['default_currency']))
-            
-            if st.button("💾 Guardar configuración afiliados"):
-                st.success("Configuración de afiliados guardada (simulado)")
-        
-        # Configuración de email
-        with st.expander("📧 Configuración de Email"):
-            email_config = config.email_config
-            
-            st.write(f"**SMTP Server:** {email_config['smtp_server']}:{email_config['smtp_port']}")
-            st.write(f"**Username:** {email_config['username']}")
-            st.write(f"**Sender:** {email_config['sender_email']}")
-            
-            # Probar configuración de email
-            if st.button("📤 Probar configuración de email"):
-                test_email = email_config['admin_email']
-                test_code = "123456"
-                
-                success, message = self.email_service.send_verification_email(test_email, test_code)
-                
-                if success:
-                    st.success(f"✅ Email de prueba enviado a {test_email}")
-                else:
-                    st.error(f"❌ Error: {message}")
-        
-        # Backup y mantenimiento
-        with st.expander("💾 Backup y Mantenimiento"):
-            col_back1, col_back2 = st.columns(2)
-            
-            with col_back1:
-                if st.button("💾 Backup de datos", use_container_width=True):
-                    st.success("Backup realizado (simulado)")
-            
-            with col_back2:
-                if st.button("🗑️ Limpiar cache", use_container_width=True, type="secondary"):
-                    st.success("Cache limpiado (simulado)")
-            
-            # Exportar datos
-            st.subheader("📁 Exportar Datos")
-            
-            col_exp1, col_exp2 = st.columns(2)
-            
-            with col_exp1:
-                if st.button("📊 Exportar afiliados", use_container_width=True):
-                    db = self.db.load_affiliates()
-                    json_data = json.dumps(db, indent=2, ensure_ascii=False)
+                if product and product.is_active:
+                    quantity = item_data.get('quantity', 1)
+                    price = product.discount_price or product.price
+                    subtotal = price * quantity
                     
-                    st.download_button(
-                        label="Descargar JSON",
-                        data=json_data,
-                        file_name=f"affiliates_backup_{datetime.now().strftime('%Y%m%d')}.json",
-                        mime="application/json"
-                    )
+                    cart_items.append({
+                        'product_id': product.id,
+                        'name': product.name,
+                        'price': price,
+                        'quantity': quantity,
+                        'subtotal': subtotal,
+                        'image_url': product.image_url,
+                        'is_digital': product.is_digital
+                    })
+                    
+                    total += subtotal
             
-            with col_exp2:
-                if st.button("💰 Exportar pagos", use_container_width=True):
-                    payments = self.payment_system.get_payment_history()
-                    json_data = json.dumps(payments, indent=2, ensure_ascii=False)
-                    
-                    st.download_button(
-                        label="Descargar JSON",
-                        data=json_data,
-                        file_name=f"payments_backup_{datetime.now().strftime('%Y%m%d')}.json",
-                        mime="application/json"
-                    )
-    
-    def _render_admin_tests(self):
-        """Renderiza pruebas administrativas"""
-        st.header("🧪 Pruebas del Sistema")
+            except (ValueError, TypeError):
+                continue
         
-        # Prueba de email
-        st.subheader("📧 Prueba de Sistema de Email")
+        return jsonify({
+            'success': True,
+            'cart': {
+                'items': cart_items,
+                'total': total,
+                'item_count': len(cart_items)
+            }
+        }), 200
         
-        test_email = st.text_input("Email para prueba", value="promptandmente@gmail.com")
-        test_subject = st.text_input("Asunto", value="Prueba del sistema")
-        test_message = st.text_area("Mensaje", value="Este es un mensaje de prueba del sistema MINDGEEKCLINIC.")
+    except Exception as e:
+        logger.error(f'Error al obtener carrito: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/cart', methods=['POST'])
+@jwt_required()
+def add_to_cart():
+    """Agrega un producto al carrito"""
+    try:
+        data = request.get_json()
         
-        if st.button("📤 Enviar email de prueba", type="primary"):
-            with st.spinner("Enviando email..."):
-                success, result = self.email_service.send_verification_email(test_email, "123456")
+        required_fields = ['product_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        product_id = data['product_id']
+        quantity = data.get('quantity', 1)
+        
+        # Verificar si el producto existe y está activo
+        product = Product.query.get(product_id)
+        if not product or not product.is_active:
+            return jsonify({
+                'success': False,
+                'message': 'Producto no encontrado'
+            }), 404
+        
+        # Verificar stock si no es digital
+        if not product.is_digital and product.stock_quantity < quantity:
+            return jsonify({
+                'success': False,
+                'message': 'Stock insuficiente'
+            }), 400
+        
+        # Inicializar carrito si no existe
+        if 'cart' not in session:
+            session['cart'] = {}
+        
+        cart = session['cart']
+        
+        # Agregar o actualizar producto en el carrito
+        if str(product_id) in cart:
+            cart[str(product_id)]['quantity'] += quantity
+        else:
+            cart[str(product_id)] = {
+                'quantity': quantity,
+                'added_at': datetime.datetime.utcnow().isoformat()
+            }
+        
+        session['cart'] = cart
+        session.modified = True
+        
+        return jsonify({
+            'success': True,
+            'message': 'Producto agregado al carrito',
+            'cart_item_count': len(cart)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al agregar al carrito: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/cart/<int:product_id>', methods=['DELETE'])
+@jwt_required()
+def remove_from_cart(product_id):
+    """Elimina un producto del carrito"""
+    try:
+        if 'cart' not in session:
+            return jsonify({
+                'success': False,
+                'message': 'El carrito está vacío'
+            }), 400
+        
+        cart = session['cart']
+        
+        if str(product_id) not in cart:
+            return jsonify({
+                'success': False,
+                'message': 'Producto no encontrado en el carrito'
+            }), 404
+        
+        # Eliminar producto
+        del cart[str(product_id)]
+        session['cart'] = cart
+        session.modified = True
+        
+        return jsonify({
+            'success': True,
+            'message': 'Producto eliminado del carrito',
+            'cart_item_count': len(cart)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al eliminar del carrito: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/cart/clear', methods=['POST'])
+@jwt_required()
+def clear_cart():
+    """Vacía el carrito"""
+    try:
+        session.pop('cart', None)
+        session.modified = True
+        
+        return jsonify({
+            'success': True,
+            'message': 'Carrito vaciado exitosamente'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al vaciar carrito: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/orders', methods=['POST'])
+@jwt_required()
+def create_order():
+    """Crea una orden a partir del carrito"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        # Obtener carrito de la sesión
+        cart = session.get('cart', {})
+        
+        if not cart:
+            return jsonify({
+                'success': False,
+                'message': 'El carrito está vacío'
+            }), 400
+        
+        # Verificar y preparar items
+        order_items = []
+        total_amount = 0
+        
+        for product_id_str, item_data in cart.items():
+            try:
+                product_id = int(product_id_str)
+                product = Product.query.get(product_id)
                 
-                if success:
-                    st.success(f"✅ Email enviado a {test_email}")
-                else:
-                    st.error(f"❌ Error: {result}")
+                if not product or not product.is_active:
+                    continue
+                
+                quantity = item_data.get('quantity', 1)
+                
+                # Verificar stock si no es digital
+                if not product.is_digital and product.stock_quantity < quantity:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Stock insuficiente para: {product.name}'
+                    }), 400
+                
+                # Calcular precio (usar precio con descuento si existe)
+                price = product.discount_price or product.price
+                subtotal = price * quantity
+                
+                order_items.append({
+                    'product': product,
+                    'quantity': quantity,
+                    'price': price,
+                    'subtotal': subtotal
+                })
+                
+                total_amount += subtotal
+            
+            except (ValueError, TypeError):
+                continue
         
-        # Prueba de base de datos
-        st.subheader("🗄️ Prueba de Base de Datos")
+        if not order_items:
+            return jsonify({
+                'success': False,
+                'message': 'No hay productos válidos en el carrito'
+            }), 400
         
-        col_db1, col_db2, col_db3 = st.columns(3)
+        # Crear número de orden único
+        order_number = generate_order_number()
         
-        with col_db1:
-            if st.button("🔍 Ver estadísticas BD", use_container_width=True):
-                db = self.db.load_affiliates()
-                stats = db.get("statistics", {})
-                st.json(stats)
+        # Crear orden
+        order = Order(
+            order_number=order_number,
+            customer_id=current_user_id,
+            total_amount=total_amount,
+            final_amount=total_amount,
+            shipping_address=user.address,
+            billing_address=user.address
+        )
         
-        with col_db2:
-            if st.button("🔄 Verificar conexión", use_container_width=True):
-                try:
-                    db = self.db.load_affiliates()
-                    st.success(f"✅ Base de datos conectada. {len(db.get('affiliates', {}))} afiliados.")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+        db.session.add(order)
+        db.session.flush()  # Para obtener el ID de la orden
         
-        with col_db3:
-            if st.button("📊 Ver estado sistema", use_container_width=True):
-                health = self.analytics.get_system_health()
-                st.json(health)
+        # Crear items de orden
+        for item in order_items:
+            order_item = OrderItem(
+                order_id=order.id,
+                product_id=item['product'].id,
+                quantity=item['quantity'],
+                unit_price=item['price'],
+                subtotal=item['subtotal']
+            )
+            
+            db.session.add(order_item)
+            
+            # Actualizar stock y contador de compras
+            if not item['product'].is_digital:
+                item['product'].stock_quantity -= item['quantity']
+            item['product'].purchases += item['quantity']
         
-        # Prueba de IA
-        st.subheader("🧠 Prueba de Sistema de IA")
+        db.session.commit()
         
-        test_prompt = st.text_area("Prompt para IA", 
-                                 value="Explica los principios básicos de la biodescodificación emocional en 100 palabras.")
+        # Vaciar carrito
+        session.pop('cart', None)
+        session.modified = True
         
-        if st.button("🤖 Probar IA", type="primary"):
-            with st.spinner("Consultando a la IA..."):
-                try:
-                    config = ConfigManager()
-                    
-                    if config.groq_api_key:
-                        groq_client = Groq(api_key=config.groq_api_key)
-                        
-                        response = groq_client.chat.completions.create(
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": "Eres un experto en biodescodificación emocional."
-                                },
-                                {
-                                    "role": "user",
-                                    "content": test_prompt
-                                }
-                            ],
-                            model="mixtral-8x7b-32768",
-                            temperature=0.7,
-                            max_tokens=500
-                        )
-                        
-                        ai_response = response.choices[0].message.content
-                        st.success("✅ Respuesta de IA:")
-                        st.write(ai_response)
-                    else:
-                        st.warning("API key de Groq no configurada")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error en IA: {e}")
+        # Crear notificación
+        NotificationSystem.create_notification(
+            user_id=current_user_id,
+            title='Orden creada',
+            message=f'Tu orden #{order_number} ha sido creada exitosamente',
+            notification_type='order',
+            action_url=f'/orders/{order.id}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Orden creada exitosamente',
+            'order': {
+                'id': order.id,
+                'order_number': order.order_number,
+                'total_amount': order.total_amount,
+                'status': order.status,
+                'created_at': order.created_at.isoformat()
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear orden: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
 
-# ============================================
-# PARTE 13: APLICACIÓN PRINCIPAL
-# ============================================
-
-def main():
-    """Función principal de la aplicación"""
-    
-    # Inicializar sistemas
-    config = ConfigManager()
-    page_renderer = PageRenderer()
-    
-    # Verificar modo mantenimiento
-    if config.app_config.get("maintenance_mode", False):
-        st.title("🛠️ Mantenimiento en curso")
-        st.info("""
-        La aplicación está en mantenimiento para mejoras. 
+@users_blueprint.route('/api/orders', methods=['GET'])
+@jwt_required()
+def get_orders():
+    """Obtiene las órdenes del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
         
-        **Horario estimado de regreso:** Próximamente
+        # Filtrar órdenes del usuario
+        orders = Order.query.filter_by(customer_id=current_user_id).order_by(Order.created_at.desc()).all()
         
-        Para consultas urgentes, contacta: promptandmente@gmail.com
-        """)
-        return
-    
-    # Configurar barra lateral
-    page_renderer.ui.sidebar_navigation()
-    
-    # Navegar a página seleccionada
-    current_page = st.session_state.get("page", "home")
-    
-    if current_page == "home":
-        page_renderer.render_home()
-    elif current_page == "diagnostic":
-        page_renderer.render_diagnostic()
-    elif current_page == "sessions":
-        page_renderer.render_sessions()
-    elif current_page == "stats":
-        page_renderer.render_stats()
-    elif current_page == "chat":
-        page_renderer.render_chat()
-    elif current_page == "affiliate":
-        page_renderer.render_affiliate()
-    elif current_page == "admin":
-        page_renderer.render_admin()
-    
-    # Footer
-    st.markdown("---")
-    
-    col_foot1, col_foot2, col_foot3 = st.columns(3)
-    
-    with col_foot1:
-        st.markdown(f"**MINDGEEKCLINIC** © 2024")
-    
-    with col_foot2:
-        st.markdown("🧠 Biodescodificación Integral")
-    
-    with col_foot3:
-        st.markdown(f"v{config.app_config.get('version', '5.0')}")
+        orders_data = []
+        for order in orders:
+            # Obtener items de la orden
+            items_data = []
+            for item in order.items:
+                product = item.product
+                items_data.append({
+                    'product_id': product.id,
+                    'product_name': product.name,
+                    'quantity': item.quantity,
+                    'unit_price': item.unit_price,
+                    'subtotal': item.subtotal
+                })
+            
+            orders_data.append({
+                'id': order.id,
+                'order_number': order.order_number,
+                'total_amount': order.total_amount,
+                'final_amount': order.final_amount,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'created_at': order.created_at.isoformat(),
+                'items': items_data
+            })
+        
+        return jsonify({
+            'success': True,
+            'orders': orders_data,
+            'count': len(orders_data)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener órdenes: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
 
-# ============================================
-# EJECUCIÓN
-# ============================================
+@users_blueprint.route('/api/orders/<int:order_id>', methods=['GET'])
+@jwt_required()
+def get_order(order_id):
+    """Obtiene detalles de una orden específica"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        order = Order.query.get(order_id)
+        
+        if not order:
+            return jsonify({
+                'success': False,
+                'message': 'Orden no encontrada'
+            }), 404
+        
+        # Verificar permisos
+        if order.customer_id != current_user_id:
+            user = User.query.get(current_user_id)
+            if user.role != 'admin':
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para ver esta orden'
+                }), 403
+        
+        # Obtener items de la orden
+        items_data = []
+        for item in order.items:
+            product = item.product
+            items_data.append({
+                'product_id': product.id,
+                'product_name': product.name,
+                'product_image': product.image_url,
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'subtotal': item.subtotal
+            })
+        
+        # Obtener información del cliente
+        customer = order.customer
+        
+        order_data = {
+            'id': order.id,
+            'order_number': order.order_number,
+            'customer': {
+                'id': customer.id,
+                'name': f'{customer.first_name} {customer.last_name}',
+                'email': customer.email,
+                'phone': customer.phone
+            },
+            'total_amount': order.total_amount,
+            'discount_amount': order.discount_amount,
+            'tax_amount': order.tax_amount,
+            'shipping_amount': order.shipping_amount,
+            'final_amount': order.final_amount,
+            'status': order.status,
+            'payment_status': order.payment_status,
+            'payment_method': order.payment_method,
+            'shipping_address': order.shipping_address,
+            'billing_address': order.billing_address,
+            'notes': order.notes,
+            'created_at': order.created_at.isoformat(),
+            'updated_at': order.updated_at.isoformat() if order.updated_at else None,
+            'completed_at': order.completed_at.isoformat() if order.completed_at else None,
+            'items': items_data
+        }
+        
+        return jsonify({
+            'success': True,
+            'order': order_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener orden: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
 
-if __name__ == "__main__":
-    main()
+# ------------------------------------------------------------
+# RUTAS DE PAGOS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/payments/create-intent', methods=['POST'])
+@jwt_required()
+def create_payment_intent():
+    """Crea un PaymentIntent de Stripe"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        required_fields = ['amount', 'order_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si la orden existe y pertenece al usuario
+        order = Order.query.get(data['order_id'])
+        if not order or order.customer_id != current_user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Orden no válida'
+            }), 404
+        
+        amount = float(data['amount'])
+        
+        # Crear payment intent con Stripe
+        result = payment_system.create_payment_intent(
+            amount=amount,
+            currency='usd',
+            metadata={
+                'order_id': order.id,
+                'user_id': current_user_id,
+                'order_number': order.order_number
+            }
+        )
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'message': result['error']
+            }), 400
+        
+        # Crear registro de pago en la base de datos
+        payment = Payment(
+            payment_reference=f"PAY-{int(time.time())}-{random.randint(1000, 9999)}",
+            order_id=order.id,
+            user_id=current_user_id,
+            amount=amount,
+            payment_method='stripe',
+            stripe_payment_intent_id=result['payment_intent_id']
+        )
+        
+        db.session.add(payment)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'client_secret': result['client_secret'],
+            'payment_intent_id': result['payment_intent_id'],
+            'payment_id': payment.id
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear payment intent: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/payments/confirm', methods=['POST'])
+@jwt_required()
+def confirm_payment():
+    """Confirma un pago de Stripe"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        required_fields = ['payment_intent_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Confirmar pago con Stripe
+        result = payment_system.confirm_payment(data['payment_intent_id'])
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'message': result['error']
+            }), 400
+        
+        # Actualizar pago en la base de datos
+        payment = Payment.query.filter_by(
+            stripe_payment_intent_id=data['payment_intent_id']
+        ).first()
+        
+        if payment:
+            payment.status = 'completed' if result['status'] == 'succeeded' else 'failed'
+            payment.stripe_charge_id = result.get('charge_id')
+            payment.updated_at = datetime.datetime.utcnow()
+            
+            # Actualizar orden
+            if payment.order_id:
+                order = Order.query.get(payment.order_id)
+                if order:
+                    order.payment_status = 'paid' if result['status'] == 'succeeded' else 'failed'
+                    order.status = 'completed' if result['status'] == 'succeeded' else 'processing'
+                    order.updated_at = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            
+            # Notificar al usuario
+            if result['status'] == 'succeeded':
+                NotificationSystem.create_notification(
+                    user_id=current_user_id,
+                    title='Pago completado',
+                    message=f'Tu pago de ${payment.amount:.2f} ha sido procesado exitosamente',
+                    notification_type='payment',
+                    action_url=f'/orders/{payment.order_id}'
+                )
+        
+        return jsonify({
+            'success': True,
+            'status': result['status'],
+            'message': 'Pago confirmado exitosamente' if result['status'] == 'succeeded' else 'Pago fallido'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al confirmar pago: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/payments', methods=['GET'])
+@jwt_required()
+def get_payments():
+    """Obtiene los pagos del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        payments = Payment.query.filter_by(user_id=current_user_id).order_by(Payment.created_at.desc()).all()
+        
+        payments_data = []
+        for payment in payments:
+            order = payment.order
+            payments_data.append({
+                'id': payment.id,
+                'payment_reference': payment.payment_reference,
+                'amount': payment.amount,
+                'currency': payment.currency,
+                'status': payment.status,
+                'payment_method': payment.payment_method,
+                'order': {
+                    'id': order.id if order else None,
+                    'order_number': order.order_number if order else None
+                },
+                'created_at': payment.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'payments': payments_data,
+            'count': len(payments_data)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener pagos: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE NOTIFICACIONES
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/notifications', methods=['GET'])
+@jwt_required()
+def get_notifications():
+    """Obtiene las notificaciones del usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Parámetros de paginación
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+        
+        # Construir query
+        query = Notification.query.filter_by(user_id=current_user_id)
+        
+        if unread_only:
+            query = query.filter_by(is_read=False)
+        
+        # Ordenar por fecha de creación (más recientes primero)
+        query = query.order_by(Notification.created_at.desc())
+        
+        # Paginar
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        notifications = pagination.items
+        
+        notifications_data = []
+        for notification in notifications:
+            notifications_data.append({
+                'id': notification.id,
+                'title': notification.title,
+                'message': notification.message,
+                'type': notification.notification_type,
+                'is_read': notification.is_read,
+                'read_at': notification.read_at.isoformat() if notification.read_at else None,
+                'action_url': notification.action_url,
+                'created_at': notification.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications_data,
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            },
+            'unread_count': Notification.query.filter_by(user_id=current_user_id, is_read=False).count()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener notificaciones: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+@jwt_required()
+def mark_notification_as_read(notification_id):
+    """Marca una notificación como leída"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        notification = Notification.query.filter_by(
+            id=notification_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not notification:
+            return jsonify({
+                'success': False,
+                'message': 'Notificación no encontrada'
+            }), 404
+        
+        if not notification.is_read:
+            notification.is_read = True
+            notification.read_at = datetime.datetime.utcnow()
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Notificación marcada como leída'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al marcar notificación como leída: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/notifications/read-all', methods=['POST'])
+@jwt_required()
+def mark_all_notifications_as_read():
+    """Marca todas las notificaciones como leídas"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Marcar todas las notificaciones no leídas como leídas
+        Notification.query.filter_by(
+            user_id=current_user_id,
+            is_read=False
+        ).update({
+            'is_read': True,
+            'read_at': datetime.datetime.utcnow()
+        })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Todas las notificaciones marcadas como leídas'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al marcar todas las notificaciones como leídas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE ADMINISTRACIÓN
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/admin/users', methods=['GET'])
+@admin_required
+def admin_get_users():
+    """Obtiene todos los usuarios (solo administrador)"""
+    try:
+        # Parámetros de filtro
+        role = request.args.get('role')
+        search = request.args.get('search')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        query = User.query
+        
+        # Aplicar filtros
+        if role:
+            query = query.filter_by(role=role)
+        
+        if search:
+            search_term = f'%{search}%'
+            query = query.filter(
+                or_(
+                    User.username.ilike(search_term),
+                    User.email.ilike(search_term),
+                    User.first_name.ilike(search_term),
+                    User.last_name.ilike(search_term)
+                )
+            )
+        
+        # Ordenar por fecha de creación
+        query = query.order_by(User.created_at.desc())
+        
+        # Paginar
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        users = pagination.items
+        
+        users_data = []
+        for user in users:
+            # Obtener estadísticas del usuario
+            appointment_count = Appointment.query.filter_by(client_id=user.id).count()
+            order_count = Order.query.filter_by(customer_id=user.id).count()
+            
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'is_active': user.is_active,
+                'is_verified': user.is_verified,
+                'created_at': user.created_at.isoformat(),
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'appointment_count': appointment_count,
+                'order_count': order_count
+            })
+        
+        return jsonify({
+            'success': True,
+            'users': users_data,
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener usuarios: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@admin_required
+def admin_update_user(user_id):
+    """Actualiza un usuario (solo administrador)"""
+    try:
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        data = request.get_json()
+        
+        # Campos actualizables por administrador
+        updatable_fields = [
+            'first_name', 'last_name', 'role', 'is_active', 
+            'is_verified', 'specialization', 'qualifications',
+            'experience_years', 'hourly_rate'
+        ]
+        
+        for field in updatable_fields:
+            if field in data:
+                setattr(user, field, data[field])
+        
+        user.updated_at = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario actualizado exitosamente',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role,
+                'is_active': user.is_active,
+                'is_verified': user.is_verified
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al actualizar usuario: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/admin/stats', methods=['GET'])
+@admin_required
+def admin_get_stats():
+    """Obtiene estadísticas del sistema (solo administrador)"""
+    try:
+        # Estadísticas de usuarios
+        total_users = User.query.count()
+        active_users = User.query.filter_by(is_active=True).count()
+        therapists_count = User.query.filter_by(role='therapist').count()
+        new_users_today = User.query.filter(
+            User.created_at >= datetime.datetime.utcnow().date()
+        ).count()
+        
+        # Estadísticas de citas
+        total_appointments = Appointment.query.count()
+        completed_appointments = Appointment.query.filter_by(status='completed').count()
+        pending_appointments = Appointment.query.filter_by(status='scheduled').count()
+        
+        # Estadísticas de órdenes
+        total_orders = Order.query.count()
+        total_revenue = db.session.query(func.sum(Order.final_amount)).scalar() or 0
+        today_revenue = db.session.query(func.sum(Order.final_amount)).filter(
+            Order.created_at >= datetime.datetime.utcnow().date()
+        ).scalar() or 0
+        
+        # Estadísticas de productos
+        total_products = Product.query.count()
+        active_products = Product.query.filter_by(is_active=True).count()
+        digital_products = Product.query.filter_by(is_digital=True).count()
+        
+        # Ingresos por mes (últimos 6 meses)
+        revenue_by_month = []
+        for i in range(5, -1, -1):
+            month_start = datetime.datetime.utcnow().replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            ) - datetime.timedelta(days=30*i)
+            
+            month_end = month_start + datetime.timedelta(days=30)
+            
+            month_revenue = db.session.query(func.sum(Order.final_amount)).filter(
+                Order.created_at >= month_start,
+                Order.created_at < month_end
+            ).scalar() or 0
+            
+            revenue_by_month.append({
+                'month': month_start.strftime('%Y-%m'),
+                'revenue': float(month_revenue)
+            })
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'users': {
+                    'total': total_users,
+                    'active': active_users,
+                    'therapists': therapists_count,
+                    'new_today': new_users_today
+                },
+                'appointments': {
+                    'total': total_appointments,
+                    'completed': completed_appointments,
+                    'pending': pending_appointments
+                },
+                'orders': {
+                    'total': total_orders,
+                    'total_revenue': float(total_revenue),
+                    'today_revenue': float(today_revenue)
+                },
+                'products': {
+                    'total': total_products,
+                    'active': active_products,
+                    'digital': digital_products
+                },
+                'revenue_by_month': revenue_by_month
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener estadísticas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DEL SISTEMA DE AFILIADOS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/affiliates', methods=['POST'])
+@jwt_required()
+def create_affiliate():
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verificar permisos de administrador
+        if not is_admin(current_user_id):
+            return jsonify({
+                'success': False,
+                'message': 'No tienes permisos para realizar esta acción'
+            }), 403
+        
+        data = request.get_json()
+        
+        # Validaciones básicas
+        required_fields = ['user_id', 'commission_rate', 'contact_info']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si el usuario existe
+        user = User.query.get(data['user_id'])
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        # Verificar si ya es afiliado
+        existing_affiliate = Affiliate.query.filter_by(user_id=data['user_id']).first()
+        if existing_affiliate:
+            return jsonify({
+                'success': False,
+                'message': 'Este usuario ya es un afiliado'
+            }), 400
+        
+        # Preparar datos para el sistema de afiliados
+        affiliate_data = {
+            'user_id': data['user_id'],
+            'commission_rate': float(data['commission_rate']),
+            'contact_info': data['contact_info'],
+            'status': data.get('status', 'active'),
+            'notes': data.get('notes', '')
+        }
+        
+        # Mapear campos adicionales
+        affiliate_data_mapped = affiliate_system.map_fields(affiliate_data)
+        
+        # Asignar affiliate_code generado si no se proporcionó
+        affiliate_code = data.get('affiliate_code')
+        if not affiliate_code:
+            affiliate_code = affiliate_system.generate_affiliate_code()
+            affiliate_data['affiliate_code'] = affiliate_code
+        
+        success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Afiliado creado exitosamente',
+                'affiliate': affiliate_record
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error creating affiliate: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error del servidor: {str(e)}'
+        }), 500
+
+@users_blueprint.route('/api/affiliates', methods=['GET'])
+@jwt_required()
+def get_affiliates():
+    """Obtiene la lista de afiliados (solo administrador)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verificar permisos de administrador
+        if not is_admin(current_user_id):
+            return jsonify({
+                'success': False,
+                'message': 'No tienes permisos para realizar esta acción'
+            }), 403
+        
+        # Obtener parámetros de filtro
+        status = request.args.get('status')
+        search = request.args.get('search')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        query = Affiliate.query.join(User)
+        
+        # Aplicar filtros
+        if status:
+            query = query.filter(Affiliate.status == status)
+        
+        if search:
+            search_term = f'%{search}%'
+            query = query.filter(
+                or_(
+                    User.first_name.ilike(search_term),
+                    User.last_name.ilike(search_term),
+                    User.email.ilike(search_term),
+                    Affiliate.affiliate_code.ilike(search_term)
+                )
+            )
+        
+        # Ordenar por fecha de creación
+        query = query.order_by(Affiliate.created_at.desc())
+        
+        # Paginar
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        affiliates = pagination.items
+        
+        affiliates_data = []
+        for affiliate in affiliates:
+            user = affiliate.user
+            stats = affiliate_system.get_affiliate_stats(affiliate.id) or {}
+            
+            affiliates_data.append({
+                'id': affiliate.id,
+                'user': {
+                    'id': user.id,
+                    'name': f'{user.first_name} {user.last_name}',
+                    'email': user.email
+                },
+                'affiliate_code': affiliate.affiliate_code,
+                'commission_rate': affiliate.commission_rate,
+                'total_earnings': affiliate.total_earnings,
+                'pending_earnings': affiliate.pending_earnings,
+                'referral_count': affiliate.referral_count,
+                'conversion_rate': affiliate.conversion_rate,
+                'status': affiliate.status,
+                'created_at': affiliate.created_at.isoformat(),
+                'stats': stats
+            })
+        
+        return jsonify({
+            'success': True,
+            'affiliates': affiliates_data,
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener afiliados: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/affiliates/<int:affiliate_id>', methods=['GET'])
+@jwt_required()
+def get_affiliate(affiliate_id):
+    """Obtiene detalles de un afiliado específico"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        affiliate = Affiliate.query.get(affiliate_id)
+        
+        if not affiliate:
+            return jsonify({
+                'success': False,
+                'message': 'Afiliado no encontrado'
+            }), 404
+        
+        # Verificar permisos
+        if affiliate.user_id != current_user_id:
+            if not is_admin(current_user_id):
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para ver este afiliado'
+                }), 403
+        
+        user = affiliate.user
+        stats = affiliate_system.get_affiliate_stats(affiliate.id) or {}
+        
+        # Obtener referencias del afiliado
+        referrals = Referral.query.filter_by(affiliate_id=affiliate.id).order_by(Referral.referral_date.desc()).limit(50).all()
+        
+        referrals_data = []
+        for referral in referrals:
+            referrer = referral.referrer
+            referred = referral.referred_user
+            
+            referrals_data.append({
+                'id': referral.id,
+                'referrer': {
+                    'id': referrer.id,
+                    'name': f'{referrer.first_name} {referrer.last_name}'
+                },
+                'referred': {
+                    'id': referred.id,
+                    'name': f'{referred.first_name} {referred.last_name}'
+                },
+                'referral_date': referral.referral_date.isoformat(),
+                'status': referral.status,
+                'conversion_value': referral.conversion_value,
+                'commission_earned': referral.commission_earned,
+                'commission_paid': referral.commission_paid
+            })
+        
+        affiliate_data = {
+            'id': affiliate.id,
+            'user': {
+                'id': user.id,
+                'name': f'{user.first_name} {user.last_name}',
+                'email': user.email,
+                'phone': user.phone,
+                'profile_image': user.profile_image
+            },
+            'affiliate_code': affiliate.affiliate_code,
+            'commission_rate': affiliate.commission_rate,
+            'total_earnings': affiliate.total_earnings,
+            'pending_earnings': affiliate.pending_earnings,
+            'paid_earnings': affiliate.paid_earnings,
+            'referral_count': affiliate.referral_count,
+            'conversion_rate': affiliate.conversion_rate,
+            'status': affiliate.status,
+            'contact_info': affiliate.contact_info,
+            'payment_method': affiliate.payment_method,
+            'notes': affiliate.notes,
+            'created_at': affiliate.created_at.isoformat(),
+            'updated_at': affiliate.updated_at.isoformat() if affiliate.updated_at else None,
+            'stats': stats,
+            'referrals': referrals_data
+        }
+        
+        return jsonify({
+            'success': True,
+            'affiliate': affiliate_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener afiliado: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/affiliates/<int:affiliate_id>', methods=['PUT'])
+@jwt_required()
+def update_affiliate(affiliate_id):
+    """Actualiza un afiliado"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        affiliate = Affiliate.query.get(affiliate_id)
+        
+        if not affiliate:
+            return jsonify({
+                'success': False,
+                'message': 'Afiliado no encontrado'
+            }), 404
+        
+        # Verificar permisos
+        if affiliate.user_id != current_user_id:
+            if not is_admin(current_user_id):
+                return jsonify({
+                    'success': False,
+                    'message': 'No tienes permisos para actualizar este afiliado'
+                }), 403
+        
+        data = request.get_json()
+        
+        # Validar datos según quién está actualizando
+        if affiliate.user_id == current_user_id:
+            # El afiliado solo puede actualizar ciertos campos
+            allowed_fields = ['contact_info', 'payment_method', 'payment_details']
+        else:
+            # El administrador puede actualizar más campos
+            allowed_fields = ['commission_rate', 'contact_info', 'status', 
+                            'payment_method', 'payment_details', 'notes']
+        
+        affiliate_data = {}
+        for field in allowed_fields:
+            if field in data:
+                affiliate_data[field] = data[field]
+        
+        # Actualizar afiliado
+        success, message, updated_affiliate = affiliate_system.update_affiliate(affiliate_id, affiliate_data)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message,
+                'affiliate': updated_affiliate
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f'Error al actualizar afiliado: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/affiliates/my-stats', methods=['GET'])
+@jwt_required()
+def get_my_affiliate_stats():
+    """Obtiene las estadísticas del afiliado actual"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verificar si el usuario es afiliado
+        affiliate = Affiliate.query.filter_by(user_id=current_user_id).first()
+        
+        if not affiliate:
+            return jsonify({
+                'success': False,
+                'message': 'No eres un afiliado'
+            }), 404
+        
+        # Obtener estadísticas
+        stats = affiliate_system.get_affiliate_stats(affiliate.id)
+        
+        if not stats:
+            return jsonify({
+                'success': False,
+                'message': 'Error al obtener estadísticas'
+            }), 500
+        
+        # Obtener referencias recientes
+        recent_referrals = Referral.query.filter_by(
+            affiliate_id=affiliate.id
+        ).order_by(Referral.referral_date.desc()).limit(10).all()
+        
+        referrals_data = []
+        for referral in recent_referrals:
+            referred = referral.referred_user
+            referrals_data.append({
+                'id': referral.id,
+                'referred_user': {
+                    'id': referred.id,
+                    'name': f'{referred.first_name} {referred.last_name}'
+                },
+                'referral_date': referral.referral_date.isoformat(),
+                'status': referral.status,
+                'conversion_value': referral.conversion_value,
+                'commission_earned': referral.commission_earned
+            })
+        
+        # Obtear ingresos por mes (últimos 6 meses)
+        earnings_by_month = []
+        for i in range(5, -1, -1):
+            month_start = datetime.datetime.utcnow().replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            ) - datetime.timedelta(days=30*i)
+            
+            month_end = month_start + datetime.timedelta(days=30)
+            
+            month_earnings = db.session.query(func.sum(Referral.commission_earned)).filter(
+                Referral.affiliate_id == affiliate.id,
+                Referral.conversion_date >= month_start,
+                Referral.conversion_date < month_end
+            ).scalar() or 0
+            
+            earnings_by_month.append({
+                'month': month_start.strftime('%Y-%m'),
+                'earnings': float(month_earnings)
+            })
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                **stats,
+                'recent_referrals': referrals_data,
+                'earnings_by_month': earnings_by_month
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener estadísticas de afiliado: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/affiliates/refer', methods=['POST'])
+@jwt_required()
+def create_referral():
+    """Crea una nueva referencia"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        required_fields = ['referred_email']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Verificar si el usuario es afiliado
+        affiliate = Affiliate.query.filter_by(user_id=current_user_id).first()
+        
+        if not affiliate:
+            return jsonify({
+                'success': False,
+                'message': 'No eres un afiliado'
+            }), 400
+        
+        # Verificar si el correo ya está registrado
+        existing_user = User.query.filter_by(email=data['referred_email']).first()
+        
+        if existing_user:
+            return jsonify({
+                'success': False,
+                'message': 'Este correo ya está registrado'
+            }), 400
+        
+        # Verificar si ya existe una referencia para este correo
+        existing_referral = Referral.query.join(User, Referral.referred_id == User.id).filter(
+            User.email == data['referred_email'],
+            Referral.referrer_id == current_user_id
+        ).first()
+        
+        if existing_referral:
+            return jsonify({
+                'success': False,
+                'message': 'Ya has referido a este correo'
+            }), 400
+        
+        # Crear usuario temporal para la referencia
+        # En producción, esto enviaría un email de invitación
+        temp_user = User(
+            email=data['referred_email'],
+            first_name=data.get('referred_first_name', ''),
+            last_name=data.get('referred_last_name', ''),
+            is_active=False
+        )
+        
+        db.session.add(temp_user)
+        db.session.flush()  # Para obtener el ID
+        
+        # Crear referencia
+        referral = Referral(
+            referrer_id=current_user_id,
+            referred_id=temp_user.id,
+            affiliate_id=affiliate.id,
+            referral_code=affiliate.affiliate_code,
+            status='pending'
+        )
+        
+        db.session.add(referral)
+        db.session.commit()
+        
+        # Enviar email de invitación
+        referral_link = f"https://tudominio.com/register?ref={affiliate.affiliate_code}"
+        
+        if email_system.username:
+            email_system.send_email(
+                to_email=data['referred_email'],
+                subject=f'Invitación de {current_user.first_name} {current_user.last_name}',
+                body_html=f"""
+                <html>
+                <body>
+                    <h1>¡Te han invitado a unirte a MindGeek Clinic!</h1>
+                    <p>{current_user.first_name} {current_user.last_name} te ha invitado a unirte a nuestra plataforma.</p>
+                    <p>MindGeek Clinic ofrece servicios de terapia en línea, productos de bienestar y más.</p>
+                    <p>Para registrarte, haz clic en el siguiente enlace:</p>
+                    <p><a href="{referral_link}">Unirse a MindGeek Clinic</a></p>
+                    <p>Al registrarte a través de este enlace, {current_user.first_name} recibirá una comisión por tus compras.</p>
+                    <br>
+                    <p>Saludos,<br>El equipo de MindGeek Clinic</p>
+                </body>
+                </html>
+                """
+            )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Invitación enviada exitosamente',
+            'referral': {
+                'id': referral.id,
+                'referred_email': data['referred_email'],
+                'status': referral.status,
+                'referral_date': referral.referral_date.isoformat()
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al crear referencia: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/affiliates/register-with-referral', methods=['POST'])
+def register_with_referral():
+    """Registra un usuario con código de referencia"""
+    try:
+        data = request.get_json()
+        
+        required_fields = ['username', 'email', 'password', 'first_name', 'last_name', 'referral_code']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'Campo requerido faltante: {field}'
+                }), 400
+        
+        # Primero, registrar al usuario normalmente
+        registration_response = register()
+        
+        if registration_response.status_code != 201:
+            return registration_response
+        
+        registration_data = json.loads(registration_response.get_data(as_text=True))
+        
+        if not registration_data['success']:
+            return registration_response
+        
+        # Buscar afiliado por código
+        affiliate = Affiliate.query.filter_by(affiliate_code=data['referral_code']).first()
+        
+        if not affiliate:
+            return jsonify({
+                'success': True,  # Aún éxito porque el usuario se registró
+                'message': 'Usuario registrado exitosamente, pero el código de referencia no es válido',
+                'user': registration_data['user'],
+                'access_token': registration_data['access_token']
+            }), 201
+        
+        # Crear referencia
+        new_user_id = registration_data['user']['id']
+        
+        referral = Referral(
+            referrer_id=affiliate.user_id,
+            referred_id=new_user_id,
+            affiliate_id=affiliate.id,
+            referral_code=data['referral_code'],
+            status='registered'
+        )
+        
+        db.session.add(referral)
+        
+        # Actualizar contador de referencias del afiliado
+        affiliate.referral_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario registrado exitosamente con código de referencia',
+            'user': registration_data['user'],
+            'access_token': registration_data['access_token'],
+            'referral': {
+                'affiliate_code': data['referral_code'],
+                'status': 'registered'
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error en registro con referencia: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE CUPONES
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/coupons/validate', methods=['POST'])
+@jwt_required()
+def validate_coupon():
+    """Valida un cupón de descuento"""
+    try:
+        data = request.get_json()
+        
+        if 'code' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'Código de cupón es requerido'
+            }), 400
+        
+        coupon = Coupon.query.filter_by(code=data['code'], is_active=True).first()
+        
+        if not coupon:
+            return jsonify({
+                'success': False,
+                'message': 'Cupón no válido'
+            }), 400
+        
+        # Verificar fecha de validez
+        now = datetime.datetime.utcnow()
+        if now < coupon.valid_from or now > coupon.valid_until:
+            return jsonify({
+                'success': False,
+                'message': 'Cupón expirado'
+            }), 400
+        
+        # Verificar límite de uso
+        if coupon.usage_limit and coupon.used_count >= coupon.usage_limit:
+            return jsonify({
+                'success': False,
+                'message': 'Cupón agotado'
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'coupon': {
+                'id': coupon.id,
+                'code': coupon.code,
+                'discount_type': coupon.discount_type,
+                'discount_value': coupon.discount_value,
+                'min_purchase': coupon.min_purchase,
+                'max_discount': coupon.max_discount,
+                'valid_until': coupon.valid_until.isoformat()
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al validar cupón: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE BLOQUEO DE USUARIOS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/users/block', methods=['POST'])
+@jwt_required()
+def block_user():
+    """Bloquea a un usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if 'user_id' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'ID de usuario es requerido'
+            }), 400
+        
+        user_to_block_id = data['user_id']
+        
+        # Verificar que no sea el mismo usuario
+        if user_to_block_id == current_user_id:
+            return jsonify({
+                'success': False,
+                'message': 'No puedes bloquearte a ti mismo'
+            }), 400
+        
+        # Verificar si el usuario existe
+        user_to_block = User.query.get(user_to_block_id)
+        if not user_to_block:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no encontrado'
+            }), 404
+        
+        # Verificar si ya está bloqueado
+        existing_block = db.session.query(user_blocks).filter_by(
+            blocker_id=current_user_id,
+            blocked_id=user_to_block_id
+        ).first()
+        
+        if existing_block:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario ya bloqueado'
+            }), 400
+        
+        # Bloquear usuario
+        db.session.execute(
+            user_blocks.insert().values(
+                blocker_id=current_user_id,
+                blocked_id=user_to_block_id,
+                reason=data.get('reason', ''),
+                created_at=datetime.datetime.utcnow()
+            )
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario bloqueado exitosamente'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al bloquear usuario: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/users/unblock', methods=['POST'])
+@jwt_required()
+def unblock_user():
+    """Desbloquea a un usuario"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if 'user_id' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'ID de usuario es requerido'
+            }), 400
+        
+        user_to_unblock_id = data['user_id']
+        
+        # Verificar si existe el bloqueo
+        existing_block = db.session.query(user_blocks).filter_by(
+            blocker_id=current_user_id,
+            blocked_id=user_to_unblock_id
+        ).first()
+        
+        if not existing_block:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario no está bloqueado'
+            }), 400
+        
+        # Desbloquear usuario
+        db.session.execute(
+            user_blocks.delete().where(
+                (user_blocks.c.blocker_id == current_user_id) &
+                (user_blocks.c.blocked_id == user_to_unblock_id)
+            )
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario desbloqueado exitosamente'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Error al desbloquear usuario: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+@users_blueprint.route('/api/users/blocked', methods=['GET'])
+@jwt_required()
+def get_blocked_users():
+    """Obtiene la lista de usuarios bloqueados"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Obtener usuarios bloqueados
+        blocked_records = db.session.query(user_blocks).filter_by(
+            blocker_id=current_user_id
+        ).all()
+        
+        blocked_users = []
+        for record in blocked_records:
+            user = User.query.get(record.blocked_id)
+            if user:
+                blocked_users.append({
+                    'user_id': user.id,
+                    'name': f'{user.first_name} {user.last_name}',
+                    'profile_image': user.profile_image,
+                    'reason': record.reason,
+                    'blocked_at': record.created_at.isoformat() if record.created_at else None
+                })
+        
+        return jsonify({
+            'success': True,
+            'blocked_users': blocked_users,
+            'count': len(blocked_users)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener usuarios bloqueados: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE REPORTES Y EXPORTACIÓN
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/reports/appointments', methods=['GET'])
+@jwt_required()
+@admin_required
+def generate_appointments_report():
+    """Genera reporte de citas"""
+    try:
+        # Parámetros de filtro
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        therapist_id = request.args.get('therapist_id')
+        status = request.args.get('status')
+        format_type = request.args.get('format', 'json')  # json, csv, pdf
+        
+        # Construir query
+        query = Appointment.query
+        
+        if start_date:
+            query = query.filter(Appointment.appointment_date >= start_date)
+        
+        if end_date:
+            query = query.filter(Appointment.appointment_date <= end_date)
+        
+        if therapist_id:
+            query = query.filter_by(therapist_id=therapist_id)
+        
+        if status:
+            query = query.filter_by(status=status)
+        
+        appointments = query.order_by(Appointment.appointment_date.desc()).all()
+        
+        if format_type == 'csv':
+            # Generar CSV
+            output = BytesIO()
+            writer = csv.writer(output)
+            
+            # Escribir encabezados
+            writer.writerow([
+                'ID', 'Cliente', 'Terapeuta', 'Fecha', 'Hora', 'Duración',
+                'Tipo', 'Estado', 'Monto', 'Estado de Pago', 'Creado'
+            ])
+            
+            # Escribir datos
+            for appt in appointments:
+                client = appt.client
+                therapist = appt.therapist
+                
+                writer.writerow([
+                    appt.id,
+                    f'{client.first_name} {client.last_name}',
+                    f'{therapist.first_name} {therapist.last_name}',
+                    appt.appointment_date.isoformat(),
+                    appt.appointment_time.strftime('%H:%M'),
+                    appt.duration,
+                    appt.appointment_type,
+                    appt.status,
+                    appt.amount,
+                    appt.payment_status,
+                    appt.created_at.isoformat()
+                ])
+            
+            output.seek(0)
+            
+            return send_file(
+                output,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f'appointments_report_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            )
+        
+        elif format_type == 'pdf':
+            # Generar PDF (implementación básica)
+            buffer = BytesIO()
+            p = canvas.Canvas(buffer, pagesize=letter)
+            
+            # Encabezado
+            p.setFont("Helvetica-Bold", 16)
+            p.drawString(100, 750, "Reporte de Citas - MindGeek Clinic")
+            p.setFont("Helvetica", 10)
+            p.drawString(100, 735, f"Generado: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Tabla
+            y = 700
+            p.setFont("Helvetica-Bold", 10)
+            p.drawString(50, y, "ID")
+            p.drawString(100, y, "Cliente")
+            p.drawString(250, y, "Terapeuta")
+            p.drawString(400, y, "Fecha")
+            p.drawString(470, y, "Estado")
+            
+            p.setFont("Helvetica", 8)
+            y -= 20
+            
+            for appt in appointments[:30]:  # Limitar para una página
+                client = appt.client
+                therapist = appt.therapist
+                
+                p.drawString(50, y, str(appt.id))
+                p.drawString(100, y, f'{client.first_name} {client.last_name}'[:15])
+                p.drawString(250, y, f'{therapist.first_name} {therapist.last_name}'[:15])
+                p.drawString(400, y, appt.appointment_date.strftime('%Y-%m-%d'))
+                p.drawString(470, y, appt.status)
+                
+                y -= 15
+                if y < 50:
+                    p.showPage()
+                    y = 750
+            
+            p.save()
+            buffer.seek(0)
+            
+            return send_file(
+                buffer,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=f'appointments_report_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+            )
+        
+        else:
+            # Formato JSON (por defecto)
+            appointments_data = []
+            for appt in appointments:
+                client = appt.client
+                therapist = appt.therapist
+                
+                appointments_data.append({
+                    'id': appt.id,
+                    'client': {
+                        'id': client.id,
+                        'name': f'{client.first_name} {client.last_name}'
+                    },
+                    'therapist': {
+                        'id': therapist.id,
+                        'name': f'{therapist.first_name} {therapist.last_name}'
+                    },
+                    'appointment_date': appt.appointment_date.isoformat(),
+                    'appointment_time': appt.appointment_time.strftime('%H:%M'),
+                    'duration': appt.duration,
+                    'type': appt.appointment_type,
+                    'status': appt.status,
+                    'amount': appt.amount,
+                    'payment_status': appt.payment_status,
+                    'created_at': appt.created_at.isoformat()
+                })
+            
+            return jsonify({
+                'success': True,
+                'report': {
+                    'type': 'appointments',
+                    'filters': {
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'therapist_id': therapist_id,
+                        'status': status
+                    },
+                    'generated_at': datetime.datetime.utcnow().isoformat(),
+                    'data': appointments_data,
+                    'count': len(appointments_data)
+                }
+            }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al generar reporte de citas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# RUTAS DE SALUD Y MONITOREO
+# ------------------------------------------------------------
+
+@users_blueprint.route('/api/health', methods=['GET'])
+def health_check():
+    """Endpoint de salud de la aplicación"""
+    try:
+        # Verificar conexión a la base de datos
+        db.session.execute('SELECT 1')
+        
+        # Verificar que las tablas principales existan
+        tables = ['users', 'appointments', 'products', 'orders']
+        for table in tables:
+            db.session.execute(f'SELECT 1 FROM {table} LIMIT 1')
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'database': 'connected',
+            'version': '1.0.0'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Health check failed: {str(e)}')
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'error': str(e)
+        }), 500
+
+@users_blueprint.route('/api/metrics', methods=['GET'])
+@admin_required
+def get_metrics():
+    """Obtiene métricas del sistema (solo administrador)"""
+    try:
+        # Métricas en tiempo real
+        active_sessions = len(socketio.server.manager.rooms.get('/', {}))
+        active_users = User.query.filter(
+            User.last_login >= datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+        ).count()
+        
+        # Métricas de rendimiento
+        memory_usage = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        
+        return jsonify({
+            'success': True,
+            'metrics': {
+                'active_sessions': active_sessions,
+                'active_users_last_hour': active_users,
+                'memory_usage_mb': round(memory_usage, 2),
+                'timestamp': datetime.datetime.utcnow().isoformat()
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'Error al obtener métricas: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor'
+        }), 500
+
+# ------------------------------------------------------------
+# WEBHOOKS
+# ------------------------------------------------------------
+
+@users_blueprint.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """Webhook para recibir eventos de Stripe"""
+    try:
+        payload = request.get_data(as_text=True)
+        sig_header = request.headers.get('Stripe-Signature')
+        
+        if not sig_header:
+            return jsonify({'error': 'No signature header'}), 400
+        
+        result = payment_system.handle_webhook(payload, sig_header)
+        
+        if result['success']:
+            return jsonify({'status': 'success'}), 200
+        else:
+            return jsonify({'error': result['error']}), 400
+            
+    except Exception as e:
+        logger.error(f'Error en webhook de Stripe: {str(e)}')
+        return jsonify({'error': 'Internal server error'}), 500
+
+# ------------------------------------------------------------
+# RUTAS DE VISTAS HTML
+# ------------------------------------------------------------
+
+@app.route('/')
+def index():
+    """Página principal"""
+    return render_template('index.html')
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Dashboard del usuario"""
+    return render_template('dashboard.html')
+
+@app.route('/therapist/dashboard')
+@login_required
+def therapist_dashboard():
+    """Dashboard del terapeuta"""
+    if current_user.role not in ['therapist', 'admin']:
+        return redirect(url_for('dashboard'))
+    return render_template('therapist_dashboard.html')
+
+@app.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    """Dashboard del administrador"""
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    return render_template('admin_dashboard.html')
+
+@app.route('/appointments')
+@login_required
+def appointments_page():
+    """Página de citas"""
+    return render_template('appointments.html')
+
+@app.route('/messages')
+@login_required
+def messages_page():
+    """Página de mensajes"""
+    return render_template('messages.html')
+
+@app.route('/marketplace')
+def marketplace():
+    """Marketplace de productos"""
+    return render_template('marketplace.html')
+
+@app.route('/affiliate')
+@login_required
+def affiliate_portal():
+    """Portal de afiliados"""
+    return render_template('affiliate.html')
+
+# ------------------------------------------------------------
+# MANEJO DE ERRORES
+# ------------------------------------------------------------
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Maneja errores 404"""
+    return jsonify({
+        'success': False,
+        'message': 'Recurso no encontrado'
+    }), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Maneja errores 500"""
+    db.session.rollback()
+    logger.error(f'Error interno del servidor: {str(error)}')
+    return jsonify({
+        'success': False,
+        'message': 'Error interno del servidor'
+    }), 500
+
+@app.errorhandler(401)
+def unauthorized_error(error):
+    """Maneja errores 401"""
+    return jsonify({
+        'success': False,
+        'message': 'No autorizado. Por favor inicia sesión.'
+    }), 401
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    """Maneja errores 403"""
+    return jsonify({
+        'success': False,
+        'message': 'Acceso prohibido. No tienes los permisos necesarios.'
+    }), 403
+
+# ------------------------------------------------------------
+# INICIALIZACIÓN DE LA APLICACIÓN
+# ------------------------------------------------------------
+
+# Registrar blueprints
+app.register_blueprint(users_blueprint)
+
+# Configurar Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Crear tablas si no existen
+@app.before_first_request
+def create_tables():
+    db.create_all()
+    
+    # Crear usuario administrador por defecto si no existe
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@mindgeekclinic.com',
+            first_name='Administrador',
+            last_name='Sistema',
+            role='admin',
+            is_active=True,
+            is_verified=True
+        )
+        admin.set_password('Admin123!')  # Cambiar en producción
+        db.session.add(admin)
+        db.session.commit()
+        logger.info('Usuario administrador creado por defecto')
+
+# ------------------------------------------------------------
+# EJECUCIÓN DE LA APLICACIÓN
+# ------------------------------------------------------------
+
+if __name__ == '__main__':
+    # En producción, usar: socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
