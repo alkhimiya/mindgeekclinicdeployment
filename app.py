@@ -4225,21 +4225,16 @@ with col_confirm2:
         st.error(f"❌ {message}")
 
 # 3. Llamar al sistema REAL de afiliados
-success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
+ success, message, affiliate_record = affiliate_system.add_affiliate(affiliate_data_mapped)
 
-# 4. Mostrar resultado simple (opcional, puedes quitarlo después)
-if success:
-    st.success(f"✅ {message}")
-else:
-    st.error(f"❌ {message}")
-         if success:
-    # Enviar email de bienvenida
+if success:  # ← 8 ESPACIOS (alineado con la línea anterior)
+    # Enviar email de bienvenida  # ← 12 ESPACIOS
     self.email_service.send_welcome_email(
-        affiliate_data['email'],
+        affiliate_data['email'],  # ← 16 ESPACIOS
         affiliate_data
     )
     
-    # Enviar notificación al administrador
+    # Enviar notificación al administrador  # ← 12 ESPACIOS
     admin_config = ConfigManager().app_config
     self.email_service.send_email(
         admin_config['admin_email'],
@@ -4247,7 +4242,7 @@ else:
         f"Nuevo afiliado: {affiliate_data['full_name']}\nID: {affiliate_record['id']}"
     )
     
-    # Mostrar éxito
+    # Mostrar éxito  # ← 12 ESPACIOS
     st.balloons()
     st.success(f"""
     🎉 ¡Registro Exitoso!
@@ -4261,19 +4256,19 @@ else:
     ¡Bienvenido al programa de afiliados!
     """)
     
-    # Guardar ID en sesión
+    # Guardar ID en sesión  # ← 12 ESPACIOS
     st.session_state.affiliate_id = affiliate_record['id']
     
-    # Limpiar datos temporales
+    # Limpiar datos temporales  # ← 12 ESPACIOS
     for key in ['affiliate_step', 'affiliate_email', 'affiliate_data']:
         if key in st.session_state:
             del st.session_state[key]
     
-    # Esperar y redirigir
+    # Esperar y redirigir  # ← 12 ESPACIOS
     time.sleep(3)
     st.rerun()
-else:
-    st.error(f"Error en el registro: {message}")       
+else:  # ← 8 ESPACIOS (alineado con if success:)
+    st.error(f"Error en el registro: {message}")  # ← 12 ESPACIOS
         # Botón para volver al paso 2
         if st.button("↩️ Volver al paso 2", type="secondary"):
             st.session_state.affiliate_step = 2
