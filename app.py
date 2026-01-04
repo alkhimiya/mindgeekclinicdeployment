@@ -431,9 +431,9 @@ class OrderCoupon(db.Model):
 user_blocks = db.Table('user_blocks',
     db.Column('blocker_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
     db.Column('blocked_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
-    db.Column('created_at', db.DateTime, default=datetime.datetime.utcnow),
+    db.Column('created_at', db.DateTime, default=datetime.datetime.utcnow),  # ← CORREGIDO
     db.Column('reason', db.Text)
-)
+                      )
 
 # ------------------------------------------------------------
 # SISTEMA DE AFILIADOS
