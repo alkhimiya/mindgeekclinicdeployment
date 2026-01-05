@@ -37,11 +37,22 @@ with st.sidebar:
 
 # 4. LÓGICA DE MÓDULOS
 
-if menu == "🏠 Dashboard":
-    st.title("Bienvenido a la Vanguardia en Salud Mental")
-    st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
-    st.image("https://raw.githubusercontent.com/alkhimiya/mindgeekclinicdeployment/main/static/logo.png", width=200) # Si tienes logo
-
+if
+elif menu == "🏠 Dashboard":
+    st.title("MINDGEEKCLINIC")
+    st.subheader("Vanguardia en Salud Mental e Hipnosis Clínica")
+    
+    st.markdown("""
+    ---
+    ### 🧠 Visión Integrativa
+    Unificando Psicología, Neurociencias y Física Cuántica para la reprogramación neuronal.
+    
+    **Estado de la plataforma:** 🚀 HealthTech en construcción activa.
+    ---
+    """)
+    
+    st.info("💡 Consejo: Una vez que subas tu logo al repositorio, aparecerá automáticamente aquí.")
+    
 elif menu == "🤖 Admisión IA AETHON":
     st.header("Analista de Admisión Transdisciplinario")
     
