@@ -5,7 +5,7 @@ from groq import Groq
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# --- BLOQUE DE ESTILO (Aquí modificas tamaños y colores) ---
+# --- BLOQUE DE ESTILO ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
@@ -20,11 +20,11 @@ st.markdown("""
         margin-bottom: 5px;
     }
     
-    /* FRASE: La vanguardia en salud mental (MODIFICA AQUÍ) */
+    /* FRASE: La vanguardia en salud mental (Color Azul Acero Profesional) */
     .subtitulo-vanguardia {
-        font-size: 1.5rem !important;  /* Tamaño de la letra */
-        color: #E63946 !important;    /* Color (Ejemplo: Rojo suave, puedes usar #1E3A8A para azul) */
-        font-weight: 600;
+        font-size: 1.4rem !important;
+        color: #4682B4 !important; /* Color relajante y profesional */
+        font-weight: 500;
         font-style: italic;
     }
     </style>
@@ -53,11 +53,9 @@ with st.sidebar:
 
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
-    # Aquí se aplica el estilo de "La vanguardia..."
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     
     st.markdown("---")
-    # Cambio solicitado: "sanación" en lugar de "transformación"
     st.markdown("""
     ### Tu proceso de sanación comienza aquí
     En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica para llegar a la raíz de tu bienestar.
@@ -79,7 +77,7 @@ elif menu == "🩺 Consulta Médica Gratis":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Nexo está escuchando. Describe tu situación..."):
+    if prompt := st.chat_input("Nexo está escuchando..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -122,3 +120,4 @@ elif menu == "💳 Planes y Suscripciones":
     ---
     **Pago:** USDT (Red TRC20).
     """)
+
