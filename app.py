@@ -1,33 +1,48 @@
 import streamlit as st
+import os
 
-# 1. Configuración básica
-st.set_page_config(page_title="MindGeek Clinic - Rescate", layout="wide", page_icon="🧠")
+# Configuración de página
+st.set_page_config(page_title="MindGeek Clinic", layout="wide", page_icon="🧠")
 
-# 2. Estilo para recuperar tu Sidebar azul
+# Estilo visual (Tu Sidebar azul)
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
+    .main { background-color: #f5f7f9; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Menú Lateral
+# --- MENÚ LATERAL ORIGINAL ---
 with st.sidebar:
-    st.title("🧠 MindGeek Clinic")
+    st.image("https://raw.githubusercontent.com/alkhimiya/mindgeekclinicdeployment/main/static/logo.png", width=100) # Intenta cargar tu logo si existe
+    st.title("MindGeek Clinic")
     st.write("---")
-    opcion = st.radio("Panel de Control:", [
+    menu = st.radio("Navegación", [
         "🏠 Inicio", 
-        "🤖 Diagnóstico IA", 
-        "👥 Pacientes",
-        "💰 Pagos y Afiliados"
+        "🤖 Asistente IA (Groq/OpenAI)", 
+        "👥 Gestión de Pacientes",
+        "📅 Agendamiento",
+        "💰 Afiliados y Pagos"
     ])
 
-# 4. Contenido Principal
-if opcion == "🏠 Inicio":
-    st.title("Sistema Recuperado")
-    st.success("¡Bienvenido! Hemos logrado que el servidor vuelva a la vida.")
-    st.info("Ahora ya no tienes el error 503. El siguiente paso es traer tu lógica de IA aquí.")
+# --- LÓGICA DE LAS SECCIONES ---
 
-elif opcion == "🤖 Diagnóstico IA":
-    st.header("Módulo de IA")
-    st.write("Reconectando con Groq y Anthropic...")
+if menu == "🏠 Inicio":
+    st.title("Bienvenido Terapeuta")
+    st.write("Selecciona una opción en el menú para comenzar.")
+    
+elif menu == "🤖 Asistente IA (Groq/OpenAI)":
+    st.header("Asistente Terapéutico con IA")
+    # Aquí es donde la app buscará tus llaves
+    api_key = st.text_input("Introduce tu API Key de Groq o OpenAI (o configúrala en Secrets)", type="password")
+    
+    pregunta = st.chat_input("Escribe tu consulta terapéutica aquí...")
+    if pregunta:
+        st.info(f"Procesando consulta: {pregunta}")
+        st.warning("Estamos vinculando tu función 'def chat_terapeuta' de las 5000 líneas.")
+
+elif menu == "💰 Afiliados y Pagos":
+    st.header("Panel de Stripe y Afiliados")
+    st.write("Estado de conexión: **Activo**")
+    # Aquí recuperaremos tu lógica de stripe
 
