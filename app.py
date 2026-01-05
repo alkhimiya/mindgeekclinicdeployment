@@ -1,122 +1,105 @@
 import streamlit as st
 import os
-from groq import Groq  # Importamos el motor de la IA
+from groq import Groq
 
-# 1. CONFIGURACIÓN DE PÁGINA
-st.set_page_config(
-    page_title="MindGeek Clinic",
-    layout="wide",
-    page_icon="🧠"
-)
+# 1. CONFIGURACIÓN DE VANGUARDIA
+st.set_page_config(page_title="MINDGEEKCLINIC | HealthTech", layout="wide", page_icon="🧠")
 
-# 2. ESTILO PERSONALIZADO (Sidebar Azul)
+# Estilo Profesional
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] {
-        background-color: #1E3A8A;
-        color: white;
-    }
-    .stRadio [data-testid="stWidgetLabel"] p {
-        color: white !important;
-        font-weight: bold;
-    }
+    [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
+    .stAlert { border-radius: 10px; border: 1px solid #1E3A8A; }
+    h1, h2 { color: #1E3A8A; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. CONEXIÓN CON SECRETS
+# 2. CONEXIÓN IA
 try:
-    GROQ_KEY = st.secrets["groq"]["api_key"]
+    client = Groq(api_key=st.secrets["groq"]["api_key"])
     CONEXION_IA = True
-except Exception:
+except:
     CONEXION_IA = False
 
-# 4. MENÚ LATERAL
+# 3. SIDEBAR DE NAVEGACIÓN
 with st.sidebar:
-    st.title("🧠 MindGeek Clinic")
+    st.title("🧠 MINDGEEKCLINIC")
+    st.caption("Salud Mental de Vanguardia")
     st.write("---")
-    menu = st.radio("Panel de Control", [
-        "🏠 Inicio", 
-        "🤖 Asistente IA", 
-        "👥 Pacientes",
-        "📅 Agendamiento",
-        "💰 Afiliados y Pagos"
+    menu = st.radio("Módulos HealthTech", [
+        "🏠 Dashboard", 
+        "🤖 Admisión IA AETHON", 
+        "💳 Planes y Suscripciones",
+        "📂 Mi Historial"
     ])
     st.write("---")
-    if CONEXION_IA:
-        st.success("Sincronizado con Groq ✅")
+    st.info("Avalado por: \n**Instituto Clínico de Neuroprogramación AETHON**")
 
-# 5. LÓGICA DE LAS SECCIONES
+# 4. LÓGICA DE MÓDULOS
 
-if menu == "🏠 Inicio":
-    st.title("Bienvenido Terapeuta")
-    st.write("### Sistema de Gestión y Asistencia IA")
-    st.info("Selecciona un módulo en el menú lateral para comenzar.")
+if menu == "🏠 Dashboard":
+    st.title("Bienvenido a la Vanguardia en Salud Mental")
+    st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
+    st.image("https://raw.githubusercontent.com/alkhimiya/mindgeekclinicdeployment/main/static/logo.png", width=200) # Si tienes logo
 
-elif menu == "🤖 Asistente IA":
-    st.header("Consulta con Asistente Terapéutico")
+elif menu == "🤖 Admisión IA AETHON":
+    st.header("Analista de Admisión Transdisciplinario")
     
-    if not CONEXION_IA:
-        st.warning("⚠️ No se encontró la API Key en Secrets.")
-    else:
-        # Inicializamos el cliente de Groq usando tus secretos
-        client = Groq(api_key=GROQ_KEY)
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-        # Crear el historial de chat para que no se borre al escribir
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-        # Mostrar los mensajes que ya existen
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+    if prompt := st.chat_input("Cuéntame, ¿qué situación estás atravesando?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-        # Chat Input: Donde escribes tú
-        if prompt := st.chat_input("¿En qué puedo ayudarte hoy?"):
-            # Guardamos lo que tú escribes
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+        with st.chat_message("assistant"):
+            # SYSTEM PROMPT OPTIMIZADO PARA HEALTHTECH
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": """
+                    Eres el Analista Senior de MINDGEEKCLINIC. 
+                    Tu enfoque unifica Psiquiatría, Cuántica, Biodescodificación y Neurociencias.
+                    TU MISIÓN: Escuchar el síntoma, identificar el conflicto biológico/emocional y proponer el PLAN AETHON.
+                    
+                    SOBRE EL PLAN: 
+                    - 4 sesiones de Hipnosis Clínica (1 mes).
+                    - Inversión: 80 USD.
+                    - Certificación: Instituto Clínico de Neuroprogramación AETHON.
+                    - Objetivo: Reprogramación neuronal profunda.
+                    
+                    Si el usuario parece listo, invítalo a la sección de 'Planes y Suscripciones'.
+                    """},
+                    *st.session_state.messages
+                ],
+                model="llama-3.3-70b-versatile",
+            )
+            response = chat_completion.choices[0].message.content
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
-            # Generamos la respuesta de la IA
-            with st.chat_message("assistant"):
-                try:
-                    chat_completion = client.chat.completions.create(
-                        messages=[
-                            {
-                                "role": "system", 
-                                "content": """
-                                Eres el Analista de Ingreso de MINDGEEKCLINIC, un centro pionero en Medicina Integrativa. 
-                                Tu conocimiento unifica: Psicología Clínica, Psiquiatría, Neurociencias, Física Cuántica, Biodescodificación y Medicina Germánica.
+elif menu == "💳 Planes y Suscripciones":
+    st.title("Programas de Transformación")
+    st.subheader("Plan Inicial de Neuroprogramación")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.write("""
+        ### Beneficios del Programa:
+        * **4 Sesiones Personalizadas** con terapeutas certificados por AETHON.
+        * **Enfoque Integrativo:** Trabajo sobre la causa raíz (Biodecodificación).
+        * **Herramientas:** Hipnosis Clínica y Reprogramación Neuronal.
+        * **Duración:** 30 días de acompañamiento.
+        """)
+        st.markdown("### Inversión: **80.00 USD**")
 
-                                TU FILOSOFÍA: 
-                                Entiendes que la enfermedad es una respuesta biológica a un conflicto emocional o una desconfiguración en el campo cuántico/neuronal del paciente.
-
-                                TU MISIÓN EN EL CHAT:
-                                1. Indagar con calidez: Si el usuario dice 'me duele el estómago', tú exploras el síntoma pero también el estrés o situación vital (cuadro emocional).
-                                2. Visión Unificada: Puedes mencionar sutilmente cómo los pensamientos (cuántica) afectan las neuronas (neurociencia) y terminan en el cuerpo (biología).
-                                3. Preparación para Hipnosis: Explica que toda esta información servirá para que el terapeuta aplique Hipnosis Clínica para reprogramar el origen del conflicto.
-
-                                IMPORTANTE: 
-                                Mantén un lenguaje profesional pero accesible. Tu meta es que el usuario se sienta comprendido en todos los niveles (mental, físico y energético) para que proceda a agendar su sesión de pago.
-                                """
-                            },
-                            *st.session_state.messages 
-                        ],
-                        model="llama-3.3-70b-versatile", 
-                    )
-                                        
-                    respuesta = chat_completion.choices[0].message.content
-                    st.markdown(respuesta)
-                    # Guardamos la respuesta de la IA en el historial
-                    st.session_state.messages.append({"role": "assistant", "content": respuesta})
-                except Exception as e:
-                    st.error(f"Hubo un problema con la IA: {e}")
-
-elif menu == "👥 Pacientes":
-    st.header("Gestión de Pacientes")
-    st.write("Módulo en desarrollo...")
-
-elif menu == "💰 Afiliados y Pagos":
-    st.header("Módulo Financiero")
-    st.write(f"Tasa de comisión configurada: **{st.secrets['affiliates']['commission_rate'] * 100}%**")
+    with col2:
+        st.success("✅ Certificación AETHON")
+        st.warning("💳 Pago vía USDT")
+        st.code("DIRECCION_DE_BILLETERA_AQUI", language="text")
+        st.caption("Envía el hash de la transacción al soporte una vez realizado.")
 
