@@ -86,7 +86,7 @@ elif menu == "🤖 Asistente IA":
                             {"role": "system", "content": "Eres un asistente terapéutico experto de MindGeek Clinic. Responde de forma profesional y empática."},
                             {"role": "user", "content": prompt}
                         ],
-                        model="llama3-8b-8192", 
+                        model="llama-3.3-70b-versatile", 
                     )
                     respuesta = chat_completion.choices[0].message.content
                     st.markdown(respuesta)
