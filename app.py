@@ -37,7 +37,6 @@ with st.sidebar:
 
 # 4. LÓGICA DE MÓDULOS
 
-if
 elif menu == "🏠 Dashboard":
     st.title("MINDGEEKCLINIC")
     st.subheader("Vanguardia en Salud Mental e Hipnosis Clínica")
