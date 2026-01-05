@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """
-ARCHIVO DE REDIRECCIÓN ÚNICO - Streamlit Cloud
-Su sistema siempre ejecuta 'app.py'. Este archivo inicia tu aplicación real.
+PUNTO DE ENTRADA PURA STREAMLIT - Sin rastros de Flask
 """
 import os
 import sys
 
-# Obtiene el puerto que asigna el entorno de la nube
-port = os.environ.get('PORT', '8501')
+# 1. Verificar que streamlit_app.py existe
+if not os.path.exists("streamlit_app.py"):
+    print("❌ ERROR: streamlit_app.py no encontrado")
+    sys.exit(1)
 
-# Comando directo y probado para lanzar tu aplicación Streamlit
-streamlit_command = f"streamlit run streamlit_app.py --server.port {port} --server.address 0.0.0.0"
-print(f"Iniciando aplicación: {streamlit_command}")
+# 2. Obtener puerto (Streamlit Cloud lo maneja internamente)
+port = os.environ.get("PORT", "8501")
+
+# 3. Mensaje claro para logs
+print(f"🚀 Iniciando MindGeek Clinic en puerto {port}")
 sys.stdout.flush()
 
-# Ejecuta el comando. 'os.system' es simple y robusto para este caso.
-os.execvp("streamlit", ["streamlit", "run", "streamlit_app.py", "--server.port", str(port), "--server.address", "0.0.0.0"])
+# 4. EJECUCIÓN PURA STREAMLIT - SIN FLASK
+os.execlp(
+    "streamlit", "streamlit", "run", "streamlit_app.py",
+    "--server.port", port,
+    "--server.address", "0.0.0.0",
+    "--server.headless", "true"
+)
