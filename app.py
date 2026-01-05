@@ -1,15 +1,29 @@
+
 import streamlit as st
 import os
 from groq import Groq
 
 # 1. CONFIGURACIÓN INICIAL
-st.set_page_config(page_title="MINDGEEKCLINIC", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# Estilo visual Geek-Profesional
+# Estilo visual para evitar deformación de texto y dar aspecto profesional
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
     .stChatFloatingInputContainer { bottom: 20px; }
+    /* Ajuste de puntaje para el título principal en móviles y desktop */
+    .titulo-principal {
+        font-size: 2.1rem !important;
+        font-weight: 800;
+        color: #1E3A8A;
+        line-height: 1.1;
+        margin-bottom: 5px;
+    }
+    .subtitulo-vanguardia {
+        font-size: 1.1rem !important;
+        color: #444;
+        font-style: italic;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -20,9 +34,9 @@ try:
 except Exception as e:
     CONEXION_IA = False
 
-# 3. MENÚ LATERAL
+# 3. SIDEBAR DE NAVEGACIÓN
 with st.sidebar:
-    st.title("🧠 MINDGEEKCLINIC")
+    st.title("🧠 MIND GEEK CLINIC")
     st.write("---")
     menu = st.radio("Navegación", [
         "🏠 Inicio", 
@@ -35,18 +49,24 @@ with st.sidebar:
 # 4. LÓGICA DE MÓDULOS
 
 if menu == "🏠 Inicio":
-    st.title("Bienvenido a la Vanguardia en Salud Mental")
-    st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
+    # Título ajustado para evitar que las palabras se amontonen o deformen
+    st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
+    
     st.markdown("---")
     st.markdown("""
-    ### Protocolo de Ingreso
-    Para brindarte una atención de alta precisión, nuestro sistema de IA realiza una evaluación clínica inicial. 
-    Este proceso es fundamental para que nuestros terapeutas certificados de **AETHON** diseñen tu plan de reprogramación neuronal.
+    ### Tu proceso de transformación comienza aquí
+    En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica para llegar a la raíz de tu bienestar.
+    
+    **¿Cómo proceder?**
+    1. Accede a **Consulta Médica Gratis** en el menú lateral.
+    2. Inicia una conversación con **Nexo**, nuestro asistente clínico especializado.
+    3. Tras la evaluación, Nexo te orientará sobre el protocolo de intervención adecuado para tu caso.
     """)
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
-    st.caption("Fase de Anamnesis y Diagnóstico Integrativo")
+    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -55,7 +75,7 @@ elif menu == "🩺 Consulta Médica Gratis":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Describe tu situación aquí..."):
+    if prompt := st.chat_input("Nexo está escuchando. Describe tu situación..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -66,20 +86,21 @@ elif menu == "🩺 Consulta Médica Gratis":
                     messages=[
                         {
                             "role": "system", 
-                            "content": """Eres el Especialista de Diagnóstico de MINDGEEKCLINIC. Tu comportamiento es el de un clínico experto y empático.
+                            "content": """Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
+                            Eres un profesional experto en Medicina Germánica, Biodescodificación y Neurociencias.
                             
-                            INSTRUCCIONES DE ACTUACIÓN:
-                            1. NO vendas el plan de inmediato. Primero debes realizar una ANAMNESIS profunda.
-                            2. INDAGA sistemáticamente en:
-                               - Tiempo de padecimiento (cronicidad).
-                               - Disparadores del entorno (eventos específicos).
-                               - Contexto Familiar y Laboral (dinámicas de estrés).
-                               - Situación emocional actual (sentimientos dominantes).
-                               - Visión de la Biodescodificación: Busca el conflicto biológico detrás del síntoma físico o emocional.
-                            3. MÉTODO: Haz una o dos preguntas clave por respuesta para no abrumar, pero no dejes avanzar al paciente sin entender el trasfondo.
-                            4. CIERRE PROFESIONAL: Solo cuando tengas información suficiente, explica que has elaborado un perfil clínico y que el siguiente paso es la intervención con Hipnosis Clínica a través del 'Plan AETHON' (4 sesiones/80 USD).
+                            TU OBJETIVO CLÍNICO:
+                            1. Presentarte como Nexo y realizar una anamnesis profunda.
+                            2. Debes indagar en: tiempo del padecimiento, eventos desencadenantes en el entorno, situación emocional, familiar y laboral actual.
+                            3. No te comportes como un vendedor. Tu prioridad es el diagnóstico profesional del conflicto biológico.
+                            4. Solo tras una indagación exhaustiva, recomienda el: 'Plan de hipnosis clínica para el tratamiento de su condición'.
                             
-                            Recuerda: Eres un profesional de la salud mental de vanguardia. Tu prioridad es la comprensión profunda del ser."""
+                            DETALLES DEL TRATAMIENTO:
+                            - Consiste en 4 sesiones de intervención profunda.
+                            - Inversión: 80 USD (Pago Único).
+                            - Método de pago: USDT.
+                            
+                            Habla de forma pausada, empática y con alto rigor profesional."""
                         },
                         *st.session_state.messages
                     ],
@@ -89,17 +110,20 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Conexión interrumpida. Por favor, repite tu último mensaje.")
+                st.error("Nexo ha perdido la conexión momentáneamente. Por favor, reintenta.")
 
 elif menu == "💳 Planes y Suscripciones":
-    st.title("Programas de Transformación")
-    st.subheader("Plan Inicial de Neuroprogramación AETHON")
-    st.write("Tras tu evaluación inicial, este es el protocolo de intervención recomendado:")
+    st.title("Tratamientos Especializados")
+    st.subheader("Plan de Hipnosis Clínica para el tratamiento de su condición")
     
     st.markdown("""
-    - **Metodología:** Hipnosis Clínica y Reprogramación Neuronal.
-    - **Frecuencia:** 4 Sesiones (1 mes de tratamiento intensivo).
-    - **Certificación:** Especialistas del Instituto AETHON.
-    - **Inversión:** 80 USD vía USDT.
+    Protocolo de intervención diseñado tras la evaluación clínica inicial.
+    
+    - **Servicio:** 4 Sesiones de Hipnosis Clínica Transpersonal.
+    - **Metodología:** Reprogramación neuronal y Biodescodificación.
+    - **Inversión:** $80.00 USD (**Pago Único**).
+    - **Certificación:** Instituto Clínico de Neuroprogramación AETHON.
+    ---
+    **Instrucciones de Pago:**
+    El pago se realiza exclusivamente vía **USDT (Red TRC20)**. Una vez completado, envía el comprobante para asignar tu fecha de inicio.
     """)
-    st.info("El diagnóstico obtenido en la consulta gratuita será entregado a tu terapeuta asignado.")
