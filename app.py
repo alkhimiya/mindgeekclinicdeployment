@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-CONFIGURACIÓN DEFINITIVA - Streamlit Cloud
-NO especificar puerto, dejar que Streamlit Cloud lo asigne
+ARCHIVO DE REDIRECCIÓN ÚNICO - Streamlit Cloud
+Su sistema siempre ejecuta 'app.py'. Este archivo inicia tu aplicación real.
 """
 import os
 import sys
 
-# Streamlit Cloud asignará automáticamente un puerto disponible
-# NO uses --server.port, deja que Streamlit Cloud lo gestione
-os.system("streamlit run streamlit_app.py --server.address=0.0.0.0")
+# Obtiene el puerto que asigna el entorno de la nube
+port = os.environ.get('PORT', '8501')
+
+# Comando directo y probado para lanzar tu aplicación Streamlit
+streamlit_command = f"streamlit run streamlit_app.py --server.port {port} --server.address 0.0.0.0"
+print(f"Iniciando aplicación: {streamlit_command}")
+sys.stdout.flush()
+
+# Ejecuta el comando. 'os.system' es simple y robusto para este caso.
+os.execvp("streamlit", ["streamlit", "run", "streamlit_app.py", "--server.port", str(port), "--server.address", "0.0.0.0"])
