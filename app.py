@@ -6,5 +6,5 @@ Simplemente ejecuta la aplicación principal.
 import os
 import sys
 
-port = os.environ.get('PORT', '8501')
+port = os.environ.get('PORT', '8502')
 os.system(f"streamlit run streamlit_app.py --server.port {port} --server.address 0.0.0.0")
