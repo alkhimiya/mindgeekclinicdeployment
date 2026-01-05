@@ -10,8 +10,6 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
     .stChatFloatingInputContainer { bottom: 20px; }
-    
-    /* Título: Bienvenidos a Mind Geek Clinic */
     .titulo-principal {
         font-size: 2.1rem !important;
         font-weight: 800;
@@ -19,11 +17,9 @@ st.markdown("""
         line-height: 1.1;
         margin-bottom: 5px;
     }
-    
-    /* FRASE: La vanguardia en salud mental (Color Azul Acero Profesional) */
     .subtitulo-vanguardia {
         font-size: 1.4rem !important;
-        color: #4682B4 !important; /* Color relajante y profesional */
+        color: #4682B4 !important;
         font-weight: 500;
         font-style: italic;
     }
@@ -54,50 +50,56 @@ with st.sidebar:
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
-    
     st.markdown("---")
-    st.markdown("""
-    ### Tu proceso de sanación comienza aquí
-    En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica para llegar a la raíz de tu bienestar.
-    
-    **¿Cómo proceder?**
-    1. Accede a **Consulta Médica Gratis** en el menú lateral.
-    2. Inicia una conversación con **Nexo**, nuestro asistente clínico especializado.
-    3. Tras la evaluación, Nexo te orientará sobre el protocolo de intervención adecuado para tu caso.
-    """)
+    st.markdown("### Tu proceso de sanación comienza aquí")
+    st.write("En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica.")
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
     st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
+    # --- LÓGICA DE SALUDO INICIAL ---
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hola, soy **Nexo**, tu asistente clínico de Mind Geek Clinic. Mi propósito es comprender profundamente tu situación para orientarte hacia la mejor ruta de sanación. Cuéntame, ¿qué síntomas o malestares estás experimentando y desde cuándo?"}
+        ]
 
+    # Mostrar historial de chat
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Nexo está escuchando..."):
+    # Entrada de usuario
+    if prompt := st.chat_input("Responde a Nexo aquí..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
+                # --- PROMPT DE LA SESIÓN (SYSTEM PROMPT) ---
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {
                             "role": "system", 
-                            "content": """Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-                            Eres un profesional experto en Medicina Germánica, Biodescodificación y Neurociencias.
+                            "content": """Identidad: Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
+                            Rigor Profesional: Actúa como un experto en Medicina Germánica, Biodescodificación y Neurociencias.
                             
-                            TU OBJETIVO CLÍNICO:
-                            1. Presentarte como Nexo y realizar una anamnesis profunda.
-                            2. Indaga en: tiempo del padecimiento, eventos desencadenantes, situación emocional, familiar y laboral.
-                            3. Tu prioridad es el diagnóstico profesional del conflicto biológico.
-                            4. Solo tras una indagación exhaustiva, recomienda el: 'Plan de hipnosis clínica para el tratamiento de su condición'.
+                            INSTRUCCIONES DE CONSULTA:
+                            1. Debes llevar el control de una anamnesis clínica seria.
+                            2. INDAGA PROFUNDAMENTE antes de dar cualquier conclusión. Pregunta sobre:
+                               - Entorno familiar y laboral (conflictos de estrés).
+                               - Eventos desencadenantes (¿Qué pasó justo antes de que el síntoma apareciera?).
+                               - Situación emocional actual.
+                            3. Tu objetivo es encontrar el CONFLICTO BIOLÓGICO. No des consejos superficiales.
+                            4. SOLO cuando hayas recogido información suficiente, sugiere el 'Plan de hipnosis clínica para el tratamiento de su condición'.
                             
-                            DETALLES: 4 sesiones, 80 USD (Pago Único), vía USDT."""
+                            DATOS DEL TRATAMIENTO:
+                            - 4 sesiones intensivas.
+                            - Pago único de 80 USD.
+                            - Método: USDT.
+                            
+                            Tono: Empático, clínico, analítico y profesional."""
                         },
                         *st.session_state.messages
                     ],
@@ -107,17 +109,10 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Nexo ha perdido la conexión. Reintenta.")
+                st.error("Error de conexión. Intenta nuevamente.")
 
 elif menu == "💳 Planes y Suscripciones":
     st.title("Tratamientos Especializados")
     st.subheader("Plan de Hipnosis Clínica para el tratamiento de su condición")
-    
-    st.markdown("""
-    - **Servicio:** 4 Sesiones de Hipnosis Clínica Transpersonal.
-    - **Inversión:** $80.00 USD (**Pago Único**).
-    - **Certificación:** Instituto Clínico de Neuroprogramación AETHON.
-    ---
-    **Pago:** USDT (Red TRC20).
-    """)
-
+    st.write("- **Inversión:** $80.00 USD (**Pago Único**)")
+    st.write("- **Certificación:** Instituto Clínico de Neuroprogramación AETHON")
