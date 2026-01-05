@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from groq import Groq
 
-# 1. CONFIGURACIÓN DE PÁGINA (Debe ser la primera instrucción de Streamlit)
+# 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="MINDGEEKCLINIC", layout="wide", page_icon="🧠")
 
 # Estilo Geek Personalizado
@@ -13,7 +13,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. CONEXIÓN CON GROQ (Cerebro de la IA)
+# 2. CONEXIÓN CON GROQ
 try:
     client = Groq(api_key=st.secrets["groq"]["api_key"])
     CONEXION_IA = True
@@ -27,8 +27,8 @@ with st.sidebar:
     st.caption("Vanguardia en Salud Mental")
     st.write("---")
     menu = st.radio("Menú Principal", [
-        "🏠 Dashboard", 
-        "🤖 Admisión IA AETHON", 
+        "🏠 Inicio", 
+        "🩺 Consulta Médica Gratis", 
         "💳 Planes y Suscripciones"
     ])
     st.write("---")
@@ -37,24 +37,24 @@ with st.sidebar:
 # 4. LÓGICA DE LOS MÓDULOS
 
 # Módulo 1: Inicio
-if menu == "🏠 Dashboard":
+if menu == "🏠 Inicio":
     st.title("Bienvenido a la Vanguardia en Salud Mental")
     st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
     st.markdown("---")
     st.markdown("""
     ### 🚀 MINDGEEKCLINIC: HealthTech en Construcción
-    Esta plataforma integra las ciencias tradicionales y las nuevas tecnologías de la mente.
+    Bienvenido a un espacio donde la ciencia tradicional y las nuevas tecnologías de la mente se encuentran para tu bienestar.
     
-    **Próximamente:**
-    - Registro de historial clínico cuántico.
-    - Seguimiento de sesiones de hipnosis.
-    - Gestión de reprogramación neuronal.
+    **¿Cómo empezar?**
+    1. Dirígete a la sección de **Consulta Médica Gratis**.
+    2. Cuéntanos qué te sucede. Nuestra IA evaluará tu caso bajo los principios de AETHON.
+    3. Obtén una recomendación para iniciar tu proceso de reprogramación neuronal.
     """)
 
-# Módulo 2: Asistente IA
-elif menu == "🤖 Admisión IA AETHON":
-    st.header("Analista de Admisión Transdisciplinario")
-    st.write("Este asistente preparará tu ficha técnica para el terapeuta.")
+# Módulo 2: Consulta Médica Gratis (IA)
+elif menu == "🩺 Consulta Médica Gratis":
+    st.header("🩺 Tu Primera Consulta de Orientación")
+    st.write("Cuéntame qué te sucede. Estoy aquí para escucharte y preparar tu ficha para el equipo de terapeutas.")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -65,7 +65,7 @@ elif menu == "🤖 Admisión IA AETHON":
             st.markdown(message["content"])
 
     # Entrada de usuario
-    if prompt := st.chat_input("¿Qué situación te trae hoy a MINDGEEKCLINIC?"):
+    if prompt := st.chat_input("¿En qué puedo ayudarte hoy?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -76,10 +76,14 @@ elif menu == "🤖 Admisión IA AETHON":
                     messages=[
                         {
                             "role": "system", 
-                            "content": """Eres el Analista de MINDGEEKCLINIC. 
-                            Conocimientos: Psicología, Cuántica, Biodescodificación. 
-                            Tu meta: Escuchar empáticamente y orientar hacia el Plan AETHON.
-                            Plan AETHON: 4 sesiones de Hipnosis Clínica por 80 USD (pago USDT)."""
+                            "content": """Eres el Consultor Inicial de MINDGEEKCLINIC. Tu tono es cálido, médico y profesional.
+                            Manejas conocimientos de: Psicología, Psiquiatría, Cuántica, Biodescodificación y Medicina Germánica. 
+                            
+                            TU MISIÓN:
+                            1. Escuchar el síntoma y preguntar por el conflicto emocional detrás (Biodescodificación).
+                            2. Explicar que esta es una consulta de orientación inicial gratuita.
+                            3. Sugerir el 'Plan de Neuroprogramación AETHON' de 4 sesiones por 80 USD para tratar la raíz con hipnosis clínica.
+                            4. Informar que los pagos son vía USDT."""
                         },
                         *st.session_state.messages
                     ],
@@ -89,7 +93,7 @@ elif menu == "🤖 Admisión IA AETHON":
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
             except Exception as e:
-                st.error("La IA está descansando un momento. Intenta de nuevo en unos segundos.")
+                st.error("Estamos recibiendo muchas consultas. Por favor, espera un momento.")
 
 # Módulo 3: Pagos
 elif menu == "💳 Planes y Suscripciones":
@@ -101,13 +105,13 @@ elif menu == "💳 Planes y Suscripciones":
         st.markdown("""
         **Detalles del Servicio:**
         - 4 Sesiones de Hipnosis Clínica.
-        - 1 Mes de acompañamiento.
-        - Terapeutas Certificados por Instituto AETHON.
+        - 1 Mes de acompañamiento continuo.
+        - Terapeutas Certificados por el **Instituto AETHON**.
         
         **Inversión:** $80.00 USD
         """)
     
     with col2:
-        st.warning("💳 Método de Pago: USDT")
-        st.info("Para agendar, realiza el pago y contacta a soporte con el comprobante.")
+        st.warning("💳 Método de Pago: USDT (Billetera Electrónica)")
+        st.info("Una vez realizado el pago, contacta a soporte para asignar tu terapeuta certificado.")
 
