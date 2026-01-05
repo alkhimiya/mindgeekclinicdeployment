@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 from groq import Groq
@@ -6,12 +5,13 @@ from groq import Groq
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# Estilo visual para evitar deformación de texto y dar aspecto profesional
+# --- BLOQUE DE ESTILO (Aquí modificas tamaños y colores) ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
     .stChatFloatingInputContainer { bottom: 20px; }
-    /* Ajuste de puntaje para el título principal en móviles y desktop */
+    
+    /* Título: Bienvenidos a Mind Geek Clinic */
     .titulo-principal {
         font-size: 2.1rem !important;
         font-weight: 800;
@@ -19,9 +19,12 @@ st.markdown("""
         line-height: 1.1;
         margin-bottom: 5px;
     }
+    
+    /* FRASE: La vanguardia en salud mental (MODIFICA AQUÍ) */
     .subtitulo-vanguardia {
-        font-size: 1.1rem !important;
-        color: #444;
+        font-size: 1.5rem !important;  /* Tamaño de la letra */
+        color: #E63946 !important;    /* Color (Ejemplo: Rojo suave, puedes usar #1E3A8A para azul) */
+        font-weight: 600;
         font-style: italic;
     }
     </style>
@@ -49,13 +52,14 @@ with st.sidebar:
 # 4. LÓGICA DE MÓDULOS
 
 if menu == "🏠 Inicio":
-    # Título ajustado para evitar que las palabras se amontonen o deformen
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
+    # Aquí se aplica el estilo de "La vanguardia..."
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     
     st.markdown("---")
+    # Cambio solicitado: "sanación" en lugar de "transformación"
     st.markdown("""
-    ### Tu proceso de transformación comienza aquí
+    ### Tu proceso de sanación comienza aquí
     En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica para llegar a la raíz de tu bienestar.
     
     **¿Cómo proceder?**
@@ -91,16 +95,11 @@ elif menu == "🩺 Consulta Médica Gratis":
                             
                             TU OBJETIVO CLÍNICO:
                             1. Presentarte como Nexo y realizar una anamnesis profunda.
-                            2. Debes indagar en: tiempo del padecimiento, eventos desencadenantes en el entorno, situación emocional, familiar y laboral actual.
-                            3. No te comportes como un vendedor. Tu prioridad es el diagnóstico profesional del conflicto biológico.
+                            2. Indaga en: tiempo del padecimiento, eventos desencadenantes, situación emocional, familiar y laboral.
+                            3. Tu prioridad es el diagnóstico profesional del conflicto biológico.
                             4. Solo tras una indagación exhaustiva, recomienda el: 'Plan de hipnosis clínica para el tratamiento de su condición'.
                             
-                            DETALLES DEL TRATAMIENTO:
-                            - Consiste en 4 sesiones de intervención profunda.
-                            - Inversión: 80 USD (Pago Único).
-                            - Método de pago: USDT.
-                            
-                            Habla de forma pausada, empática y con alto rigor profesional."""
+                            DETALLES: 4 sesiones, 80 USD (Pago Único), vía USDT."""
                         },
                         *st.session_state.messages
                     ],
@@ -110,20 +109,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Nexo ha perdido la conexión momentáneamente. Por favor, reintenta.")
+                st.error("Nexo ha perdido la conexión. Reintenta.")
 
 elif menu == "💳 Planes y Suscripciones":
     st.title("Tratamientos Especializados")
     st.subheader("Plan de Hipnosis Clínica para el tratamiento de su condición")
     
     st.markdown("""
-    Protocolo de intervención diseñado tras la evaluación clínica inicial.
-    
     - **Servicio:** 4 Sesiones de Hipnosis Clínica Transpersonal.
-    - **Metodología:** Reprogramación neuronal y Biodescodificación.
     - **Inversión:** $80.00 USD (**Pago Único**).
     - **Certificación:** Instituto Clínico de Neuroprogramación AETHON.
     ---
-    **Instrucciones de Pago:**
-    El pago se realiza exclusivamente vía **USDT (Red TRC20)**. Una vez completado, envía el comprobante para asignar tu fecha de inicio.
+    **Pago:** USDT (Red TRC20).
     """)
