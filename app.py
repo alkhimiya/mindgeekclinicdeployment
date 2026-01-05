@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-CONFIGURACIÓN DEFINITIVA - Ignora problemas de health check
+CONFIGURACIÓN DEFINITIVA - Streamlit Cloud
+NO especificar puerto, dejar que Streamlit Cloud lo asigne
 """
 import os
-import time
+import sys
 
-# Dar tiempo para que todo se inicialice
-time.sleep(2)
-
-# Configuración MÍNIMA que funciona
-os.system("streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8501")
+# Streamlit Cloud asignará automáticamente un puerto disponible
+# NO uses --server.port, deja que Streamlit Cloud lo gestione
+os.system("streamlit run streamlit_app.py --server.address=0.0.0.0")
