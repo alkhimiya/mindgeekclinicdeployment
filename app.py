@@ -30,13 +30,13 @@ with st.sidebar:
     st.write("---")
     st.info("Respaldado por el **Instituto Clínico de Neuroprogramación AETHON**")
 
-# 4. FUNCIONES GLOBALES (Cerebro Financiero)
+# 4. FUNCIONES GLOBALES (Cerebro Financiero Multidivisa)
 @st.cache_data(ttl=3600)
 def calcular_finanzas_globales():
     monto_usd = 80.00
     paridad_eur_usd = 0.92
-    tasa_ve_bcv = 360.50     # Euro BCV
-    tasa_co_trm = 3950.00    # TRM Colombia aprox.
+    tasa_ve_bcv = 360.50     # Tasa Euro BCV
+    tasa_co_trm = 3950.00    # Tasa TRM Colombia
     
     monto_eur = monto_usd * paridad_eur_usd
     monto_bs = monto_eur * tasa_ve_bcv
@@ -56,11 +56,11 @@ if menu == "🏠 Inicio":
     st.markdown("""
     #### **La Frontera de la Nueva Medicina**
     Bienvenidos a la intersección donde la computación avanzada se encuentra con la inteligencia del alma. 
-    Hemos decodificado el lenguaje del síntoma para ofrecerle un puente cuántico hacia su sanación.
+    Hemos decodificado el lenguaje del síntoma para ofrecerle un puente cuántico hacia su sanación integral.
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO REFORZADO) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Interacción profunda con Nexo - Instituto AETHON")
@@ -82,7 +82,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": "Eres Nexo, experto en Biodescodificación e Hipnosis. Tu tono es extremadamente empático y humano. Explica que la enfermedad es una respuesta biológica a un conflicto emocional. Debes indagar profundamente (5-6 turnos). Al final, ofrece el protocolo de 4 sesiones (3 hipnosis + 1 refuerzo) y menciona que un especialista humano analizará este expediente antes de la cita presencial/online. Finaliza con: CLAVE_ORDEN: [Resumen]."
+                        "content": """Eres Nexo, experto en Biodescodificación e Hipnosis Clínica. 
+                        TU PERSONALIDAD: Empatía extrema, analítico y cálido.
+                        
+                        PROTOCOLO DE CIERRE (Obligatorio cuando el paciente acepta o termina la sesión):
+                        1. Valida su deseo de sanar.
+                        2. Explica que el siguiente paso es formalizar el ingreso: 'Para que este expediente llegue al especialista humano que analizará su caso, es necesario formalizar su ingreso'.
+                        3. INVITA AL ÁREA ADMINISTRATIVA: Indica que debe ir al menú lateral -> Área Administrativa.
+                        4. RECUERDA: Tras el registro en Administración, se habilitará la agenda en línea para sus 4 sesiones.
+                        
+                        Finaliza con: CLAVE_ORDEN: [Resumen clínico detallado]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
@@ -94,22 +103,22 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
             except Exception as e:
-                st.error(f"Error de comunicación con el núcleo: {e}")
+                st.error(f"Error de conexión con el núcleo: {e}")
 
-# --- MÓDULO: ÁREA ADMINISTRATIVA ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (MULTIDIVISA) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
     
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
         diag = st.session_state.get('diagnostico_nexo', 'Evaluación en proceso')
         
-        # 1. EXPEDIENTE (Elegancia Clínica sin montos)
+        # 1. EXPEDIENTE (Elegancia Clínica)
         st.markdown(f"""
         <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #4682B4; box-shadow: 0px 4px 15px rgba(0,0,0,0.2);">
             <h3 style="color: #FFD700; margin-top:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
             <p style="font-style: italic; margin-top:10px; line-height: 1.6;">{diag}</p>
             <hr style="border: 0.5px solid rgba(255,255,255,0.2);">
-            <p style="font-size: 0.9rem;"><b>Protocolo:</b> 4 Sesiones de Intervención Profunda. Un terapeuta humano estudiará este análisis para abordar su cita con total conocimiento de su caso.</p>
+            <p style="font-size: 0.9rem;"><b>Nota Institucional:</b> Su terapeuta humano analizará este expediente antes de su primera cita para abordar su caso con total conocimiento previo.</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -122,15 +131,13 @@ elif menu == "🏢 Área Administrativa":
                 <h4 style="color: #1E3A8A; margin:0;">Pago Móvil Mercantil</h4>
                 <p style="color: #1E3A8A; margin: 5px 0;">V-15.214.337 | Tel: 04262272765 | Tasa BCV: {tasa_ve} Bs.</p>
                 <div style="background: #1E3A8A; color: #FFD700; padding: 15px; border-radius: 8px; text-align: center; margin-top:10px;">
-                <p style="margin:0; font-size: 0.8rem; color: white;">TOTAL A TRANSFERIR:</p>
                 <h2 style="margin:0;">{total_bs:,.2f} Bs.</h2></div></div>""", unsafe_allow_html=True)
 
         with tab_co:
             st.markdown(f"""<div style="background-color: #FFF5F0; padding: 20px; border-radius: 12px; border: 1px solid #D35400;">
-                <h4 style="color: #D35400; margin:0;">Transferencia Bancaria Colombia</h4>
-                <p style="color: #D35400; margin: 5px 0;">Datos: [Cuenta por asignar la próxima semana] | TRM: {tasa_co} COP</p>
+                <h4 style="color: #D35400; margin:0;">Transferencia Colombia</h4>
+                <p style="color: #D35400; margin: 5px 0;">Datos: [Asignación próxima semana] | TRM Banco de la Rep: {tasa_co} COP</p>
                 <div style="background: #D35400; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-top:10px;">
-                <p style="margin:0; font-size: 0.8rem; opacity: 0.9;">TOTAL A TRANSFERIR:</p>
                 <h2 style="margin:0;">{total_cop:,.2f} COP</h2></div></div>""", unsafe_allow_html=True)
 
         with tab_usdt:
@@ -138,18 +145,17 @@ elif menu == "🏢 Área Administrativa":
                 <h4 style="color: #1E7E34; margin:0;">USDT (Red BEP20)</h4>
                 <p style="color: #1E7E34; word-break: break-all; font-family: monospace;">0xE30516Af847E0a7E343917e0C204E1e974754dBa</p>
                 <div style="background: #1E7E34; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-top:10px;">
-                <p style="margin:0; font-size: 0.8rem; opacity: 0.9;">INVERSIÓN DIGITAL:</p>
                 <h2 style="margin:0;">80.00 USDT</h2></div></div>""", unsafe_allow_html=True)
 
         st.write("---")
-        ref = st.text_input("Número de Referencia de Pago:")
+        ref = st.text_input("Ingrese número de Referencia:")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("🚀 FINALIZAR Y AGENDAR CITA", use_container_width=True):
-                if ref: st.balloons(); st.success("Registro administrativo exitoso. Su proceso ha comenzado.")
+            if st.button("🚀 FINALIZAR REGISTRO", use_container_width=True):
+                if ref: st.balloons(); st.success("Registro completado exitosamente.")
         with c2:
             msj = f"Saludos AETHON. Formalizo mi ingreso. Ref: {ref}."
-            st.link_button("💬 NOTIFICAR REGISTRO POR WHATSAPP", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
+            st.link_button("💬 NOTIFICAR POR WHATSAPP", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
     else:
-        st.warning("⚠️ El Área Administrativa se habilitará una vez que Nexo complete su evaluación clínica.")
-        
+        st.warning("⚠️ Debe completar su evaluación con Nexo primero.")
+    
