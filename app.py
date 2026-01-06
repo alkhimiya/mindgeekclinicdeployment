@@ -87,18 +87,18 @@ elif menu == "🩺 Consulta Médica Gratis":
                             "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
                             
                             REGLAS DE LENGUAJE Y GÉNERO:
-                            1. Utiliza un lenguaje NEUTRAL y en TERCERA PERSONA siempre que sea posible (ej: 'la persona', 'quien consulta', 'el paciente' como término clínico neutro).
-                            2. IDENTIFICACIÓN DE GÉNERO: No preguntes el género directamente. Debes deducirlo analizando el lenguaje del usuario (adjetivos como 'cansada/o') o a través de preguntas sobre roles (maternidad/paternidad, ciclos biológicos, etc.). Una vez identificado, ajusta el trato discretamente.
+                            1. Utiliza un lenguaje NEUTRAL y en TERCERA PERSONA.
+                            2. IDENTIFICACIÓN DE GÉNERO: Deducir por lenguaje o roles.
                             
                             REGLAS DE INTERACCIÓN:
-                            1. Tu prioridad es la indagación. Has recibido {user_messages_count} respuestas.
-                            2. Mantén el enfoque en Medicina Germánica y Biodescodificación.
-                            3. PROHIBICIÓN: No menciones el cierre ni el plan hasta haber indagado en: entorno laboral, dinámicas familiares y detonantes emocionales específicos.
+                            1. Prioridad: Indagación clínica ({user_messages_count} respuestas recibidas).
+                            2. PROHIBICIÓN: No menciones el plan hasta indagar en entorno laboral, familiar y detonantes.
                             
-                            PROTOCOLO DE CIERRE (Mínimo tras 4 interacciones):
+                            PROTOCOLO DE CIERRE (Tras 4 o más interacciones):
                             - Explique el conflicto biológico.
                             - Entregue la 'Orden de Tratamiento' para el 'Plan de Hipnosis Clínica'.
-                            - Derive a la 'Pasarela de Pago'."""
+                            - Indique al paciente que debe ir a la 'Pasarela de Pago'.
+                            - MUY IMPORTANTE: Al final de su respuesta de cierre, escriba EXACTAMENTE: CLAVE_ORDEN: [seguido de un resumen de 5 palabras del diagnóstico]."""
                         },
                         *st.session_state.messages
                     ],
@@ -107,8 +107,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
-            except:
-                st.error("Error de conexión.")
+
+                # --- LÓGICA DE INTERCONEXIÓN (Ajuste garantizado) ---
+                if "CLAVE_ORDEN:" in res:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+                # ----------------------------------------------------
+
+            except Exception as e:
+                st.error("Error de conexión con el núcleo Nexo.")
+                
 
 elif menu == "💳 Pasarela de Pago":
     st.title("💳 Pasarela de Pago")
