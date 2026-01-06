@@ -112,94 +112,80 @@ elif menu == "🩺 Consulta Médica Gratis":
             except Exception as e:
                 st.error(f"Error de conexión con Nexo: {e}")
 
-# ANCLA_PAGOS (Versión Final con Datos Reales y Cálculo Automático)
+# ANCLA_PAGOS (Versión Triangulación USD -> EUR -> BS)
 elif menu == "💳 Pasarela de Pago":
     st.title("🛡️ Formalización de su Proceso de Sanación")
 
-    # 1. RASTREADOR DE TASA BCV (Automatizado)
+    # 1. LÓGICA DE TRIANGULACIÓN FINANCIERA
     @st.cache_data(ttl=3600)
-    def obtener_tasa_bcv():
-        try:
-            import random
-            # Simulación de rastreo de alta precisión para evitar bloqueos de servidores externos
-            tasa_base = 48.25 
-            variacion = random.uniform(-0.15, 0.15)
-            return round(tasa_base + variacion, 2)
-        except:
-            return 48.50
+    def calcular_montos_reales():
+        # Datos proporcionados y paridad internacional aproximada
+        tasa_euro_bcv = 360.50  # Valor oficial según tu reporte del BCV
+        paridad_eur_usd = 0.92  # 1 USD suele ser aprox 0.92 EUR (ajustable)
+        
+        monto_usd = 80.00
+        monto_eur = monto_usd * paridad_eur_usd
+        monto_bs = monto_eur * tasa_euro_bcv
+        
+        return tasa_euro_bcv, monto_eur, monto_bs
 
-    tasa_actual = obtener_tasa_bcv()
-    monto_usd = 80
-    monto_bs = monto_usd * tasa_actual # Cálculo automático del monto en Bs.
+    tasa_bcv, total_eur, total_bs = calcular_montos_reales()
 
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
         diagnostico = st.session_state.get('diagnostico_nexo', 'Evaluación General')
         
-        # 2. HOJA DE RUTA DIGITAL
+        # 2. REPORTE DE ORDEN CON TRIANGULACIÓN
         st.markdown(f"""
         <div style="background-color: #F0F2F6; padding: 25px; border-radius: 15px; border: 1px solid #1E3A8A;">
-            <h4 style="color: #1E3A8A; margin-top:0;">📡 REPORTE DE ORDEN SINCRONIZADO</h4>
-            <p style="color: #000000; font-size: 1.1rem;"><strong>Paciente:</strong> Registro de Evaluación Web</p>
-            <p style="color: #000000; font-size: 1.1rem;"><strong>Enfoque Clínico:</strong> {diagnostico}</p>
+            <h4 style="color: #1E3A8A; margin-top:0;">📡 CÁLCULO DE TASA OFICIAL BCV</h4>
+            <p style="color: #000; margin-bottom:5px;"><strong>Inversión Base:</strong> $80.00 USD</p>
+            <p style="color: #000; margin-bottom:5px;"><strong>Equivalencia en Euros:</strong> {total_eur:.2f} €</p>
             <hr style="border: 0.5px solid #1E3A8A;">
-            <p style="color: #1E3A8A; font-weight: bold; font-size: 1.2rem; margin-bottom: 5px;">Monto de Inversión:</p>
-            <h2 style="color: #000000; margin-top: 0;">${monto_usd}.00 USD</h2>
             <div style="background-color: #1E3A8A; padding: 15px; border-radius: 8px;">
-                <p style="margin:0; font-weight: bold; color: #FFFFFF; font-size: 0.9rem;">📈 TASA OFICIAL EURO BCV:</p>
-                <p style="margin:0; font-size: 1.3rem; color: #FFFFFF;">{tasa_actual} Bs/EUR</p>
+                <p style="margin:0; font-weight: bold; color: #FFFFFF; font-size: 0.9rem;">TASA OFICIAL EUR (BCV):</p>
+                <p style="margin:0; font-size: 1.3rem; color: #FFFFFF;">{tasa_bcv:.2f} Bs/EUR</p>
+                <p style="margin:5px 0 0 0; font-weight: bold; color: #FFD700; font-size: 1.2rem;">TOTAL A PAGAR: {total_bs:,.2f} Bs.</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
         st.write("---")
         
-        # 3. OPCIONES DE PAGO (Tabs)
-        tab1, tab2 = st.tabs(["🇻🇪 PAGO MÓVIL (Bolívares)", "💎 CRIPTO (USDT)"])
+        # 3. MÉTODOS DE PAGO
+        tab1, tab2 = st.tabs(["🇻🇪 PAGO MÓVIL (Mercantil)", "💎 CRIPTO (USDT)"])
         
         with tab1:
-            st.subheader("Pago Móvil Mercantil")
-            st.warning(f"Total a Transferir: {monto_bs:,.2f} Bs.")
-            
-            # Cuadro de datos bancarios
             st.markdown(f"""
-            <div style="background-color: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px dashed #1E3A8A;">
-                <p style="color: #000000; margin: 5px 0;"><strong>Banco:</strong> Banco Mercantil</p>
-                <p style="color: #000000; margin: 5px 0;"><strong>Teléfono:</strong> 04262272765</p>
-                <p style="color: #000000; margin: 5px 0;"><strong>Cédula:</strong> V-15.214.337</p>
-                <p style="color: #1E3A8A; font-weight: bold; margin-top: 10px; font-size: 1.1rem;">
-                    Monto Exacto: {monto_bs:,.2f} Bs.
-                </p>
+            <div style="background-color: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
+                <h4 style="color: #1E3A8A;">Datos de Pago Móvil:</h4>
+                <p style="color: #000;"><strong>Banco:</strong> Banco Mercantil</p>
+                <p style="color: #000;"><strong>Cédula:</strong> V-15.214.337</p>
+                <p style="color: #000;"><strong>Teléfono:</strong> 04262272765</p>
+                <h3 style="color: #1E3A8A; border-top: 1px solid #eee; padding-top:10px;">Monto: {total_bs:,.2f} Bs.</h3>
             </div>
             """, unsafe_allow_html=True)
 
         with tab2:
-            st.subheader("Depósito en Cripto")
-            st.write("Redes soportadas: **BEP20 / ERC20**")
-            st.code("0xE30516Af847E0a7E343917e0C204E1e974754dBa", language="text")
-            st.caption("Copie la dirección para evitar errores en la transferencia.")
+            st.write("Depósito Directo en USDT (Red BEP20):")
+            st.code("0xE30516Af847E0a7E343917e0C204E1e974754dBa")
 
         st.write("---")
         
-        # 4. CONFIRMACIÓN Y SOPORTE
-        st.subheader("Paso Final: Registro de Confirmación")
-        txn_id = st.text_input("Ingrese el número de Referencia bancaria o TXID:", key="ref_pago")
-        
+        # 4. CIERRE Y WHATSAPP
+        txn_id = st.text_input("Número de Referencia:")
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("🚀 CONFIRMAR REGISTRO", use_container_width=True):
+            if st.button("🚀 CONFIRMAR PAGO", use_container_width=True):
                 if txn_id:
                     st.balloons()
-                    st.success("¡Pago Registrado! El Instituto AETHON procesará su acceso en breve.")
-                else:
-                    st.error("Por favor, ingrese el número de referencia para validar.")
+                    st.success("Referencia recibida. El Instituto AETHON procesará su orden.")
         
         with col2:
-            # Mensaje automático de WhatsApp con los datos del pago
-            msj_wa = f"Hola Nexo, envío confirmación de pago. Ref: {txn_id}. Monto: {monto_bs:,.2f} Bs."
+            msj_wa = f"Hola Nexo, confirmo pago de {total_bs:,.2f} Bs. Ref: {txn_id}"
             url_wa = f"https://wa.me/584262272765?text={msj_wa.replace(' ', '%20')}"
             st.link_button("💬 NOTIFICAR POR WHATSAPP", url_wa, use_container_width=True)
             
     else:
-        st.warning("⚠️ Se requiere una evaluación clínica previa con Nexo para habilitar la pasarela de pago.")
-            
+        st.warning("⚠️ Debe completar la evaluación clínica con Nexo para habilitar los pagos.")
+        
