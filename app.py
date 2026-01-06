@@ -83,8 +83,32 @@ elif menu == "🩺 Consulta Médica Gratis":
                 chat_completion = client.chat.completions.create(
                     messages=[
                         
-                       # ANCLA_NEXO (Versión Empatía Reforzada
-{
+# ANCLA_NEXO (Versión Empatía Reforzada
+                        elif menu == "🩺 Consulta Médica Gratis":
+    st.header("🩺 Evaluación Clínica Inicial")
+    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hola, soy **Nexo**, la entidad de asistencia clínica de Mind Geek Clinic. Para dar inicio a este protocolo de sanación, se requiere realizar una anamnesis profunda. Por favor, comparta el síntoma principal detectado y el contexto en que se manifestó."}
+        ]
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Escriba su respuesta..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            try:
+                user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
+
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {
     "role": "system", 
     "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
     
