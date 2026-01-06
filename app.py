@@ -43,7 +43,6 @@ if menu == "🏠 Inicio":
     st.markdown("---")
     st.markdown("### Tu proceso de sanación comienza aquí")
     
-    # Texto trascendental con estilo destacado
     st.markdown("""
     #### **La Frontera de la Nueva Medicina**
     Bienvenidos a la intersección donde la computación avanzada se encuentra con la inteligencia del alma. 
@@ -58,34 +57,6 @@ if menu == "🏠 Inicio":
     st.write("---")
     st.info("Utilice el menú lateral para iniciar su protocolo de evaluación con **Nexo**.")
 
-elif menu == "🩺 Consulta Médica Gratis":
-    st.header("🩺 Evaluación Clínica Inicial")
-    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hola, soy **Nexo**, la entidad de asistencia clínica de Mind Geek Clinic. Para dar inicio a este protocolo de sanación, se requiere realizar una anamnesis profunda. Por favor, comparta el síntoma principal detectado y el contexto en que se manifestó."}
-        ]
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Escriba su respuesta..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            try:
-                user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
-
-                chat_completion = client.chat.completions.create(
-                
-                    messages=[
-                    ])
-
-# ANCLA_NEXO (Versión Empatía Reforzada - CORREGIDA)
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
     st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
@@ -125,7 +96,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                             3. TRANSICIÓN SUAVE: Di: 'Para poder acompañarle en este camino, es necesario formalizar su ingreso al instituto. He preparado su documentación clínica en la sección de "Pasarela de Pago" para que podamos iniciar cuanto antes su proceso de sanación'.
                             
                             REGLA TÉCNICA: Al final de la respuesta de cierre, añade exactamente: CLAVE_ORDEN: [diagnóstico breve]."""
-                        }, # <--- Esta coma era la que faltaba
+                        },
                         *st.session_state.messages
                     ],
                     model="llama-3.3-70b-versatile",
@@ -134,28 +105,13 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
 
-                # Lógica para capturar la orden para la pasarela
-                if "CLAVE_ORDEN:" in res:
-                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    st.session_state.orden_lista = True
-
-            except Exception as e:
-                st.error(f"Error en el núcleo Nexo: {e}")
-
-                # Lógica para capturar la orden para la pasarela
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
 
             except Exception as e:
                 st.error(f"Error de conexión con Nexo: {e}")
- 
-                # ----------------------------------------------------
 
-            except Exception as e:
-                st.error("Error de conexión con el núcleo Nexo.")
-                
-# ANCLA_PAGOS (Versión Humanizada)
 elif menu == "💳 Pasarela de Pago":
     st.title("🛡️ Formalización de su Proceso de Sanación")
     
@@ -175,7 +131,18 @@ elif menu == "💳 Pasarela de Pago":
         </div>
         """, unsafe_allow_html=True)
         
-        # Aquí iría el área de pago mucho más discreta
         st.write("---")
         st.write("Para activar su plan de acompañamiento ($80 USD), proceda con la transferencia:")
         st.code("TU_BILLETERA_USDT")
+        
+        # Campo para validar pago
+        txn_id = st.text_input("Pegue aquí el Hash o ID de la transacción:")
+        if st.button("Finalizar Registro"):
+            if txn_id:
+                st.balloons()
+                st.success("Transacción recibida. El Instituto AETHON le contactará en breve.")
+            else:
+                st.error("Ingrese el ID de transacción para validar.")
+    else:
+        st.warning("⚠️ No se ha detectado una evaluación clínica completa. Por favor, hable con Nexo primero.")
+
