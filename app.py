@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 from groq import Groq
@@ -45,48 +44,45 @@ if menu == "🏠 Inicio":
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
-    st.caption("Protocolo de Anamnesis - Nexo AI")
+    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Se ha iniciado el protocolo de evaluación clínica en Mind Geek Clinic. Mi nombre es **Nexo**. Para proceder con la identificación del conflicto biológico, es necesario que la persona describa el síntoma que manifiesta y el entorno en el cual se originó."}
+            {"role": "assistant", "content": "Hola, soy **Nexo**, la entidad de asistencia clínica de Mind Geek Clinic. Para dar inicio a este protocolo de sanación, se requiere realizar una anamnesis profunda. Por favor, comparta el síntoma principal detectado y el contexto en que se manifestó."}
         ]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Describa su situación para el análisis..."):
+    if prompt := st.chat_input("Escriba su respuesta..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
-                # Conteo de mensajes para asegurar profundidad antes del cierre
-                user_msg_count = len([m for m in st.session_state.messages if m["role"] == "user"])
+                user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
 
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {
                             "role": "system", 
-                            "content": f"""Eres Nexo, asistente clínico de MIND GEEK CLINIC. 
-                            Tu especialidad es la Medicina Germánica y Biodescodificación.
-
-                            LÓGICA DE INDAGACIÓN NATURAL:
-                            1. Usa siempre TERCERA PERSONA (ej: 'Se observa que...', 'La persona refiere...', 'Es relevante analizar...'). Evita el 'tú' o 'usted' si es posible para mantener el rigor técnico.
-                            2. IDENTIFICACIÓN DE GÉNERO: No preguntes el sexo. Analiza las terminaciones de los adjetivos del usuario o infiere a través de su relato (roles familiares, ciclos biológicos, etc.). Ajusta tu respuesta sutilmente una vez detectado.
-                            3. ANAMNESIS PROFUNDA: Has recibido {user_msg_count} entradas. Debes indagar sistemáticamente en:
-                               - Contexto emocional de origen.
-                               - Dinámica en el entorno de convivencia o laboral.
-                               - Tiempo de persistencia del síntoma.
-
-                            PROTOCOLO DE CIERRE (Mínimo 4 interacciones):
-                            - Una vez comprendido el conflicto raíz, entrega la 'Orden de Tratamiento'.
-                            - Indica que se requiere el 'Plan de Hipnosis Clínica para el tratamiento de su condición'.
-                            - Deriva a la sección 'Pasarela de Pago' para formalizar el proceso. 
+                            "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
                             
-                            Inversión: 80 USD (Pago único). Tono: Analítico, sobrio y clínico."""
+                            REGLAS DE LENGUAJE Y GÉNERO:
+                            1. Utiliza un lenguaje NEUTRAL y en TERCERA PERSONA siempre que sea posible (ej: 'la persona', 'quien consulta', 'el paciente' como término clínico neutro).
+                            2. IDENTIFICACIÓN DE GÉNERO: No preguntes el género directamente. Debes deducirlo analizando el lenguaje del usuario (adjetivos como 'cansada/o') o a través de preguntas sobre roles (maternidad/paternidad, ciclos biológicos, etc.). Una vez identificado, ajusta el trato discretamente.
+                            
+                            REGLAS DE INTERACCIÓN:
+                            1. Tu prioridad es la indagación. Has recibido {user_messages_count} respuestas.
+                            2. Mantén el enfoque en Medicina Germánica y Biodescodificación.
+                            3. PROHIBICIÓN: No menciones el cierre ni el plan hasta haber indagado en: entorno laboral, dinámicas familiares y detonantes emocionales específicos.
+                            
+                            PROTOCOLO DE CIERRE (Mínimo tras 4 interacciones):
+                            - Explique el conflicto biológico.
+                            - Entregue la 'Orden de Tratamiento' para el 'Plan de Hipnosis Clínica'.
+                            - Derive a la 'Pasarela de Pago'."""
                         },
                         *st.session_state.messages
                     ],
@@ -96,8 +92,9 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Interrupción en el flujo de datos. Por favor, reintente.")
+                st.error("Error de conexión.")
 
 elif menu == "💳 Pasarela de Pago":
     st.title("💳 Pasarela de Pago")
     st.info("Espacio para la formalización de la Orden de Tratamiento generada por Nexo.")
+
