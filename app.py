@@ -10,19 +10,8 @@ st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
     .stChatFloatingInputContainer { bottom: 20px; }
-    .titulo-principal {
-        font-size: 2.1rem !important;
-        font-weight: 800;
-        color: #1E3A8A;
-        line-height: 1.1;
-        margin-bottom: 5px;
-    }
-    .subtitulo-vanguardia {
-        font-size: 1.4rem !important;
-        color: #4682B4 !important;
-        font-weight: 500;
-        font-style: italic;
-    }
+    .titulo-principal { font-size: 2.1rem !important; font-weight: 800; color: #1E3A8A; line-height: 1.1; }
+    .subtitulo-vanguardia { font-size: 1.4rem !important; color: #4682B4 !important; font-weight: 500; font-style: italic; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -40,7 +29,7 @@ with st.sidebar:
     menu = st.radio("Navegación", [
         "🏠 Inicio", 
         "🩺 Consulta Médica Gratis", 
-        "💳 Planes y Suscripciones"
+        "💳 Pasarela de Pago"
     ])
     st.write("---")
     st.info("Respaldado por el **Instituto Clínico de Neuroprogramación AETHON**")
@@ -52,54 +41,45 @@ if menu == "🏠 Inicio":
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### Tu proceso de sanación comienza aquí")
-    st.write("En **Mind Geek Clinic**, integramos Psicología, Neurociencias y Física Cuántica.")
+    st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
     st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
-    # --- LÓGICA DE SALUDO INICIAL ---
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hola, soy **Nexo**, tu asistente clínico de Mind Geek Clinic. Mi propósito es comprender profundamente tu situación para orientarte hacia la mejor ruta de sanación. Cuéntame, ¿qué síntomas o malestares estás experimentando y desde cuándo?"}
+            {"role": "assistant", "content": "Hola, soy **Nexo**, su asistente clínico en Mind Geek Clinic. Para iniciar este proceso de sanación, es imperativo realizar una anamnesis profunda de su situación. Por favor, descríbame su síntoma principal y bajo qué contexto emocional o familiar se manifestó por primera vez."}
         ]
 
-    # Mostrar historial de chat
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Entrada de usuario
-    if prompt := st.chat_input("Responde a Nexo aquí..."):
+    if prompt := st.chat_input("Responda a la evaluación clínica..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
-                # --- PROMPT DE LA SESIÓN (SYSTEM PROMPT) ---
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {
                             "role": "system", 
                             "content": """Identidad: Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-                            Rigor Profesional: Actúa como un experto en Medicina Germánica, Biodescodificación y Neurociencias.
+                            Rigor: Actúa con la autoridad de un profesional en Medicina Germánica y Biodescodificación.
                             
-                            INSTRUCCIONES DE CONSULTA:
-                            1. Debes llevar el control de una anamnesis clínica seria.
-                            2. INDAGA PROFUNDAMENTE antes de dar cualquier conclusión. Pregunta sobre:
-                               - Entorno familiar y laboral (conflictos de estrés).
-                               - Eventos desencadenantes (¿Qué pasó justo antes de que el síntoma apareciera?).
-                               - Situación emocional actual.
-                            3. Tu objetivo es encontrar el CONFLICTO BIOLÓGICO. No des consejos superficiales.
-                            4. SOLO cuando hayas recogido información suficiente, sugiere el 'Plan de hipnosis clínica para el tratamiento de su condición'.
+                            PROTOCOLO DE CIERRE PROFESIONAL:
+                            1. Tu meta es identificar el conflicto biológico/emocional a través de la anamnesis (familia, trabajo, tiempo de afección).
+                            2. Cuando el paciente haya aportado suficiente información, NO digas 'cuesta tanto'. Di lo siguiente:
+                               'Basado en el perfil clínico que hemos trazado, he generado su Orden de Tratamiento. 
+                               Usted requiere la aplicación del "Plan de Hipnosis Clínica para el tratamiento de su condición", 
+                               el cual consta de 4 sesiones de intervención profunda orientadas a la reprogramación neuronal de la causa raíz.'
+                            3. DERIVACIÓN: Instruye al paciente a dirigirse a la sección 'Pasarela de Pago' en el menú lateral para formalizar su ingreso al programa y obtener los detalles de la billetera USDT.
+                            4. RECUERDA: Habla de "Orden de Tratamiento" y "Derivación al área de pagos", no de ventas.
                             
-                            DATOS DEL TRATAMIENTO:
-                            - 4 sesiones intensivas.
-                            - Pago único de 80 USD.
-                            - Método: USDT.
-                            
-                            Tono: Empático, clínico, analítico y profesional."""
+                            Inversión: 80 USD (Pago Único)."""
                         },
                         *st.session_state.messages
                     ],
@@ -109,10 +89,9 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Error de conexión. Intenta nuevamente.")
+                st.error("Nexo está procesando otros perfiles clínicos. Por favor, reintente.")
 
-elif menu == "💳 Planes y Suscripciones":
-    st.title("Tratamientos Especializados")
-    st.subheader("Plan de Hipnosis Clínica para el tratamiento de su condición")
-    st.write("- **Inversión:** $80.00 USD (**Pago Único**)")
-    st.write("- **Certificación:** Instituto Clínico de Neuroprogramación AETHON")
+elif menu == "💳 Pasarela de Pago":
+    st.title("💳 Pasarela de Pago")
+    st.info("Esta sección está siendo configurada para recibir su Orden de Tratamiento generada por Nexo.")
+
