@@ -117,8 +117,46 @@ elif menu == "🩺 Consulta Médica Gratis":
             except Exception as e:
                 st.error("Error de conexión con el núcleo Nexo.")
                 
-
+# ANCLA_PAGOS
 elif menu == "💳 Pasarela de Pago":
     st.title("💳 Pasarela de Pago")
-    st.info("Espacio para la formalización de la Orden de Tratamiento generada por Nexo.")
-
+    
+    # Verificamos si Nexo ya emitió el diagnóstico
+    if "orden_lista" in st.session_state and st.session_state.orden_lista:
+        st.success("✅ Orden de Tratamiento Vinculada")
+        
+        # Diseño de la Receta Digital / Orden de Pago
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 25px; border-radius: 15px; border: 1px solid #dee2e6; border-left: 5px solid #1E3A8A;">
+            <h3 style="color: #1E3A8A; margin-top: 0;">ORDEN DE INTERVENCIÓN CLÍNICA</h3>
+            <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> Hipnosis Clínica Transpersonal</p>
+            <p style="margin-bottom: 5px;"><strong>Diagnóstico Nexo:</strong> {st.session_state.diagnostico_nexo}</p>
+            <p style="margin-bottom: 5px;"><strong>Sesiones:</strong> 4 Encuentros de Reprogramación</p>
+            <hr>
+            <h4 style="color: #1E3A8A;">Monto a Transferir: 80.00 USD</h4>
+            <p style="font-size: 0.9rem; color: #666;">Por favor, realice el depósito en <b>USDT (Red TRC20)</b> a la siguiente dirección oficial de Mind Geek Clinic:</p>
+            <code style="background-color: #ffffff; border: 1px solid #ccc; padding: 12px; display: block; font-size: 1.1rem; text-align: center; border-radius: 8px;">
+                TU_BILLETERA_AQUI_PEGALA
+            </code>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("")
+        st.markdown("### 📤 Reportar Pago")
+        # Campo para que el paciente pegue el Hash o ID de transacción
+        txn_id = st.text_input("Pegue aquí el Hash o ID de la transacción de Binance:")
+        
+        if st.button("Finalizar Registro"):
+            if txn_id:
+                st.balloons()
+                st.success("Ficha clínica y comprobante enviados al Instituto AETHON. En breve serás contactado por tu terapeuta.")
+            else:
+                st.error("Por favor, ingrese el ID de la transacción para validar su orden.")
+                
+    else:
+        # Si el usuario entra aquí sin hablar con Nexo
+        st.warning("⚠️ No se ha detectado una evaluación clínica activa.")
+        st.write("Para generar su orden de tratamiento, primero debe completar la entrevista con **Nexo** en la sección de 'Consulta Médica Gratis'.")
+        if st.button("Ir a consulta con Nexo"):
+            st.info("Seleccione '🩺 Consulta Médica Gratis' en el menú lateral.")
+            
