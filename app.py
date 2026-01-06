@@ -119,11 +119,10 @@ elif menu == "🩺 Consulta Médica Gratis":
             except Exception as e:
                 st.error(f"Error de comunicación con el núcleo Nexo: {e}")
 
-# --- MÓDULO: ÁREA ADMINISTRATIVA (DISEÑO BLINDADO DE ALTO CONTRASTE) ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (DISEÑO PREMIUM TECH REFORZADO) ---
 elif menu == "🏢 Área Administrativa":
-    st.title("🏢 Registro y Formalización")
-    st.markdown("### Instituto Clínico de Neuroprogramación AETHON")
-    st.divider()
+    st.title("🏢 Registro y Formalización de Ingreso")
+    st.caption("Instituto Clínico de Neuroprogramación AETHON")
 
     # 1. CEREBRO FINANCIERO
     @st.cache_data(ttl=3600)
@@ -140,66 +139,72 @@ elif menu == "🏢 Área Administrativa":
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
         diag = st.session_state.get('diagnostico_nexo', 'Evaluación General')
         
-        # 2. EXPEDIENTE (Usando columnas y contenedores nativos)
-        with st.container(border=True):
-            st.subheader("📋 Expediente de Ingreso Digital")
-            
-            c1, c2 = st.columns(2)
-            c1.markdown(f"**Protocolo:** \n {diag}")
-            c2.markdown(f"**Plan:** \n Intervención Profunda (4 Sesiones)")
-            
-            st.divider()
-            
-            # Métricas grandes y claras (Estas nunca fallan visualmente)
-            col_a, col_b, col_c = st.columns(3)
-            col_a.metric("Inversión Base", "$80.00 USD")
-            col_b.metric("Tasa EUR/BS (BCV)", f"{tasa_bcv}")
-            col_c.metric("Total a Formalizar", f"{total_bs:,.2f} Bs.")
-            
-            st.info(f"Monto exacto a transferir: {total_bs:,.2f} Bolívares")
+        # 2. EXPEDIENTE DIGITAL COLORIDO (Diseño de Alto Impacto)
+        st.markdown(f"""
+        <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; border-left: 10px solid #4682B4; box-shadow: 0px 4px 15px rgba(0,0,0,0.2); color: white;">
+            <h3 style="color: #FFD700; margin-top:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
+            <p style="margin-bottom: 10px; font-size: 1.1rem;"><strong>Protocolo Detectado:</strong> {diag}</p>
+            <hr style="border: 0.5px solid rgba(255,255,255,0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <p style="margin:0; font-size: 0.9rem; opacity: 0.8;">Inversión Base</p>
+                    <p style="margin:0; font-size: 1.4rem; font-weight: bold;">$80.00 USD</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin:0; font-size: 0.9rem; opacity: 0.8;">Tasa EUR (BCV)</p>
+                    <p style="margin:0; font-size: 1.4rem; font-weight: bold;">{tasa_bcv} Bs.</p>
+                </div>
+            </div>
+            <div style="background-color: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; border: 1px solid #FFD700;">
+                <p style="margin:0; font-size: 1rem; color: #FFD700; font-weight: bold;">TOTAL A FORMALIZAR:</p>
+                <h2 style="margin:0; font-size: 2.2rem; color: #FFFFFF;">{total_bs:,.2f} <span style="font-size: 1.2rem;">Bs.</span></h2>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("---")
+        
+        # 3. MÉTODOS DE PAGO CON COLOR
+        tab1, tab2 = st.tabs(["🇻🇪 PAGO MÓVIL (MERCANTIL)", "💎 BILLETERA USDT"])
+        
+        with tab1:
+            st.markdown(f"""
+            <div style="background-color: #F0F8FF; padding: 20px; border-radius: 12px; border: 1px solid #1E3A8A; color: #1E3A8A;">
+                <h4 style="margin-top:0; color: #1E3A8A;">Datos de Transferencia:</h4>
+                <p style="margin: 5px 0;"><strong>Banco:</strong> Banco Mercantil</p>
+                <p style="margin: 5px 0;"><strong>Cédula:</strong> V-15.214.337</p>
+                <p style="margin: 5px 0;"><strong>Teléfono:</strong> 04262272765</p>
+                <p style="margin-top: 10px; font-size: 1.2rem; font-weight: bold; background: #1E3A8A; color: white; padding: 5px 10px; border-radius: 5px; display: inline-block;">
+                    Monto: {total_bs:,.2f} Bs.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with tab2:
+            st.markdown(f"""
+            <div style="background-color: #E6F4EA; padding: 20px; border-radius: 12px; border: 1px solid #1E7E34; color: #155724;">
+                <h4 style="margin-top:0; color: #155724;">Dirección USDT (Red BEP20):</h4>
+                <p style="word-break: break-all; font-family: monospace; font-size: 1.1rem; font-weight: bold; background: white; padding: 10px; border-radius: 5px; border: 1px dashed #1E7E34;">
+                    0xE30516Af847E0a7E343917e0C204E1e974754dBa
+                </p>
+                <p style="font-size: 0.8rem; margin-top: 5px;">⚠️ Asegúrese de utilizar únicamente la red Binance Smart Chain.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.write("---")
         
-        # 3. DATOS DE TRANSFERENCIA (Formato simple y legible)
-        st.markdown("#### 💳 Métodos de Transferencia")
-        
-        pago_movil, usdt = st.tabs(["🇻🇪 Pago Móvil Mercantil", "💎 Cripto USDT"])
-        
-        with pago_movil:
-            # Usamos un bloque de código para los datos, así se ven destacados en gris
-            st.markdown("**Envíe su transferencia con los siguientes datos:**")
-            st.code(f"""
-Banco: Mercantil
-Cédula: V-15.214.337
-Teléfono: 04262272765
-Monto: {total_bs:,.2f} Bs.
-            """, language="text")
-            st.caption("Verifique los datos antes de confirmar.")
-
-        with usdt:
-            st.write("Red: **Binance Smart Chain (BEP20)**")
-            st.code("0xE30516Af847E0a7E343917e0C204E1e974754dBa", language="text")
-
-        st.write("---")
-        
-        # 4. FORMULARIO DE CIERRE
-        st.subheader("Confirmación de Proceso")
-        ref = st.text_input("Número de Referencia Bancaria:", placeholder="Ej: 002345...")
-        
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            if st.button("🚀 FINALIZAR REGISTRO", use_container_width=True, type="primary"):
-                if ref:
-                    st.balloons()
-                    st.success("Registro completado. Bienvenido al Instituto AETHON.")
-                else:
-                    st.error("Por favor, escriba la referencia.")
-        
-        with col_btn2:
+        # 4. REGISTRO Y WHATSAPP
+        ref = st.text_input("Número de Referencia:")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🚀 FINALIZAR REGISTRO CLÍNICO", use_container_width=True):
+                if ref: st.balloons(); st.success("¡Registro Exitoso!")
+        with c2:
             msj = f"Saludos Instituto AETHON. Formalizo mi ingreso. Ref: {ref}. Monto: {total_bs:,.2f} Bs."
-            st.link_button("💬 NOTIFICAR POR WHATSAPP", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
+            st.link_button("💬 NOTIFICAR AL DEPARTAMENTO", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
             
     else:
-        st.warning("⚠️ Se requiere la validación clínica de Nexo para acceder a esta área.")
+        st.warning("⚠️ Su reporte clínico requiere validación de Nexo.")
+        
             
         
