@@ -78,6 +78,7 @@ elif menu == "🏢 Área Administrativa":
     tasa_bcv, total_eur, total_bs = calcular_montos_reales()
 
     if "orden_lista" in 
+    
     # --- MÓDULO: CONSULTA (NEXO - VERSIÓN PUENTE HUMANO-CUÁNTICO) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
