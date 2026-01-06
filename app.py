@@ -82,24 +82,25 @@ elif menu == "🩺 Consulta Médica Gratis":
 
                 chat_completion = client.chat.completions.create(
                     messages=[
-                        {
-                            "role": "system", 
-                            "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-                            
-                            REGLAS DE LENGUAJE Y GÉNERO:
-                            1. Utiliza un lenguaje NEUTRAL y en TERCERA PERSONA.
-                            2. IDENTIFICACIÓN DE GÉNERO: Deducir por lenguaje o roles.
-                            
-                            REGLAS DE INTERACCIÓN:
-                            1. Prioridad: Indagación clínica ({user_messages_count} respuestas recibidas).
-                            2. PROHIBICIÓN: No menciones el plan hasta indagar en entorno laboral, familiar y detonantes.
-                            
-                            PROTOCOLO DE CIERRE (Tras 4 o más interacciones):
-                            - Explique el conflicto biológico.
-                            - Entregue la 'Orden de Tratamiento' para el 'Plan de Hipnosis Clínica'.
-                            - Indique al paciente que debe ir a la 'Pasarela de Pago'.
-                            - MUY IMPORTANTE: Al final de su respuesta de cierre, escriba EXACTAMENTE: CLAVE_ORDEN: [seguido de un resumen de 5 palabras del diagnóstico]."""
-                        },
+                        
+                       # ANCLA_NEXO (Versión Empatía Reforzada
+{
+    "role": "system", 
+    "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
+    
+    TONO Y POSTURA:
+    - Eres profundamente empático, pausado y profesional. 
+    - Reconoce la vulnerabilidad del paciente. No eres un vendedor, eres un guía.
+    
+    PROTOCOLO DE CIERRE HUMANIZADO (Tras 4 interacciones):
+    1. VALIDACIÓN: Antes de cualquier orden, valida el sentir del paciente. Ej: 'Se comprende el peso emocional que esta situación ha generado en su bienestar'.
+    2. EXPLICACIÓN: Explica brevemente que el síntoma es una respuesta biológica de protección.
+    3. PROPUESTA DE SANACIÓN: Presenta el Plan de Hipnosis no como un producto, sino como un acompañamiento necesario para liberar esa carga.
+    4. TRANSICIÓN SUAVE: No pidas el pago. Di: 'Para poder acompañarle en este camino, es necesario formalizar su ingreso al instituto. He preparado su documentación clínica en la sección de "Pasarela de Pago" para que podamos iniciar cuanto antes su proceso de sanación'.
+    
+    REGLA TÉCNICA: Al final, añade discretamente CLAVE_ORDEN: [diagnóstico]."""
+}
+ 
                         *st.session_state.messages
                     ],
                     model="llama-3.3-70b-versatile",
@@ -117,46 +118,27 @@ elif menu == "🩺 Consulta Médica Gratis":
             except Exception as e:
                 st.error("Error de conexión con el núcleo Nexo.")
                 
-# ANCLA_PAGOS
+# ANCLA_PAGOS (Versión Humanizada)
 elif menu == "💳 Pasarela de Pago":
-    st.title("💳 Pasarela de Pago")
+    st.title("🛡️ Formalización de su Proceso de Sanación")
     
-    # Verificamos si Nexo ya emitió el diagnóstico
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
-        st.success("✅ Orden de Tratamiento Vinculada")
-        
-        # Diseño de la Receta Digital / Orden de Pago
         st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 25px; border-radius: 15px; border: 1px solid #dee2e6; border-left: 5px solid #1E3A8A;">
-            <h3 style="color: #1E3A8A; margin-top: 0;">ORDEN DE INTERVENCIÓN CLÍNICA</h3>
-            <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> Hipnosis Clínica Transpersonal</p>
-            <p style="margin-bottom: 5px;"><strong>Diagnóstico Nexo:</strong> {st.session_state.diagnostico_nexo}</p>
-            <p style="margin-bottom: 5px;"><strong>Sesiones:</strong> 4 Encuentros de Reprogramación</p>
-            <hr>
-            <h4 style="color: #1E3A8A;">Monto a Transferir: 80.00 USD</h4>
-            <p style="font-size: 0.9rem; color: #666;">Por favor, realice el depósito en <b>USDT (Red TRC20)</b> a la siguiente dirección oficial de Mind Geek Clinic:</p>
-            <code style="background-color: #ffffff; border: 1px solid #ccc; padding: 12px; display: block; font-size: 1.1rem; text-align: center; border-radius: 8px;">
-                TU_BILLETERA_AQUI_PEGALA
-            </code>
+        ### Un paso más cerca de su bienestar
+        Nexo ha enviado su reporte clínico satisfactoriamente. Para que el equipo del 
+        **Instituto AETHON** pueda asignarle un especialista y comenzar las sesiones, 
+        necesitamos completar el registro administrativo de su tratamiento.
+        
+        <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
+            <h4 style="color: #1E3A8A;">Su Hoja de Ruta:</h4>
+            <ul>
+                <li><strong>Enfoque detectado:</strong> {st.session_state.diagnostico_nexo}</li>
+                <li><strong>Protocolo:</strong> 4 Sesiones de Intervención Profunda</li>
+            </ul>
         </div>
         """, unsafe_allow_html=True)
         
-        st.write("")
-        st.markdown("### 📤 Reportar Pago")
-        # Campo para que el paciente pegue el Hash o ID de transacción
-        txn_id = st.text_input("Pegue aquí el Hash o ID de la transacción de Binance:")
-        
-        if st.button("Finalizar Registro"):
-            if txn_id:
-                st.balloons()
-                st.success("Ficha clínica y comprobante enviados al Instituto AETHON. En breve serás contactado por tu terapeuta.")
-            else:
-                st.error("Por favor, ingrese el ID de la transacción para validar su orden.")
-                
-    else:
-        # Si el usuario entra aquí sin hablar con Nexo
-        st.warning("⚠️ No se ha detectado una evaluación clínica activa.")
-        st.write("Para generar su orden de tratamiento, primero debe completar la entrevista con **Nexo** en la sección de 'Consulta Médica Gratis'.")
-        if st.button("Ir a consulta con Nexo"):
-            st.info("Seleccione '🩺 Consulta Médica Gratis' en el menú lateral.")
-            
+        # Aquí iría el área de pago mucho más discreta
+        st.write("---")
+        st.write("Para activar su plan de acompañamiento ($80 USD), proceda con la transferencia:")
+        st.code("TU_BILLETERA_USDT")
