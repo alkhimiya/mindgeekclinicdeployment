@@ -64,6 +64,7 @@ if menu == "🏠 Inicio":
     st.info("Utilice el menú lateral para iniciar su protocolo de evaluación con **Nexo**.")
 
 # --- MÓDULO: CONSULTA MÉDICA ---
+
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Espacio Sagrado de Sanación - Instituto AETHON")
@@ -105,8 +106,8 @@ elif menu == "🩺 Consulta Médica Gratis":
 
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    
-   # --- MÓDULO: ÁREA ADMINISTRATIVA (INTERNACIONAL - VEN/COL/USDT) ---
+
+# --- MÓDULO: ÁREA ADMINISTRATIVA (INTERNACIONAL - VEN/COL/USDT) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
     st.caption("Dirección Administrativa - Instituto Clínico de Neuroprogramación AETHON")
@@ -199,9 +200,4 @@ elif menu == "🏢 Área Administrativa":
             st.link_button("💬 NOTIFICAR REGISTRO", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
     else:
         st.warning("⚠️ Requiere evaluación previa por Nexo.")
-                 st.session_state.orden_lista = True
-            except Exception as e:
-                st.error(f"Error de conexión con Nexo: {e}")
-
-
-
+                    
