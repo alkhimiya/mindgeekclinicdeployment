@@ -81,8 +81,9 @@ elif menu == "🩺 Consulta Médica Gratis":
                 user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
 
                 chat_completion = client.chat.completions.create(
+                
                     messages=[
-                    ]
+                    ])
 
 # ANCLA_NEXO (Versión Empatía Reforzada - CORREGIDA)
 elif menu == "🩺 Consulta Médica Gratis":
