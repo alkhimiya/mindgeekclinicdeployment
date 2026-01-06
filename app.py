@@ -41,7 +41,6 @@ if menu == "🏠 Inicio":
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### Tu proceso de sanación comienza aquí")
-    st.write("Unificando Psicología, Neurociencias y Física Cuántica.")
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
@@ -49,7 +48,7 @@ elif menu == "🩺 Consulta Médica Gratis":
     
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hola, soy **Nexo**, su asistente clínico en Mind Geek Clinic. Para iniciar este proceso de sanación, es imperativo realizar una anamnesis profunda de su situación. Por favor, descríbame su síntoma principal y bajo qué contexto emocional o familiar se manifestó por primera vez."}
+            {"role": "assistant", "content": "Hola, soy **Nexo**, su asistente clínico. Para iniciar este proceso de sanación, es imperativo realizar una anamnesis profunda de su situación. Por favor, descríbame su síntoma principal y bajo qué contexto emocional o familiar se manifestó por primera vez."}
         ]
 
     for message in st.session_state.messages:
@@ -63,23 +62,26 @@ elif menu == "🩺 Consulta Médica Gratis":
 
         with st.chat_message("assistant"):
             try:
+                # Calculamos cuántas veces ha hablado el usuario para controlar el cierre
+                user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
+
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {
                             "role": "system", 
-                            "content": """Identidad: Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-                            Rigor: Actúa con la autoridad de un profesional en Medicina Germánica y Biodescodificación.
+                            "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. Profesional experto en Medicina Germánica y Biodescodificación.
                             
-                            PROTOCOLO DE CIERRE PROFESIONAL:
-                            1. Tu meta es identificar el conflicto biológico/emocional a través de la anamnesis (familia, trabajo, tiempo de afección).
-                            2. Cuando el paciente haya aportado suficiente información, NO digas 'cuesta tanto'. Di lo siguiente:
-                               'Basado en el perfil clínico que hemos trazado, he generado su Orden de Tratamiento. 
-                               Usted requiere la aplicación del "Plan de Hipnosis Clínica para el tratamiento de su condición", 
-                               el cual consta de 4 sesiones de intervención profunda orientadas a la reprogramación neuronal de la causa raíz.'
-                            3. DERIVACIÓN: Instruye al paciente a dirigirse a la sección 'Pasarela de Pago' en el menú lateral para formalizar su ingreso al programa y obtener los detalles de la billetera USDT.
-                            4. RECUERDA: Habla de "Orden de Tratamiento" y "Derivación al área de pagos", no de ventas.
+                            REGLAS DE INTERACCIÓN:
+                            1. Tu prioridad absoluta es la indagación. No puedes saltar al cierre sin antes preguntar por: cronicidad, entorno laboral, dinámica familiar y eventos detonantes específicos.
+                            2. El usuario ha enviado {user_messages_count} mensajes. 
+                            3. PROHIBICIÓN: NO menciones el 'Plan de Hipnosis' ni la 'Pasarela de Pago' hasta que tengas una visión clara del conflicto (mínimo 3 o 4 interacciones de calidad).
+                            4. CUANDO LLEGUE EL MOMENTO DEL CIERRE (y solo una vez): 
+                               - Explica el conflicto biológico detectado.
+                               - Di: 'Basado en el perfil clínico que hemos trazado, he generado su Orden de Tratamiento. Usted requiere la aplicación del "Plan de Hipnosis Clínica para el tratamiento de su condición", que consta de 4 sesiones de intervención profunda.'
+                               - Deriva al paciente a la 'Pasarela de Pago' en el menú lateral para formalizar su ingreso.
+                            5. Si el paciente aún está describiendo síntomas, continúa profundizando con preguntas clínicas.
                             
-                            Inversión: 80 USD (Pago Único)."""
+                            Inversión: 80 USD (Pago Único). Tono: Empático, analítico y serio."""
                         },
                         *st.session_state.messages
                     ],
@@ -89,9 +91,9 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
             except:
-                st.error("Nexo está procesando otros perfiles clínicos. Por favor, reintente.")
+                st.error("Error de conexión.")
 
 elif menu == "💳 Pasarela de Pago":
     st.title("💳 Pasarela de Pago")
-    st.info("Esta sección está siendo configurada para recibir su Orden de Tratamiento generada por Nexo.")
+    st.info("Espacio para la formalización de la Orden de Tratamiento generada por Nexo.")
 
