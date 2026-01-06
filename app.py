@@ -84,7 +84,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                     messages=[
                         
 # ANCLA_NEXO (Versión Empatía Reforzada
-                        elif menu == "🩺 Consulta Médica Gratis":
+   elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
     st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
