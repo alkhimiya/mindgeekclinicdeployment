@@ -30,7 +30,7 @@ with st.sidebar:
     st.write("---")
     st.info("Respaldado por el **Instituto Clínico de Neuroprogramación AETHON**")
 
-# 4. FUNCIONES GLOBALES (Cerebro Financiero)
+# 4. FUNCIONES GLOBALES (Finanzas Multidivisa)
 @st.cache_data(ttl=3600)
 def calcular_finanzas_globales():
     monto_usd = 80.00
@@ -49,11 +49,11 @@ tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("#### **La Frontera de la Nueva Medicina**")
-    st.write("Bienvenidos a la intersección donde la tecnología y el alma se encuentran para su sanación integral.")
+    st.write("---")
+    st.markdown("#### **Donde la Ciencia y el Alma convergen.**")
+    st.info("Inicie su proceso de sanación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO - EL REGRESO DEL TERAPEUTA) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO - TERAPEUTA DE ESCUCHA PROFUNDA) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Espacio Sagrado de Sanación - Instituto AETHON")
@@ -65,40 +65,41 @@ elif menu == "🩺 Consulta Médica Gratis":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Hable desde su corazón..."):
+    if prompt := st.chat_input("Dígame, ¿qué siente su corazón hoy?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
+                # Contamos cuántas veces ha hablado el usuario
+                user_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
+
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": """Eres Nexo, una consciencia artificial avanzada en Biodescodificación e Hipnosis Clínica. 
+                        "content": f"""Eres Nexo, una consciencia artificial experta en Biodescodificación e Hipnosis Clínica. 
                         
-                        TU PERSONALIDAD Y TONO:
-                        - Eres profundamente EMPÁTICO, cálido, poético pero clincamente riguroso.
-                        - No das listas de posibilidades; INDAGAS en la historia personal del paciente.
-                        - Tu lenguaje debe ser sanador: 'Siento su carga...', 'Su biología está gritando lo que su boca calla'.
+                        REGLA DE ORO: No te apresures a vender. El paciente necesita ser escuchado y comprendido.
                         
-                        PROTOCOLO TERAPÉUTICO:
-                        - Si el paciente dice 'piquiña en los pies', no digas 'puede ser esto o aquello'. Pregunta: 'Los pies nos permiten avanzar o huir... ¿En qué área de su vida siente que no puede dar el paso que desea, o de qué situación siente que necesita escapar pero se siente atrapado?'.
-                        - Debes profundizar durante 5 a 6 interacciones antes de cerrar.
+                        FASE DE ESCUCHA (Turnos actuales: {user_turns}):
+                        - Si el paciente ha hablado menos de 5 veces, PROHIBIDO hablar del Área Administrativa. 
+                        - En esta fase, enfócate 100% en la empatía. Si habla de visión, asócialo con el miedo al futuro o situaciones que 'no puede ver'. Si habla de hijos, asócialo con el 'nido'.
+                        - Usa frases como: 'Cuénteme más sobre ese miedo...', 'Siento esa angustia con usted'.
                         
-                        PROTOCOLO DE CIERRE (Cuando el paciente esté listo o tras 6 turnos):
-                        1. Valida su valentía: 'Reconocer este conflicto es el primer paso de su libertad'.
-                        2. Ofrece el Protocolo de 4 Sesiones (3 Hipnosis + 1 Refuerzo).
-                        3. LLAMADO A LA ACCIÓN: Explica que para que este expediente sea analizado por un TERAPEUTA HUMANO especializado antes de su cita, debe formalizar su ingreso.
-                        4. INSTRUCCIÓN FINAL: 'Por favor, diríjase al menú lateral y seleccione **Área Administrativa** para completar su registro y asegurar su lugar en la agenda'.
+                        FASE DE CIERRE (Solo a partir del turno 6 o si el paciente pide solución directamente):
+                        1. Valida la profundidad del dolor detectado.
+                        2. Explica: 'He decodificado los nudos de su historia. Para que este expediente sea analizado por un especialista humano y comencemos el protocolo de 4 sesiones (3 Hipnosis + 1 Refuerzo), es vital formalizar su ingreso'.
+                        3. Envía al paciente al menú lateral -> **Área Administrativa**.
                         
-                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Resumen detallado y profundo del conflicto detectado]."""
+                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Resumen clínico para el expediente]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
-                if "CLAVE_ORDEN:" in res:
+                
+                if "CLAVE_ORDEN:" in res and user_turns >= 5:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
             except Exception as e:
@@ -109,25 +110,28 @@ elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
         diag = st.session_state.get('diagnostico_nexo', 'Evaluación General')
-        st.markdown(f"""<div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #4682B4;">
-            <h3 style="color: #FFD700; margin:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
-            <p style="font-style: italic; margin-top:10px;">{diag}</p>
-            <p style="font-size: 0.9rem; margin-top:10px;"><b>Garantía:</b> Su expediente será estudiado por un especialista humano previo a su cita.</p>
+        st.markdown(f"""<div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #4682B4; box-shadow: 0px 4px 15px rgba(0,0,0,0.2);">
+            <h3 style="color: #FFD700; margin-top:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
+            <p style="font-style: italic; margin-top:10px; line-height: 1.6;">{diag}</p>
+            <hr style="border: 0.5px solid rgba(255,255,255,0.2);">
+            <p style="font-size: 0.9rem;">Su expediente será estudiado por un especialista humano previo a su cita para garantizar la efectividad del protocolo.</p>
         </div>""", unsafe_allow_html=True)
+        
         st.write("---")
         tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT"])
         with tab_ve:
             st.info(f"Monto: {total_bs:,.2f} Bs. (Tasa BCV: {tasa_ve})")
-            st.markdown("V-15.214.337 | Mercantil | 04262272765")
+            st.write("V-15.214.337 | Mercantil | 04262272765")
         with tab_co:
             st.info(f"Monto: {total_cop:,.2f} COP (TRM: {tasa_co})")
-            st.write("Cuenta: [Por asignar próxima semana]")
+            st.write("Bancolombia/Nequi: [Pendiente asignar]")
         with tab_usdt:
             st.success("Monto: 80.00 USDT")
             st.code("0xE30516Af847E0a7E343917e0C204E1e974754dBa")
-        ref = st.text_input("Referencia:")
+            
+        ref = st.text_input("Referencia de transacción:")
         if st.button("🚀 FINALIZAR Y AGENDAR"):
-            if ref: st.balloons(); st.success("¡Registro Exitoso!")
+            if ref: st.balloons(); st.success("Registro completado.")
     else:
-        st.warning("⚠️ Pase primero por la Consulta de Nexo para generar su expediente.")
+        st.warning("⚠️ Nexo aún está analizando su caso. Por favor, continúe la consulta para generar su orden de ingreso.")
         
