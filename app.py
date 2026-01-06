@@ -105,59 +105,103 @@ elif menu == "🩺 Consulta Médica Gratis":
 
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    st.session_state.orden_lista = True
-            except Exception as e:
-                st.error(f"Error de conexión con Nexo: {e}")
-
-# --- MÓDULO: ÁREA ADMINISTRATIVA ---
+                    
+   # --- MÓDULO: ÁREA ADMINISTRATIVA (INTERNACIONAL - VEN/COL/USDT) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
-    st.caption("Instituto Clínico de Neuroprogramación AETHON")
+    st.caption("Dirección Administrativa - Instituto Clínico de Neuroprogramación AETHON")
 
-    tasa_bcv, total_eur, total_bs = calcular_montos_reales()
+    # 1. CEREBRO FINANCIERO MULTIDIVISA
+    @st.cache_data(ttl=3600)
+    def calcular_finanzas_globales():
+        # Referencias Base
+        monto_usd = 80.00
+        paridad_eur_usd = 0.92
+        
+        # Tasas Oficiales (Simuladas - Deberás actualizarlas o conectar API luego)
+        tasa_eur_bcv = 360.50     # BCV Venezuela
+        tasa_usd_cop = 3950.00    # TRM Colombia (Banco de la República)
+        
+        # Cálculos
+        monto_eur = monto_usd * paridad_eur_usd
+        monto_bs = monto_eur * tasa_eur_bcv
+        monto_cop = monto_usd * tasa_usd_cop
+        
+        return tasa_eur_bcv, tasa_usd_cop, monto_bs, monto_cop
+
+    tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
-        diag = st.session_state.get('diagnostico_nexo', 'Evaluación General')
+        diag = st.session_state.get('diagnostico_nexo', 'Análisis en proceso...')
         
-        # Expediente Premium Tech
+        # 1. EXPEDIENTE (Puro y Clínico)
         st.markdown(f"""
         <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; border-left: 10px solid #4682B4; box-shadow: 0px 4px 15px rgba(0,0,0,0.2); color: white;">
             <h3 style="color: #FFD700; margin-top:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
-            <p style="margin-bottom: 10px; font-size: 1.1rem;"><strong>Análisis de Raíz:</strong> {diag}</p>
-            <p style="font-size: 0.9rem; color: #4682B4;">Protocolo: 3 Sesiones Hipnosis + 1 Refuerzo. <i>Un terapeuta humano estudiará este caso previo a su cita.</i></p>
-            <hr style="border: 0.5px solid rgba(255,255,255,0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div><p style="margin:0; opacity: 0.8;">Inversión</p><p style="margin:0; font-size: 1.4rem; font-weight: bold;">$80.00 USD</p></div>
-                <div style="text-align: right;"><p style="margin:0; opacity: 0.8;">Tasa BCV</p><p style="margin:0; font-size: 1.4rem; font-weight: bold;">{tasa_bcv} Bs.</p></div>
-            </div>
-            <div style="background-color: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; border: 1px solid #FFD700;">
-                <h2 style="margin:0; color: #FFFFFF;">{total_bs:,.2f} <span style="font-size: 1.2rem;">Bs.</span></h2>
-            </div>
+            <p style="margin-bottom: 10px; font-size: 1.1rem;"><strong>Análisis Biológico:</strong></p>
+            <p style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; font-style: italic;">{diag}</p>
+            <p style="margin-top:10px; font-size: 0.9rem;">Protocolo: 4 Sesiones (Hipnosis Clínica + Refuerzo). Asignación de terapeuta humano en proceso.</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.write("---")
-        tab1, tab2 = st.tabs(["🇻🇪 PAGO MÓVIL", "💎 BILLETERA USDT"])
+        st.subheader("💳 Selección de Método de Formalización")
         
-        with tab1:
-            st.markdown(f"""<div style="background-color: #F0F8FF; padding: 20px; border-radius: 12px; border: 1px solid #1E3A8A; color: #1E3A8A;">
-                <h4 style="margin:0;">Datos Mercantil:</h4>
-                V-15.214.337 | 04262272765 | <b>Monto: {total_bs:,.2f} Bs.</b></div>""", unsafe_allow_html=True)
+        # 2. MÉTODOS DE PAGO POR PAÍS / TIPO
+        tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA (Bs)", "🇨🇴 COLOMBIA (COP)", "💎 CRIPTO (USDT)"])
+        
+        with tab_ve:
+            st.markdown(f"""
+            <div style="background-color: #F0F8FF; padding: 20px; border-radius: 12px; border: 1px solid #1E3A8A; color: #1E3A8A;">
+                <h4 style="margin:0;">Pago Móvil Mercantil</h4>
+                <p style="margin: 5px 0;">V-15.214.337 | Tel: 04262272765</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Tasa oficial BCV: {tasa_ve} Bs/EUR</p>
+                <div style="background-color: #1E3A8A; color: white; padding: 10px; border-radius: 8px; margin-top: 10px; text-align: center;">
+                    <h3 style="margin:0; color: #FFD700;">{total_bs:,.2f} Bs.</h3>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        with tab2:
-            st.markdown(f"""<div style="background-color: #E6F4EA; padding: 20px; border-radius: 12px; border: 1px solid #1E7E34; color: #155724;">
-                <h4 style="margin:0;">Red BEP20:</h4>
-                <p style="word-break: break-all; font-family: monospace;">0xE30516Af847E0a7E343917e0C204E1e974754dBa</p></div>""", unsafe_allow_html=True)
+        with tab_co:
+            st.markdown(f"""
+            <div style="background-color: #FFF5F0; padding: 20px; border-radius: 12px; border: 1px solid #D35400; color: #D35400;">
+                <h4 style="margin:0;">Transferencia Bancaria Colombia</h4>
+                <p style="margin: 5px 0;"><b>Banco:</b> [PENDIENTE POR ASIGNAR]</p>
+                <p style="margin: 5px 0;"><b>Cuenta:</b> [ESPACIO RESERVADO PRÓXIMA SEMANA]</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Anclado a TRM Banco de la República: {tasa_co} COP/USD</p>
+                <div style="background-color: #D35400; color: white; padding: 10px; border-radius: 8px; margin-top: 10px; text-align: center;">
+                    <h3 style="margin:0; color: #FFFFFF;">{total_cop:,.2f} COP</h3>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with tab_usdt:
+            st.markdown(f"""
+            <div style="background-color: #E6F4EA; padding: 20px; border-radius: 12px; border: 1px solid #1E7E34; color: #155724;">
+                <h4 style="margin:0;">Depósito Digital USDT (BEP20)</h4>
+                <p style="word-break: break-all; font-family: monospace; font-weight: bold; background: white; padding: 10px; border-radius: 5px; border: 1px dashed #1E7E34; margin: 10px 0;">
+                    0xE30516Af847E0a7E343917e0C204E1e974754dBa
+                </p>
+                <div style="background-color: #1E7E34; color: white; padding: 10px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin:0;">80.00 USDT</h3>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.write("---")
-        ref = st.text_input("Referencia de pago:")
+        ref = st.text_input("Número de Referencia:")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("🚀 FINALIZAR REGISTRO CLÍNICO", use_container_width=True):
-                if ref: st.balloons(); st.success("¡Bienvenido al Instituto AETHON!")
+            if st.button("🚀 FINALIZAR Y AGENDAR", use_container_width=True):
+                if ref: st.balloons(); st.success("Registro administrativo completado.")
         with c2:
-            msj = f"Saludos AETHON. Formalizo mi ingreso. Ref: {ref}. Monto: {total_bs:,.2f} Bs."
+            msj = f"Saludos AETHON. Formalizo ingreso. Ref: {ref}."
             st.link_button("💬 NOTIFICAR REGISTRO", f"https://wa.me/584262272765?text={msj.replace(' ', '%20')}", use_container_width=True)
     else:
         st.warning("⚠️ Requiere evaluación previa por Nexo.")
+                 st.session_state.orden_lista = True
+            except Exception as e:
+                st.error(f"Error de conexión con Nexo: {e}")
+
+
 
