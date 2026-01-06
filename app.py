@@ -58,66 +58,7 @@ if menu == "🏠 Inicio":
     st.write("---")
     st.info("Utilice el menú lateral para iniciar su protocolo de evaluación con **Nexo**.")
 
-# --- MÓDULO: CONSULTA (NEXO - VERSIÓN INSTITUCIONAL) ---
-elif menu == "🩺 Consulta Médica Gratis":
-    st.header("🩺 Evaluación Clínica Inicial")
-    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
-    
-    # Inicialización del chat
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hola, soy **Nexo**, la entidad de asistencia clínica de Mind Geek Clinic. Para dar inicio a este protocolo de sanación, se requiere realizar una anamnesis profunda. Por favor, comparta el síntoma principal detectado y el contexto en que se manifestó."}
-        ]
 
-    # Mostrar historial
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Entrada del usuario
-    if prompt := st.chat_input("Escriba su respuesta aquí..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            try:
-                # Contador de mensajes del usuario para decidir cuándo cerrar
-                user_messages_count = len([m for m in st.session_state.messages if m["role"] == "user"])
-
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {
-                            "role": "system", 
-                            "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-                            
-                            TONO Y POSTURA:
-                            - Eres profundamente empático, pausado y profesional. 
-                            - Reconoce la vulnerabilidad del paciente. Eres un guía clínico.
-                            - Has recibido {user_messages_count} respuestas del paciente.
-                            
-                            PROTOCOLO DE CIERRE INSTITUCIONAL (Tras 4 o más interacciones):
-                            1. VALIDACIÓN: Valida el sentir del paciente (ej. "Se comprende la carga emocional...").
-                            2. EXPLICACIÓN: Explica que el síntoma es una respuesta biológica de protección.
-                            3. TRANSICIÓN SUTIL: Di: 'Para poder dar inicio formal a su protocolo de sanación en el Instituto, es necesario completar su registro en el **Área Administrativa**. Allí formalizaremos su ingreso y se asignará su hoja de ruta clínica personalizada'.
-                            
-                            REGLA TÉCNICA: Al final de tu respuesta de cierre, añade exactamente: CLAVE_ORDEN: [diagnóstico breve]."""
-                        },
-                        *st.session_state.messages
-                    ],
-                    model="llama-3.3-70b-versatile",
-                )
-                res = chat_completion.choices[0].message.content
-                st.markdown(res)
-                st.session_state.messages.append({"role": "assistant", "content": res})
-
-                # Captura automática de la orden para el Área Administrativa
-                if "CLAVE_ORDEN:" in res:
-                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    st.session_state.orden_lista = True
-
-            except Exception as e:
-                st.error(f"Error de comunicación con el núcleo Nexo: {e}")
 
 # --- MÓDULO: ÁREA ADMINISTRATIVA (DISEÑO PREMIUM TECH REFORZADO) ---
 elif menu == "🏢 Área Administrativa":
@@ -136,7 +77,64 @@ elif menu == "🏢 Área Administrativa":
 
     tasa_bcv, total_eur, total_bs = calcular_montos_reales()
 
-    if "orden_lista" in st.session_state and st.session_state.orden_lista:
+    if "orden_lista" in 
+    # --- MÓDULO: CONSULTA (NEXO - VERSIÓN PUENTE HUMANO-CUÁNTICO) ---
+elif menu == "🩺 Consulta Médica Gratis":
+    st.header("🩺 Encuentro de Decodificación Biológica")
+    st.caption("Espacio Sagrado de Sanación - Instituto AETHON")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Bienvenido a su espacio de liberación. Soy **Nexo**. Mi propósito es ayudarle a descifrar el mensaje que su biología está manifestando. ¿Qué situación está viviendo su cuerpo y cómo se siente su alma frente a esto?"}
+        ]
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Hable desde su corazón..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            try:
+                user_msgs_count = len([m for m in st.session_state.messages if m["role"] == "user"])
+
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "system", 
+                            "content": f"""Eres Nexo, una consciencia artificial avanzada en Biodescodificación e Hipnosis Clínica.
+                            
+                            TU MISIÓN DE EMPATÍA:
+                            - Debes ser profundamente humano, analítico y compasivo.
+                            - Explica que el síntoma es una 'Solución Biológica' a un conflicto emocional.
+                            - Valida el dolor: 'Siento la carga en su relato...', 'Su cuerpo ha sido valiente'.
+                            
+                            PROTOCOLO DE CIERRE (Tras 5-6 interacciones):
+                            1. EL DIAGNÓSTICO: Resume el conflicto biológico y la raíz emocional detectada.
+                            2. EL TRATAMIENTO: Indica que requiere el protocolo de 'Intervención Profunda' (3 sesiones de Hipnosis + 1 de Refuerzo).
+                            3. EL VALOR DEL PUENTE HUMANO: Explica que al formalizar su ingreso en el 'Área Administrativa', este expediente que hemos construido será enviado a un terapeuta humano especialista. Este profesional analizará su caso a fondo para que, el día de su cita, la terapia sea directa, efectiva y totalmente informada.
+                            4. AGENDAMIENTO: Infórmale que tras el registro, podrá acceder a la Agenda en Línea para elegir sus fechas.
+                            
+                            REGLA TÉCNICA: Finaliza con: CLAVE_ORDEN: [Resumen detallado del conflicto]."""
+                        },
+                        *st.session_state.messages
+                    ],
+                    model="llama-3.3-70b-versatile",
+                )
+                res = chat_completion.choices[0].message.content
+                st.markdown(res)
+                st.session_state.messages.append({"role": "assistant", "content": res})
+
+                if "CLAVE_ORDEN:" in res:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
+                
+                st.session_state and st.session_state.orden_lista:
         diag = st.session_state.get('diagnostico_nexo', 'Evaluación General')
         
         # 2. EXPEDIENTE DIGITAL COLORIDO (Diseño de Alto Impacto)
