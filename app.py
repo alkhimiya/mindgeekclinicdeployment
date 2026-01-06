@@ -39,8 +39,24 @@ with st.sidebar:
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
+    
     st.markdown("---")
     st.markdown("### Tu proceso de sanación comienza aquí")
+    
+    # Texto trascendental con estilo destacado
+    st.markdown("""
+    #### **La Frontera de la Nueva Medicina**
+    Bienvenidos a la intersección donde la computación avanzada se encuentra con la inteligencia del alma. 
+    En **Mind Geek Clinic**, hemos decodificado el lenguaje del síntoma a través de la tecnología de 
+    vanguardia y las Ciencias de la Nueva Salud. 
+    
+    Tendemos un puente cuántico entre la neurociencia y la biología celular para ofrecer alternativas 
+    complementarias que restauran la coherencia entre el cuerpo y la mente. Aquí, la tecnología se 
+    convierte en el instrumento de precisión que revela el camino hacia su sanación integral.
+    """)
+    
+    st.write("---")
+    st.info("Utilice el menú lateral para iniciar su protocolo de evaluación con **Nexo**.")
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
