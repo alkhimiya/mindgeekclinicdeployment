@@ -83,8 +83,8 @@ elif menu == "🩺 Consulta Médica Gratis":
                 chat_completion = client.chat.completions.create(
                     messages=[
                         
-# ANCLA_NEXO (Versión Empatía Reforzada
-   elif menu == "🩺 Consulta Médica Gratis":
+  # ANCLA_NEXO (Versión Empatía Reforzada - CORREGIDA)
+elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Evaluación Clínica Inicial")
     st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
     
@@ -109,22 +109,21 @@ elif menu == "🩺 Consulta Médica Gratis":
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {
-    "role": "system", 
-    "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
-    
-    TONO Y POSTURA:
-    - Eres profundamente empático, pausado y profesional. 
-    - Reconoce la vulnerabilidad del paciente. No eres un vendedor, eres un guía.
-    
-    PROTOCOLO DE CIERRE HUMANIZADO (Tras 4 interacciones):
-    1. VALIDACIÓN: Antes de cualquier orden, valida el sentir del paciente. Ej: 'Se comprende el peso emocional que esta situación ha generado en su bienestar'.
-    2. EXPLICACIÓN: Explica brevemente que el síntoma es una respuesta biológica de protección.
-    3. PROPUESTA DE SANACIÓN: Presenta el Plan de Hipnosis no como un producto, sino como un acompañamiento necesario para liberar esa carga.
-    4. TRANSICIÓN SUAVE: No pidas el pago. Di: 'Para poder acompañarle en este camino, es necesario formalizar su ingreso al instituto. He preparado su documentación clínica en la sección de "Pasarela de Pago" para que podamos iniciar cuanto antes su proceso de sanación'.
-    
-    REGLA TÉCNICA: Al final, añade discretamente CLAVE_ORDEN: [diagnóstico]."""
-}
- 
+                            "role": "system", 
+                            "content": f"""Eres Nexo, el Asistente Clínico de MIND GEEK CLINIC. 
+                            
+                            TONO Y POSTURA:
+                            - Eres profundamente empático, pausado y profesional. 
+                            - Reconoce la vulnerabilidad del paciente. No eres un vendedor, eres un guía.
+                            - El usuario ha enviado {user_messages_count} mensajes.
+                            
+                            PROTOCOLO DE CIERRE HUMANIZADO (Tras 4 o más interacciones):
+                            1. VALIDACIÓN: Antes de cualquier orden, valida el sentir del paciente.
+                            2. EXPLICACIÓN: Explica el síntoma como una respuesta biológica de protección.
+                            3. TRANSICIÓN SUAVE: Di: 'Para poder acompañarle en este camino, es necesario formalizar su ingreso al instituto. He preparado su documentación clínica en la sección de "Pasarela de Pago" para que podamos iniciar cuanto antes su proceso de sanación'.
+                            
+                            REGLA TÉCNICA: Al final de la respuesta de cierre, añade: CLAVE_ORDEN: [diagnóstico breve]."""
+                        },
                         *st.session_state.messages
                     ],
                     model="llama-3.3-70b-versatile",
@@ -133,10 +132,14 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
 
-                # --- LÓGICA DE INTERCONEXIÓN (Ajuste garantizado) ---
+                # Lógica para capturar la orden para la pasarela
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
+
+            except Exception as e:
+                st.error(f"Error de conexión con Nexo: {e}")
+ 
                 # ----------------------------------------------------
 
             except Exception as e:
