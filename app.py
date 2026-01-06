@@ -27,10 +27,11 @@ with st.sidebar:
     st.title("🧠 MIND GEEK CLINIC")
     st.write("---")
     menu = st.radio("Navegación", [
-        "🏠 Inicio", 
-        "🩺 Consulta Médica Gratis", 
-        "💳 Pasarela de Pago"
-    ])
+    "🏠 Inicio", 
+    "🩺 Consulta Médica Gratis", 
+    "🏢 Área Administrativa" # <-- Cambiado de "Pasarela de Pago"
+])
+
     st.write("---")
     st.info("Respaldado por el **Instituto Clínico de Neuroprogramación AETHON**")
 
