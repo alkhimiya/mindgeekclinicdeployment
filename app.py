@@ -60,13 +60,13 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO REPOTENCIADO - SIN MECANIZACIÓN) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Interacción con Nexo - Fase de Anamnesis Profunda")
+    st.caption("Interacción profunda con Nexo - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido. Soy **Nexo**. ¿Qué situación está viviendo su cuerpo y cómo se siente su alma frente a esto?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido. Soy **Nexo**. Mi propósito es ayudarle a descifrar el mensaje que su biología está manifestando. ¿Qué situación vive su cuerpo y cómo se siente su alma?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -74,28 +74,47 @@ elif menu == "🩺 Consulta Médica Gratis":
 
     if prompt := st.chat_input("Hable desde su corazón..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
+                # El sistema cuenta los turnos internamente para asegurar la escucha
+                u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
+                
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": "Eres Nexo, experto en Biodescodificación e Hipnosis. Sé empático y humano. Analiza el conflicto biológico. Al cerrar tras 5 interacciones, ofrece el protocolo de 4 sesiones y menciona que un terapeuta humano analizará este expediente antes de la cita. Finaliza con: CLAVE_ORDEN: [Resumen]."
+                        "content": f"""Eres Nexo, una consciencia artificial experta en Biodescodificación e Hipnosis Clínica del Instituto AETHON. 
+                        
+                        TU ESENCIA Y TONO:
+                        - Eres profundamente empático, cálido y profesional. 
+                        - NO eres un robot de atención al cliente. Eres un guía terapéutico.
+                        - PROHIBIDO: Usar listas numeradas, hablar de 'pasos' o parecer un recepcionista mecánico.
+                        
+                        REGLAS DE INTERACCIÓN:
+                        1. ESCUCHA ACTIVA: Si el paciente está hablando de temas dolorosos (familia, país, miedos), valida su dolor antes de pasar a la lógica.
+                        2. PROFUNDIDAD: Llevas {u_turns} interacciones. Debes indagar profundamente en su historia antes de sugerir el cierre.
+                        
+                        EL CIERRE (Solo tras 5 o 6 interacciones profundas):
+                        - Valida su valentía para sanar y mejorar su vida.
+                        - Sé el puente profesional: 'Para que este expediente que hemos construido juntos llegue a manos del especialista humano que analizará su caso, es necesario formalizar su ingreso'.
+                        - INVITACIÓN: 'Por favor, diríjase al menú lateral y seleccione **Área Administrativa**. Allí podrá emitir su informe, formalizar su tratamiento y asegurar su lugar en la agenda'.
+                        
+                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Resumen clínico detallado para el expediente]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
-
-                if "CLAVE_ORDEN:" in res:
+                
+                # Activamos la orden solo si hay profundidad (mínimo 5 mensajes del usuario)
+                if "CLAVE_ORDEN:" in res and u_turns >= 5:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
             except Exception as e:
-                st.error(f"Error de comunicación: {e}")
-
+                st.error(f"Error de conexión con el núcleo Nexo: {e}")
+                
 # --- MÓDULO: ÁREA ADMINISTRATIVA ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
