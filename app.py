@@ -115,52 +115,84 @@ elif menu == "🩺 Consulta Médica Gratis":
             except Exception as e:
                 st.error(f"Error en el núcleo Nexo: {e}")
 
-# --- MÓDULO: ÁREA ADMINISTRATIVA ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (VERSIÓN REPARADA ALTA VISIBILIDAD) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
     
     if "orden_lista" in st.session_state and st.session_state.orden_lista:
         diag = st.session_state.get('diagnostico_nexo', 'Evaluación consolidada por Nexo')
         
+        # Expediente Clínico de Alta Visibilidad
         st.markdown(f"""
-        <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #4682B4;">
-            <h3 style="color: #FFD700; margin:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
-            <p style="font-style: italic; margin-top:10px;">{diag}</p>
-            <p style="font-size: 0.9rem; margin-top:10px;">Protocolo: 4 Sesiones con Terapeutas Humanos.</p>
+        <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #FFD700; box-shadow: 0px 4px 10px rgba(0,0,0,0.3);">
+            <h3 style="color: #FFD700; margin:0; font-family: sans-serif;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
+            <p style="font-style: italic; margin-top:10px; color: #ECF0F1; font-size: 1.1rem;">{diag}</p>
+            <hr style="border-color: rgba(255,255,255,0.1);">
+            <p style="font-size: 0.9rem; color: #BDC3C7;"><b>Protocolo:</b> 4 Sesiones con Terapeutas Humanos. Este informe ha sido derivado al departamento de especialistas.</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.write("---")
         st.subheader("💳 Protocolos de Inversión")
-        tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT (BEP20)"])
+        tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 CRIPTO"])
         
         with tab_ve:
-            st.markdown(f"""<div style="background-color: #F0F8FF; padding: 20px; border-radius: 12px; border: 1px solid #1E3A8A;">
-                <h4 style="color: #1E3A8A;">Pago Móvil Mercantil</h4>
-                <p>V-15.214.337 | 04262272765 | Tasa BCV: {tasa_ve} Bs.</p>
-                <div style="background: #1E3A8A; color: #FFD700; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>{total_bs:,.2f} Bs.</h2></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; border: 2px solid #4682B4; color: white;">
+                    <h4 style="color: #FFD700; margin-top: 0;">🇻🇪 Pago Móvil Mercantil</h4>
+                    <p style="margin: 5px 0; font-size: 1.1rem;"><b>Documento:</b> V-15.214.337</p>
+                    <p style="margin: 5px 0; font-size: 1.1rem;"><b>Teléfono:</b> 04262272765</p>
+                    <p style="margin: 5px 0; color: #BDC3C7; font-size: 0.9rem;">Tasa BCV (Euro): {tasa_ve} Bs.</p>
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px; border: 1px solid rgba(255, 215, 0, 0.4);">
+                        <span style="font-size: 0.8rem; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;">Monto a Formalizar</span>
+                        <h2 style="margin: 5px 0; color: white; font-size: 2.2rem;">{total_bs:,.2f} Bs.</h2>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
         with tab_co:
-            st.markdown(f"""<div style="background-color: #FFF5F0; padding: 20px; border-radius: 12px; border: 1px solid #D35400;">
-                <h4 style="color: #D35400;">Bancolombia / Nequi</h4>
-                <p>TRM: {tasa_co} COP</p>
-                <div style="background: #D35400; color: white; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>{total_cop:,.2f} COP</h2></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #D35400; padding: 25px; border-radius: 15px; border: 2px solid #E67E22; color: white;">
+                    <h4 style="color: #FFD700; margin-top: 0;">🇨🇴 Bancolombia / Nequi</h4>
+                    <p style="margin: 5px 0; font-size: 1.1rem;"><b>Estado:</b> Próxima apertura de cuenta</p>
+                    <p style="margin: 5px 0; font-size: 1.1rem;"><b>Referencia TRM:</b> {tasa_co} COP</p>
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px; border: 1px solid rgba(255, 215, 0, 0.4);">
+                        <span style="font-size: 0.8rem; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;">Monto a Formalizar</span>
+                        <h2 style="margin: 5px 0; color: white; font-size: 2.2rem;">{total_cop:,.2f} COP</h2>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
         with tab_usdt:
-            st.markdown(f"""<div style="background-color: #E6F4EA; padding: 20px; border-radius: 12px; border: 1px solid #1E7E34;">
-                <h4 style="color: #1E7E34;">Billetera USDT (Red BEP20)</h4>
-                <p style="word-break: break-all; font-weight: bold;">0xE30516Af847E0a7E343917e0C204E1e974754dBa</p>
-                <div style="background: #1E7E34; color: white; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>80.00 USDT</h2></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #145A32; padding: 25px; border-radius: 15px; border: 2px solid #1E8449; color: white;">
+                    <h4 style="color: #FFD700; margin-top: 0;">💎 USDT (Red BEP20)</h4>
+                    <p style="margin: 5px 0; font-size: 1rem;"><b>Red:</b> Binance Smart Chain (BEP20)</p>
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin: 10px 0;">
+                        <code style="color: #58D68D; font-size: 0.9rem; word-break: break-all;">0xE30516Af847E0a7E343917e0C204E1e974754dBa</code>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px; border: 1px solid rgba(255, 215, 0, 0.4);">
+                        <span style="font-size: 0.8rem; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;">Monto a Formalizar</span>
+                        <h2 style="margin: 5px 0; color: white; font-size: 2.2rem;">80.00 USDT</h2>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
         st.write("---")
+        # Botón de WhatsApp con estilo mejorado
         st.markdown(f"""
-            <a href="https://wa.me/584262272765?text=Hola,%20adjunto%20mi%20comprobante%20de%20pago%20para%20formalizar%20mi%20ingreso%20a%20Mind%20Geek%20Clinic." class="btn-whatsapp">
-                ✅ ENVIAR COMPROBANTE POR WHATSAPP
-            </a>
+            <div style="text-align: center;">
+                <a href="https://wa.me/584262272765?text=Hola,%20adjunto%20mi%20comprobante%20de%20pago%20para%20formalizar%20mi%20ingreso%20a%20Mind%20Geek%20Clinic." class="btn-whatsapp" style="display: block; width: 100%; text-align: center;">
+                    ✅ ENVIAR COMPROBANTE POR WHATSAPP
+                </a>
+            </div>
         """, unsafe_allow_html=True)
+        
+        ref = st.text_input("Referencia de pago / Hash de transacción:")
+        if st.button("🚀 FINALIZAR Y AGENDAR ESPECIALISTA", use_container_width=True):
+            if ref: 
+                st.balloons()
+                st.success("Registro administrativo completado. Un coordinador de agenda validará su ingreso.")
     else:
-        st.warning("⚠️ Requiere evaluación previa por Nexo en la Consulta Médica.")
-
+        st.warning("⚠️ Requiere evaluación previa por Nexo en la sección de Consulta Médica.")
+        
