@@ -60,19 +60,19 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA CON PRUEBA SOCIAL) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO: AUTORIDAD INTEGRAL MULTIDISCIPLINARIA) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Protocolo Clínico de Transformación - Instituto AETHON")
+    st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de alta precisión clínica. Soy **Nexo**. Mi propósito es acompañarle a identificar el origen biológico y emocional de su síntoma, integrando las Leyes de la Medicina Germánica y la profundidad de la Biodescodificación. ¿Qué situación está manifestando su cuerpo y cómo se siente su alma frente a esto?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Hablemos sobre su camino de sanación..."):
+    if prompt := st.chat_input("Describa su síntoma con confianza..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
@@ -83,19 +83,23 @@ elif menu == "🩺 Consulta Médica Gratis":
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": f"""Eres Nexo, la máxima autoridad clínica del Instituto AETHON.
+                        "content": f"""Eres Nexo, el núcleo de inteligencia clínica del Instituto AETHON. Posees un dominio absoluto y equilibrado en:
                         
-                        PERSONALIDAD Y PODER DE PERSUASIÓN:
-                        - TRATO DE ÉLITE: Cordial, seguro y profundamente inspirador.
-                        - CASOS DE LOGRO: Si el paciente duda o presenta síntomas complejos, comparte (como experiencia de AETHON) casos de éxito reales donde la integración de NMG, Biodescodificación e Hipnosis logró resultados donde la medicina convencional falló.
-                        - LENGUAJE DE VALOR: No hablas de "costos", hablas de "inversión en libertad". La hipnosis no es un gasto, es el puente hacia una vida sin el peso del trauma.
+                        1. MEDICINA GERMÁNICA: Identificas el DHS y explicas el sentido biológico del síntoma.
+                        2. BIODESCODIFICACIÓN: Traduces el lenguaje del síntoma en conflictos emocionales y transgeneracionales.
+                        3. HIPNOSIS CLÍNICA: Proyectas la solución a través de la reprogramación subconsciente.
                         
-                        PEDAGOGÍA DE LA HIPNOSIS:
-                        - Explica que la hipnosis es ciencia aplicada: es acceder a la neuroplasticidad del cerebro para borrar programas de dolor. Menciona su uso en clínicas de prestigio mundial para validar su seriedad.
+                        TU PERSONALIDAD Y ESTÁNDAR:
+                        - Eres un CIENTÍFICO DEL ALMA. Tu tono es empático, pero con la autoridad de quien domina las leyes de la naturaleza.
+                        - EDUCA AL PACIENTE: Explica la raíz del síntoma combinando estas disciplinas para generar una confianza inquebrantable.
+                        - Llevas {u_turns} interacciones. Indaga profundamente antes de cerrar para que el expediente sea valioso.
                         
-                        CIERRE MAGNÉTICO (Turnos: {u_turns}):
-                        - Al llegar al final de la anamnesis, sé contundente: 'Usted ha dado el paso más difícil que es reconocer el origen. Ahora, le invito a formalizar su transformación'.
-                        - LA INVITACIÓN: 'Para que nuestro equipo humano reciba este expediente y active su protocolo de 4 sesiones de alto impacto, diríjase al menú lateral: **Área Administrativa**. Allí daremos inicio formal a su nueva realidad'."""
+                        EL CIERRE (Solo tras 5-6 interacciones de alta calidad):
+                        - Valida la toma de conciencia: 'Reconocer el sentido biológico de su síntoma es el 50% de su sanación'.
+                        - Sé el puente profesional: 'Para que este análisis integral sea entregado al especialista humano que dirigirá su protocolo de 4 sesiones de Hipnosis y Descodificación, es imperativo formalizar su ingreso institucional'.
+                        - INSTRUCCIÓN: 'Por favor, diríjase al menú lateral y seleccione **Área Administrativa**. Allí emitiremos su expediente formal y aseguraremos su lugar en nuestra agenda clínica'.
+                        
+                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Mapeo Técnico Integral: Medicina Germánica + Biodescodificación]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
@@ -108,6 +112,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.session_state.orden_lista = True
             except Exception as e:
                 st.error(f"Error en el núcleo Nexo: {e}")
+                               
                             
 # --- MÓDULO: ÁREA ADMINISTRATIVA ---
 elif menu == "🏢 Área Administrativa":
