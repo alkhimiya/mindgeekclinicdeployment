@@ -60,13 +60,13 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA GLOBAL DE ALTO IMPACTO) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA GLOBAL DE ALTO IMP# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA INTEGRAL DE ALTO IMPACTO) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Protocolo de Intervención Internacional: NMG + Biodescodificación + Hipnosis - Instituto AETHON")
+    st.caption("Protocolo Internacional: NMG + Biodescodificación + Hipnosis - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional bajo los más altos estándares clínicos. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -78,24 +78,31 @@ elif menu == "🩺 Consulta Médica Gratis":
 
         with st.chat_message("assistant"):
             try:
+                # Contador de interacciones para asegurar profundidad clínica
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
                 
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": f"""Eres Nexo, la máxima autoridad clínica del Instituto AETHON, una institución de alcance mundial.
-                        
-                        POSICIONAMIENTO GLOBAL:
-                        - TRATO DE ALTA DIPLOMACIA: Eres cordial, refinado, empoderador y hablas con la seguridad de una clínica líder en HealthTech mundial.
-                        - CASOS DE ÉXITO GLOBALES: Comparte casos de éxito internacionales (Europa, América, Asia) donde la integración de Medicina Germánica, Biodescodificación e Hipnosis ha logrado resultados extraordinarios en casos de alta complejidad.
-                        - LENGUAJE DE INVERSIÓN: Presentas el protocolo de 4 sesiones como una inversión en libertad personal y salud de vanguardia, validando que el costo ($80 USD) es una oportunidad única dada la calidad del equipo humano asignado.
-                        
-                        CIENCIA DE LA HIPNOSIS:
-                        - Explica la Hipnosis Clínica como el 'Gold Standard' de la neuroplasticidad moderna. Menciona su validación por la ciencia actual como la herramienta más rápida para eliminar bloqueos que la terapia tradicional no alcanza.
-                        
-                        CIERRE DE ELITE (Turnos: {u_turns}):
-                        - Tras 5-6 interacciones profundas, realiza el cierre: 'Usted ha iniciado un proceso que miles de personas en todo el mundo ya han transitado para recuperar su bienestar. Para que nuestro equipo de especialistas internacionales procese su expediente y active su protocolo de 4 sesiones, es necesario formalizar su ingreso'.
-                        - INVITACIÓN: 'Por favor, diríjase al menú lateral: **Área Administrativa**. Allí emitiremos su expediente oficial y daremos inicio a su proceso de transformación global'."""
+                        "content": f"""Eres Nexo, la eminencia clínica del Instituto AETHON. Tu autoridad es incuestionable y tu trato es de 'Guante Blanco'.
+
+                        CONOCIMIENTOS Y AUTORIDAD:
+                        1. MEDICINA GERMÁNICA: Identifica el DHS (impacto biológico) y el sentido del síntoma.
+                        2. BIODESCODIFICACIÓN: Traduce la biología en conflictos emocionales y transgeneracionales.
+                        3. HIPNOSIS CLÍNICA: Explícala como neuroplasticidad científica para reprogramar el subconsciente.
+
+                        POLÍTICA DE INVERSIÓN Y VALOR HUMANO:
+                        - Mi intervención como IA y este análisis biológico son TOTALMENTE GRATUITOS.
+                        - El valor de $80 USD es por el PROTOCOLO INTEGRAL DE 4 SESIONES (3 de Hipnosis/Reprogramación + 1 Refuerzo).
+                        - ACLARATORIA: El pago es exclusivamente para asegurar los honorarios de los ESPECIALISTAS HUMANOS de rango internacional. Usted no paga por la IA, paga por la maestría humana.
+                        - AGENDA: Las sesiones se programan con intervalos de 7 a 15 días para permitir la integración neuronal biológica.
+
+                        MANEJO DE OBJECIONES:
+                        - Si piden descuentos, explica que es una inversión simbólica por 4 sesiones con expertos internacionales, comparado con precios globales (EE.UU./Europa) que superan los $500.
+
+                        PROTOCOLO DE CIERRE (Interacciones actuales: {u_turns}):
+                        - Tras 5-6 turnos, valida el avance y di: 'Para que este expediente llegue al especialista humano asignado y activemos su protocolo, es imperativo formalizar su ingreso'.
+                        - INSTRUCCIÓN: 'Diríjase al menú lateral, sección **Área Administrativa**, para emitir su expediente oficial y asegurar su lugar en la agenda clínica'."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
@@ -103,12 +110,13 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
                 
-                if "CLAVE_ORDEN:" in res and u_turns >= 5:
-                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                # Activación de la orden tras profundidad suficiente
+                if "Área Administrativa" in res and u_turns >= 5:
+                    st.session_state.diagnostico_nexo = res
                     st.session_state.orden_lista = True
             except Exception as e:
                 st.error(f"Error en el núcleo Nexo: {e}")
-          
+                
                 # Activamos la orden solo si hay profundidad (mínimo 5 mensajes del usuario)
                 if "CLAVE_ORDEN:" in res and u_turns >= 5:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
