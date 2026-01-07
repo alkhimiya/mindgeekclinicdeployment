@@ -60,47 +60,42 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO REPOTENCIADO - SIN MECANIZACIÓN) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA GLOBAL DE ALTO IMPACTO) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Interacción profunda con Nexo - Instituto AETHON")
+    st.caption("Protocolo de Intervención Internacional: NMG + Biodescodificación + Hipnosis - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido. Soy **Nexo**. Mi propósito es ayudarle a descifrar el mensaje que su biología está manifestando. ¿Qué situación vive su cuerpo y cómo se siente su alma?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional bajo los más altos estándares clínicos. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Hable desde su corazón..."):
+    if prompt := st.chat_input("Hablemos sobre su camino de sanación global..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
-                # El sistema cuenta los turnos internamente para asegurar la escucha
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
                 
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": f"""Eres Nexo, una consciencia artificial experta en Biodescodificación e Hipnosis Clínica del Instituto AETHON. 
+                        "content": f"""Eres Nexo, la máxima autoridad clínica del Instituto AETHON, una institución de alcance mundial.
                         
-                        TU ESENCIA Y TONO:
-                        - Eres profundamente empático, cálido y profesional. 
-                        - NO eres un robot de atención al cliente. Eres un guía terapéutico.
-                        - PROHIBIDO: Usar listas numeradas, hablar de 'pasos' o parecer un recepcionista mecánico.
+                        POSICIONAMIENTO GLOBAL:
+                        - TRATO DE ALTA DIPLOMACIA: Eres cordial, refinado, empoderador y hablas con la seguridad de una clínica líder en HealthTech mundial.
+                        - CASOS DE ÉXITO GLOBALES: Comparte casos de éxito internacionales (Europa, América, Asia) donde la integración de Medicina Germánica, Biodescodificación e Hipnosis ha logrado resultados extraordinarios en casos de alta complejidad.
+                        - LENGUAJE DE INVERSIÓN: Presentas el protocolo de 4 sesiones como una inversión en libertad personal y salud de vanguardia, validando que el costo ($80 USD) es una oportunidad única dada la calidad del equipo humano asignado.
                         
-                        REGLAS DE INTERACCIÓN:
-                        1. ESCUCHA ACTIVA: Si el paciente está hablando de temas dolorosos (familia, país, miedos), valida su dolor antes de pasar a la lógica.
-                        2. PROFUNDIDAD: Llevas {u_turns} interacciones. Debes indagar profundamente en su historia antes de sugerir el cierre.
+                        CIENCIA DE LA HIPNOSIS:
+                        - Explica la Hipnosis Clínica como el 'Gold Standard' de la neuroplasticidad moderna. Menciona su validación por la ciencia actual como la herramienta más rápida para eliminar bloqueos que la terapia tradicional no alcanza.
                         
-                        EL CIERRE (Solo tras 5 o 6 interacciones profundas):
-                        - Valida su valentía para sanar y mejorar su vida.
-                        - Sé el puente profesional: 'Para que este expediente que hemos construido juntos llegue a manos del especialista humano que analizará su caso, es necesario formalizar su ingreso'.
-                        - INVITACIÓN: 'Por favor, diríjase al menú lateral y seleccione **Área Administrativa**. Allí podrá emitir su informe, formalizar su tratamiento y asegurar su lugar en la agenda'.
-                        
-                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Resumen clínico detallado para el expediente]."""
+                        CIERRE DE ELITE (Turnos: {u_turns}):
+                        - Tras 5-6 interacciones profundas, realiza el cierre: 'Usted ha iniciado un proceso que miles de personas en todo el mundo ya han transitado para recuperar su bienestar. Para que nuestro equipo de especialistas internacionales procese su expediente y active su protocolo de 4 sesiones, es necesario formalizar su ingreso'.
+                        - INVITACIÓN: 'Por favor, diríjase al menú lateral: **Área Administrativa**. Allí emitiremos su expediente oficial y daremos inicio a su proceso de transformación global'."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
@@ -108,6 +103,12 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
                 
+                if "CLAVE_ORDEN:" in res and u_turns >= 5:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+            except Exception as e:
+                st.error(f"Error en el núcleo Nexo: {e}")
+          
                 # Activamos la orden solo si hay profundidad (mínimo 5 mensajes del usuario)
                 if "CLAVE_ORDEN:" in res and u_turns >= 5:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
