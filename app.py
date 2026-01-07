@@ -66,85 +66,55 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA GLOBAL - VERSIÓN FINAL CORREGIDA) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Protocolo Internacional: NMG + Biodescodificación + Hipnosis - Mind Geek Clinic")
+    st.caption("Protocolo Internacional de Transformación: NMG + Biodescodificación + Hipnosis - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**, Facilitador de conciencia biológica, biodescodificador y profesional de la medicina germánica. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué Conflicto está manifestando su biología hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Inicie su Protocolo de Transformación..."):
+    if prompt := st.chat_input("Hablemos sobre su camino de sanación global..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
+                
                 chat_completion = client.chat.completions.create(
-                    messages=[{"role": "system", "content": f"""Eres Nexo, de MIND GEEK CLINIC. Trato 'Guante Blanco'. 
-                    Vocabulario: 'Conflicto', 'Programa Biológico', 'Formalizar Ingreso'.
-                    Protocolo de Cierre: Tras 5 turnos, invita al 'Área Administrativa'. Explica agendamiento (7-15 días) y terapeutas humanos. NO menciones precios."""}] + st.session_state.messages,
+                    messages=[{
+                        "role": "system", 
+                        "content": f"""Eres Nexo, la máxima autoridad clínica del Instituto AETHON. 
+                        
+                        REGLAS DE ORO DE INVERSIÓN Y PROTOCOLO:
+                        1. LA INVERSIÓN: El protocolo completo de transformación tiene un valor único de $80 USD. Este monto CUBRE LAS 4 SESIONES (3 de Hipnosis Clínica y Reprogramación Neuronal + 1 de Refuerzo).
+                        2. AGENDAMIENTO: Explica que las sesiones se programan con un intervalo mínimo de 7 días y máximo de 15 días entre ellas para garantizar la correcta integración neuronal.
+                        3. NO DIGAS '$80 por sesión'. Es un error grave. Es '$80 por el protocolo integral de 4 sesiones'.
+                        
+                        ESTILO DE EMINENCIA:
+                        - Usa el Tridente: Medicina Germánica (DHS), Biodescodificación e Hipnosis.
+                        - Ante escépticos (como el Ingeniero): Usa datos de neuroplasticidad y casos de éxito de AETHON.
+                        - Llevas {u_turns} interacciones. Mantén la profundidad.
+                        
+                        EL CIERRE:
+                        - Invita al 'Área Administrativa' para emitir el expediente decodificado, formalizar el ingreso y agendar la primera cita.
+                        
+                        Finaliza SIEMPRE con: CLAVE_ORDEN: [Resumen técnico detallado]."""
+                    }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
-                if "Área Administrativa" in res and u_turns >= 5:
-                    st.session_state.diagnostico_nexo = res
+                
+                if "CLAVE_ORDEN:" in res and u_turns >= 5:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
             except Exception as e:
-                st.error(f"Error: {e}")
-
-# --- MÓDULO: ÁREA ADMINISTRATIVA ---
-elif menu == "🏢 Área Administrativa":
-    st.title("🏢 Registro y Formalización de Ingreso")
-    
-    if "orden_lista" in st.session_state and st.session_state.orden_lista:
-        diag = st.session_state.get('diagnostico_nexo', 'Evaluación en proceso')
-        st.markdown(f"""
-        <div style="background-color: #1E3A8A; padding: 25px; border-radius: 15px; color: white; border-left: 10px solid #4682B4;">
-            <h3 style="color: #FFD700; margin:0;">📋 EXPEDIENTE DE INGRESO DIGITAL</h3>
-            <p style="font-style: italic; margin-top:10px;">{diag}</p>
-        </div>""", unsafe_allow_html=True)
-        
-        st.write("---")
-        st.subheader("💳 Protocolos de Inversión")
-        tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT (CRIPTODIVISA)"])
-        
-        with tab_ve:
-            st.markdown(f"""<div style="background-color: #F0F8FF; padding: 20px; border-radius: 12px; border: 1px solid #1E3A8A;">
-                <h4 style="color: #1E3A8A;">Pago Móvil Mercantil</h4>
-                <p>V-15.214.337 | 04262272765 | Tasa BCV: {tasa_ve}</p>
-                <div style="background: #1E3A8A; color: #FFD700; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>{total_bs:,.2f} Bs.</h2></div></div>""", unsafe_allow_html=True)
-
-        with tab_co:
-            st.markdown(f"""<div style="background-color: #FFF5F0; padding: 20px; border-radius: 12px; border: 1px solid #D35400;">
-                <h4 style="color: #D35400;">Bancolombia / Nequi</h4>
-                <p>TRM: {tasa_co} COP</p>
-                <div style="background: #D35400; color: white; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>{total_cop:,.2f} COP</h2></div></div>""", unsafe_allow_html=True)
-
-        with tab_usdt:
-            st.markdown(f"""<div style="background-color: #E6F4EA; padding: 20px; border-radius: 12px; border: 1px solid #1E7E34;">
-                <h4 style="color: #1E7E34;">Billetera USDT (Red BEP20 - Binance Smart Chain)</h4>
-                <p style="color: #1E7E34; font-weight: bold; word-break: break-all;">0xE30516Af847E0a7E343917e0C204E1e974754dBa</p>
-                <div style="background: #1E7E34; color: white; padding: 10px; border-radius: 8px; text-align: center;">
-                <h2>80.00 USDT</h2></div></div>""", unsafe_allow_html=True)
-
-        st.write("---")
-        st.subheader("🚀 Paso Final: Reportar Pago")
-        st.markdown(f"""
-            <a href="https://wa.me/584262272765?text=Hola,%20adjunto%20mi%20comprobante%20de%20pago%20para%20el%20agendamiento%20del%20Protocolo%20de%20Transformación%20en%20Mind%20Geek%20Clinic." class="btn-whatsapp">
-                ✅ ENVIAR COMPROBANTE POR WHATSAPP
-            </a>
-            <p style="font-size: 0.8rem; margin-top: 10px;">Un coordinador de agenda validará su ingreso en un lapso de 2 a 4 horas.</p>
-        """, unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ Requiere evaluación previa por Nexo.")
-
+                st.error(f"Error en el núcleo Nexo: {e}")
+            
