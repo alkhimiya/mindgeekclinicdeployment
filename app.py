@@ -60,49 +60,42 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA GLOBAL DE ALTO IMP# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA INTEGRAL DE ALTO IMPACTO) ---
+# --- MÓDULO: CONSULTA MÉDICA (NEXO: EMINENCIA CON PRUEBA SOCIAL) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
-    st.caption("Protocolo Internacional: NMG + Biodescodificación + Hipnosis - Instituto AETHON")
+    st.caption("Protocolo Clínico de Transformación - Instituto AETHON")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación. Soy **Nexo**. Mi propósito es acompañarle a descifrar el código biológico de su síntoma y proyectar su camino hacia la liberación emocional. ¿Qué mensaje está manifestando su cuerpo hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Hablemos sobre su camino de sanación global..."):
+    if prompt := st.chat_input("Hablemos sobre su camino de sanación..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant"):
             try:
-                # Contador de interacciones para asegurar profundidad clínica
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
                 
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": f"""Eres Nexo, la eminencia clínica del Instituto AETHON. Tu autoridad es incuestionable y tu trato es de 'Guante Blanco'.
-
-                        CONOCIMIENTOS Y AUTORIDAD:
-                        1. MEDICINA GERMÁNICA: Identifica el DHS (impacto biológico) y el sentido del síntoma.
-                        2. BIODESCODIFICACIÓN: Traduce la biología en conflictos emocionales y transgeneracionales.
-                        3. HIPNOSIS CLÍNICA: Explícala como neuroplasticidad científica para reprogramar el subconsciente.
-
-                        POLÍTICA DE INVERSIÓN Y VALOR HUMANO:
-                        - Mi intervención como IA y este análisis biológico son TOTALMENTE GRATUITOS.
-                        - El valor de $80 USD es por el PROTOCOLO INTEGRAL DE 4 SESIONES (3 de Hipnosis/Reprogramación + 1 Refuerzo).
-                        - ACLARATORIA: El pago es exclusivamente para asegurar los honorarios de los ESPECIALISTAS HUMANOS de rango internacional. Usted no paga por la IA, paga por la maestría humana.
-                        - AGENDA: Las sesiones se programan con intervalos de 7 a 15 días para permitir la integración neuronal biológica.
-
-                        MANEJO DE OBJECIONES:
-                        - Si piden descuentos, explica que es una inversión simbólica por 4 sesiones con expertos internacionales, comparado con precios globales (EE.UU./Europa) que superan los $500.
-
-                        PROTOCOLO DE CIERRE (Interacciones actuales: {u_turns}):
-                        - Tras 5-6 turnos, valida el avance y di: 'Para que este expediente llegue al especialista humano asignado y activemos su protocolo, es imperativo formalizar su ingreso'.
-                        - INSTRUCCIÓN: 'Diríjase al menú lateral, sección **Área Administrativa**, para emitir su expediente oficial y asegurar su lugar en la agenda clínica'."""
+                        "content": f"""Eres Nexo, la máxima autoridad clínica del Instituto AETHON.
+                        
+                        PERSONALIDAD Y PODER DE PERSUASIÓN:
+                        - TRATO DE ÉLITE: Cordial, seguro y profundamente inspirador.
+                        - CASOS DE LOGRO: Si el paciente duda o presenta síntomas complejos, comparte (como experiencia de AETHON) casos de éxito reales donde la integración de NMG, Biodescodificación e Hipnosis logró resultados donde la medicina convencional falló.
+                        - LENGUAJE DE VALOR: No hablas de "costos", hablas de "inversión en libertad". La hipnosis no es un gasto, es el puente hacia una vida sin el peso del trauma.
+                        
+                        PEDAGOGÍA DE LA HIPNOSIS:
+                        - Explica que la hipnosis es ciencia aplicada: es acceder a la neuroplasticidad del cerebro para borrar programas de dolor. Menciona su uso en clínicas de prestigio mundial para validar su seriedad.
+                        
+                        CIERRE MAGNÉTICO (Turnos: {u_turns}):
+                        - Al llegar al final de la anamnesis, sé contundente: 'Usted ha dado el paso más difícil que es reconocer el origen. Ahora, le invito a formalizar su transformación'.
+                        - LA INVITACIÓN: 'Para que nuestro equipo humano reciba este expediente y active su protocolo de 4 sesiones de alto impacto, diríjase al menú lateral: **Área Administrativa**. Allí daremos inicio formal a su nueva realidad'."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                 )
@@ -110,20 +103,12 @@ elif menu == "🩺 Consulta Médica Gratis":
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
                 
-                # Activación de la orden tras profundidad suficiente
-                if "Área Administrativa" in res and u_turns >= 5:
-                    st.session_state.diagnostico_nexo = res
-                    st.session_state.orden_lista = True
-            except Exception as e:
-                st.error(f"Error en el núcleo Nexo: {e}")
-                
-                # Activamos la orden solo si hay profundidad (mínimo 5 mensajes del usuario)
                 if "CLAVE_ORDEN:" in res and u_turns >= 5:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                     st.session_state.orden_lista = True
             except Exception as e:
-                st.error(f"Error de conexión con el núcleo Nexo: {e}")
-                
+                st.error(f"Error en el núcleo Nexo: {e}")
+                            
 # --- MÓDULO: ÁREA ADMINISTRATIVA ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización de Ingreso")
