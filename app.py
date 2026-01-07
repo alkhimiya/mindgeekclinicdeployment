@@ -72,7 +72,7 @@ elif menu == "🩺 Consulta Médica Gratis":
     st.caption("Protocolo Internacional: NMG + Biodescodificación + Hipnosis - Mind Geek Clinic")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**, Facilitador de Biological Consciousness. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué Conflicto está manifestando su biología hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de transformación de escala internacional. Soy **Nexo**, Facilitador de conciencia biológica, biodescodificador y profesional de la medicina germánica. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué Conflicto está manifestando su biología hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
