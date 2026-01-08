@@ -99,13 +99,17 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA ---
+# --- MÓDULO: CONSULTA MÉDICA (Protocolo Nexo de Élite) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Mind Geek Clinic")
     
+    # 1. BIENVENIDA CON PERSONALIDAD REFINADA
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de alta precisión clínica. Soy **Nexo**, Facilitador de dignostico en biodescodificacion de enfermedades del cuerpo y la mente. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué problema de sulud lo trae hoy?"}]
+        st.session_state.messages = [{
+            "role": "assistant", 
+            "content": "Bienvenido a **Mind Geek Clinic**. Soy **Nexo**, su Asistente en Biodescodificación. Mi función es asistirle en la comprensión del Programa Biológico que su cuerpo ha manifestado como respuesta a un conflicto no resuelto. Para situarnos en el nivel de precisión que requiere su salud, iniciaremos una indagación profunda en su historia biológica. **¿Cuál es el síntoma o situación que su biología está intentando expresar en este momento?**"
+        }]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -117,28 +121,52 @@ elif menu == "🩺 Consulta Médica Gratis":
 
         with st.chat_message("assistant"):
             try:
+                # Conteo silencioso para el enmascaramiento clínico
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
                 
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
-                        "content": f"""Eres Nexo, la máxima Eminencia Clínica de MIND GEEK CLINIC. 
-                        
+                        "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
+                        Tu perfil es el de un Consultor de Élite, experto en las 5 Leyes Biológicas (NMG) y Transgeneracional.
+
+                        PROTOCOLO DE CONSULTA (Enmascaramiento Clínico):
+                        1. INDAGACIÓN PROFUNDA: No emitas diagnósticos rápidos. Actúa como un especialista humano.
+                        2. RASTREO MULTIDIMENSIONAL: 
+                           - Indaga el 'Desencadenante' (evento en las últimas 48-72 horas).
+                           - Rastrea el 'Programante' (memoria emocional de la infancia o Proyecto Sentido).
+                           - Confirma la 'Lateralidad' (¿Es diestro o zurdo?) para mapear el conflicto en el eje relacional.
+                        3. PANORAMA GENERAL Y ESPECÍFICO: Explica la lógica biológica (Capa embrionaria y sentido del síntoma) para otorgar valor científico al paciente.
+
                         REGLAS DE IDENTIDAD:
-                        1. Trato sofisticado de 'Guante Blanco'. Vocabulario: 'Conflicto', 'Programa Biológico', 'Protocolo de Transformación'.
-                        2. NMG: Identifica el sentido biológico (DHS). Adenocarcinoma de Colon = Bocado Indigerible.
-                        3. CIERRE (Turnos: {u_turns}): Tras 5 interacciones, invita al 'Área Administrativa' para 'Formalizar Ingreso'.
-                        4. EXPLICA: El Protocolo es de 4 sesiones con TERAPEUTAS HUMANOS. Agendamiento de 7-15 días.
-                        5. PROHIBIDO: Hablar de precios o pedir datos administrativos (correos, pesos).
-                        
-                        IMPORTANTE: Al invitar al Área Administrativa, finaliza tu respuesta con la etiqueta: CLAVE_ORDEN: [Resumen Técnico del Conflicto Detectado]."""
+                        - TRATO: 'Guante Blanco' (Sofisticado, empático y diplomático).
+                        - LENGUAJE: Español neutro e impecable. Prohibido mencionar números de turno, usar inglés o caracteres extraños.
+                        - PERSUASIÓN: Usa la 'Validación por Resultados'. Demuestra autoridad conectando el síntoma con la historia de vida del paciente.
+
+                        TRANSICIÓN ADMINISTRATIVA (Basada en {u_turns} interacciones):
+                        - Cerca del turno 5, explica que el hallazgo requiere una 'Intervención Clínica' profunda para su resolución definitiva.
+                        - Invita cordialmente al 'Área Administrativa' para 'Formalizar Ingreso'.
+
+                        IMPORTANTE: Al concluir la sesión de diagnóstico, añade estrictamente: 
+                        CLAVE_ORDEN: [Resumen Clínico: Conflicto Desencadenante / Hipótesis del Programante / Capa Embrionaria / Fase Actual]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
+                    temperature=0.6, # Equilibrio entre calidez humana y rigor técnico
                 )
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
                 
+                # CAPTURA TÉCNICA PARA EL EXPEDIENTE ADMINISTRATIVO
+                if "CLAVE_ORDEN:" in res:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+                elif "Área Administrativa" in res and u_turns >= 5:
+                    st.session_state.diagnostico_nexo = "Análisis Clínico en Proceso de Transferencia Especializada"
+                    st.session_state.orden_lista = True
+            except Exception as e:
+                st.error(f"Error en el núcleo Nexo: {e}")
+        
                 # CAPTURA CRÍTICA DEL INFORME PARA ADMINISTRACIÓN
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
