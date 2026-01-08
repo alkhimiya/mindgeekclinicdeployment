@@ -37,7 +37,6 @@ with st.sidebar:
     st.info("Sistema de Salud Mental: **Mind Geek Clinic**")
 
 # 4. FUNCIONES GLOBALES (Cerebro Financiero de Alta Precisión y Automatización)
-# 4. FUNCIONES GLOBALES (Cerebro Financiero de Alta Precisión)
 import requests
 
 # Eliminamos el cache para forzar la actualización en vivo durante la verificación
@@ -99,7 +98,7 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (Protocolo Nexo de Élite) ---
+# --- MÓDULO: CONSULTA MÉDICA (Protocolo Nexo de Élite con Puente de Navegación) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Mind Geek Clinic")
@@ -151,12 +150,46 @@ elif menu == "🩺 Consulta Médica Gratis":
                         CLAVE_ORDEN: [Resumen Clínico: Conflicto Desencadenante / Hipótesis del Programante / Capa Embrionaria / Fase Actual]."""
                     }] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
-                    temperature=0.6, # Equilibrio entre calidez humana y rigor técnico
+                    temperature=0.6,
                 )
                 res = chat_completion.choices[0].message.content
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
                 
+                # CAPTURA TÉCNICA PARA EL EXPEDIENTE ADMINISTRATIVO
+                if "CLAVE_ORDEN:" in res:
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+                elif "Área Administrativa" in res and u_turns >= 5:
+                    st.session_state.diagnostico_nexo = "Análisis Clínico en Proceso de Transferencia Especializada"
+                    st.session_state.orden_lista = True
+
+                # --- PUENTE DE NAVEGACIÓN INTUITIVA (Visualización del Botón de Paso) ---
+                if st.session_state.get('orden_lista'):
+                    st.markdown("---")
+                    st.markdown(f"""
+                        <div style="background-color: #E8F0FE; padding: 25px; border-radius: 15px; border-left: 8px solid #1E3A8A; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 20px;">
+                            <h3 style="color: #1E3A8A; margin-top: 0; font-family: sans-serif;">✅ ANÁLISIS CLÍNICO CONSOLIDADO</h3>
+                            <p style="color: #2C3E50; font-size: 1.1rem; line-height: 1.5;">
+                                Nexo ha finalizado el mapeo biológico. Para revisar su <b>Protocolo de Transformación</b>, presupuesto y métodos de formalización, proceda al siguiente paso:
+                            </p>
+                            <div style="background: white; padding: 15px; border-radius: 10px; border: 1px dashed #1E3A8A; text-align: center;">
+                                <p style="font-weight: bold; color: #D35400; font-size: 1.2rem; margin: 0;">
+                                    ⬅️ DESPLIEGUE EL MENÚ LATERAL (Flecha >)
+                                </p>
+                                <p style="color: #1E3A8A; font-size: 1.3rem; font-weight: 900; margin: 5px 0;">
+                                    Y SELECCIONE: "🏢 Área Administrativa"
+                                </p>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button("🆘 ¿No encuentra el menú? Haga clic aquí para ayuda"):
+                        st.info("En la esquina superior izquierda de su pantalla verá un icono pequeño de flecha (>). Al presionarlo, aparecerán las opciones de la Clínica. Elija 'Área Administrativa'.")
+
+            except Exception as e:
+                st.error(f"Error en el núcleo Nexo: {e}")
+              
                 # CAPTURA TÉCNICA PARA EL EXPEDIENTE ADMINISTRATIVO
                 if "CLAVE_ORDEN:" in res:
                     st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
