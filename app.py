@@ -45,14 +45,12 @@ def calcular_finanzas_globales():
     monto_usd = 80.00
     
     # Valores de RESPALDO (Por si falla la conexión a internet)
-    # Se mantienen actualizados a la realidad observada en bcv.org.ve
     tasa_ve_bcv_eur = 59.21  
     tasa_co_trm = 3950.00
     paridad_eur_usd = 0.92
 
     try:
         # A. CONEXIÓN A PARIDAD INTERNACIONAL (USD -> EUR)
-        # Consultamos la referencia de mercado para que la paridad sea exacta al minuto
         url_intl = "https://open.er-api.com/v6/latest/USD"
         data_intl = requests.get(url_intl, timeout=5).json()
         
@@ -61,36 +59,24 @@ def calcular_finanzas_globales():
             tasa_co_trm = data_intl["rates"]["COP"]
 
         # B. CONEXIÓN AL PORTAL BCV (VENEZUELA - EURO OFICIAL)
-        # Usamos un motor que captura la data exacta de bcv.org.ve
         url_ve = "https://pydolarve.org/api/v1/engine?page=bcv"
         data_ve = requests.get(url_ve, timeout=5).json()
         
-        # Extracción del Euro Oficial para el Protocolo de la Clínica
+        # Extracción del Euro Oficial del BCV
         tasa_ve_bcv_eur = data_ve["result"]["eur"]["value"]
         
-    except Exception as e:
-        # Si las fuentes fallan, el sistema protege la operación con el respaldo seguro
+    except Exception:
+        # Si las fuentes fallan, el sistema usa el respaldo
         pass
 
-    # --- PROTOCOLO DE CONVERSIÓN DE MIND GEEK CLINIC ---
-    
-    # 1. Transformación a Moneda Base (Euro) según paridad internacional
+    # --- PROTOCOLO DE CONVERSIÓN ---
     monto_eur = monto_usd * paridad_eur_usd
-    
-    # 2. Cálculo para Venezuela (Basado en Euro BCV)
     monto_bs = monto_eur * tasa_ve_bcv_eur
-    
-    # 3. Cálculo para Colombia (Basado en TRM)
     monto_cop = monto_usd * tasa_co_trm
     
     return tasa_ve_bcv_eur, tasa_co_trm, monto_bs, monto_cop
 
-# Inyección automática de datos al sistema
-tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
-
-    
-    return tasa_ve_bcv, tasa_co_trm, monto_bs, monto_cop
-
+# Inyección automática de datos al sistema (Fuera de la función)
 tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
 # 5. LÓGICA DE MÓDULOS
