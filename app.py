@@ -37,36 +37,43 @@ with st.sidebar:
     st.info("Sistema de Salud Mental: **Mind Geek Clinic**")
 
 # 4. FUNCIONES GLOBALES (Cerebro Financiero de Alta Precisión y Automatización)
+# 4. FUNCIONES GLOBALES (Cerebro Financiero de Alta Precisión)
 import requests
 
-@st.cache_data(ttl=600)  # Actualización automática cada 10 minutos
+# Eliminamos el cache para forzar la actualización en vivo durante la verificación
 def calcular_finanzas_globales():
-    # --- PARÁMETROS BASE ---
     monto_usd = 80.00
     
-    # Valores de RESPALDO (Por si falla la conexión a internet)
-    tasa_ve_bcv_eur = 59.21  
-    tasa_co_trm = 3950.00
-    paridad_eur_usd = 0.92
+    # Valores de RESPALDO (Solo si falla la conexión)
+    # AJUSTE ESTOS VALORES A LO QUE VE EN EL BCV AHORA MISMO
+    tasa_ve_bcv_eur = 60.15  
+    tasa_co_trm = 4050.00
+    paridad_eur_usd = 0.93
 
     try:
-        # A. CONEXIÓN A PARIDAD INTERNACIONAL (USD -> EUR)
+        # A. PARIDAD INTERNACIONAL
         url_intl = "https://open.er-api.com/v6/latest/USD"
-        data_intl = requests.get(url_intl, timeout=5).json()
+        res_intl = requests.get(url_intl, timeout=7)
+        data_intl = res_intl.json()
         
-        if data_intl["result"] == "success":
+        if data_intl.get("result") == "success":
             paridad_eur_usd = data_intl["rates"]["EUR"]
             tasa_co_trm = data_intl["rates"]["COP"]
 
-        # B. CONEXIÓN AL PORTAL BCV (VENEZUELA - EURO OFICIAL)
-        url_ve = "https://pydolarve.org/api/v1/engine?page=bcv"
-        data_ve = requests.get(url_ve, timeout=5).json()
+        # B. TASA OFICIAL VENEZUELA (Portal BCV)
+        # Usamos una API alternativa más estable que apunta directo al BCV
+        url_ve = "https://ve.dolarapi.com/v1/dolares/oficial" 
+        res_ve = requests.get(url_ve, timeout=7)
+        data_ve = res_ve.json()
         
-        # Extracción del Euro Oficial del BCV
-        tasa_ve_bcv_eur = data_ve["result"]["eur"]["value"]
+        # El BCV publica el USD oficial, calculamos el EURO BCV con paridad
+        tasa_usd_bcv = data_ve["promedio"]
+        # La relación legal es Tasa USD * (1/Paridad) para obtener el Euro BCV
+        tasa_ve_bcv_eur = tasa_usd_bcv / paridad_eur_usd
         
-    except Exception:
-        # Si las fuentes fallan, el sistema usa el respaldo
+    except Exception as e:
+        # Si desea ver el error técnico, descomente la siguiente línea:
+        # st.error(f"Error de conexión financiera: {e}")
         pass
 
     # --- PROTOCOLO DE CONVERSIÓN ---
@@ -76,7 +83,7 @@ def calcular_finanzas_globales():
     
     return tasa_ve_bcv_eur, tasa_co_trm, monto_bs, monto_cop
 
-# Inyección automática de datos al sistema (Fuera de la función)
+# Inyección de datos
 tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
 # 5. LÓGICA DE MÓDULOS
