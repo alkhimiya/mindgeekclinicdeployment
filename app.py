@@ -71,7 +71,7 @@ elif menu == "🩺 Consulta Médica Gratis":
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Mind Geek Clinic")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de alta precisión clínica. Soy **Nexo**, Facilitador de Biological Consciousness. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué Conflicto está manifestando su biología hoy?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Bienvenido a este espacio de alta precisión clínica. Soy **Nexo**, Facilitador de dignostico en biodescodificacion de enfermedades del cuerpo y la mente. Mi propósito es acompañarle a descifrar el Programa Biológico de su síntoma. ¿Qué problema de sulud lo trae hoy?"}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
