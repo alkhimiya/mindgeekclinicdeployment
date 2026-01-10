@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import streamlit as st
 import os
 from groq import Groq
@@ -9,7 +8,7 @@ import urllib.parse
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# --- BLOQUE DE ESTILO (Copia fiel blindada) ---
+# --- BLOQUE DE ESTILO (Tu código satisfactorio intacto) ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
@@ -56,49 +55,36 @@ with st.sidebar:
     st.write("---")
     st.info("Sistema de Salud Mental: **Mind Geek Clinic**")
 
-# 4. FUNCIONES GLOBALES (Tus cálculos de alta precisión originales)
+# 4. FUNCIONES GLOBALES (Tus cálculos de alta precisión)
 def calcular_finanzas_globales():
     monto_usd = 80.00
-    
-    # Valores de RESPALDO (Solo si falla la conexión)
     tasa_ve_bcv_eur = 60.15  
     tasa_co_trm = 4050.00
     paridad_eur_usd = 0.93
-
     try:
-        # A. PARIDAD INTERNACIONAL
         url_intl = "https://open.er-api.com/v6/latest/USD"
         res_intl = requests.get(url_intl, timeout=7)
         data_intl = res_intl.json()
-        
         if data_intl.get("result") == "success":
             paridad_eur_usd = data_intl["rates"]["EUR"]
             tasa_co_trm = data_intl["rates"]["COP"]
-
-        # B. TASA OFICIAL VENEZUELA (Portal BCV)
         url_ve = "https://ve.dolarapi.com/v1/dolares/oficial" 
         res_ve = requests.get(url_ve, timeout=7)
         data_ve = res_ve.json()
-        
         tasa_usd_bcv = data_ve["promedio"]
         tasa_ve_bcv_eur = tasa_usd_bcv / paridad_eur_usd
-        
     except Exception as e:
         pass
-
-    # --- PROTOCOLO DE CONVERSIÓN ---
     monto_eur = monto_usd * paridad_eur_usd
     monto_bs = monto_eur * tasa_ve_bcv_eur
     monto_cop = monto_usd * tasa_co_trm
-    
     return tasa_ve_bcv_eur, tasa_co_trm, monto_bs, monto_cop
 
-# Inyección de datos
 tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
 # 5. LÓGICA DE MÓDULOS
 
-# --- MÓDULO: INICIO (Restaurado con 🧠) ---
+# --- MÓDULO: INICIO (Copia fiel + 🧠) ---
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic 🧠</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
@@ -131,7 +117,6 @@ elif menu == "🩺 Consulta Médica Gratis":
         with st.chat_message("assistant"):
             try:
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
-                
                 chat_completion = client.chat.completions.create(
                     messages=[{
                         "role": "system", 
@@ -175,46 +160,34 @@ elif menu == "🩺 Consulta Médica Gratis":
                 if st.session_state.get('orden_lista'):
                     st.markdown("---")
                     st.info("✅ ANÁLISIS CLÍNICO CONSOLIDADO. Por favor, proceda al Área Administrativa.")
-
             except Exception as e:
                 st.error("Error de comunicación biológica.")
 
-# --- MÓDULO: ÁREA ADMINISTRATIVA (Tu base + Expansión Modular de Citas) ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (Tu base + Inserción de Citas) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización")
     
     if st.session_state.get('orden_lista'):
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando Programa Biológico...')
-        
-        # Bloque con visibilidad blindada (Original)
         st.markdown(f"""
             <div class="expediente-container">
                 <h3 style="color: #FFD700; margin-top: 0;">📋 EXPEDIENTE DE DIAGNÓSTICO</h3>
                 <p class="expediente-texto">{diagnostico}</p>
             </div>
         """, unsafe_allow_html=True)
-
-        # NUEVO: AGENDAMIENTO BIOLÓGICO (Fase Beta)
-        st.subheader("📅 Cronograma de Intervención")
-        st.info("Las sesiones se proyectan con intervalos biológicos para la integración del proceso.")
         
+        # --- INSERCIÓN QUIRÚRGICA: AGENDAMIENTO ---
+        st.subheader("📅 Plan de Tratamiento (4 Sesiones)")
         hoy = datetime.date.today()
-        fecha_1 = st.date_input("Seleccione fecha de Sesión 1:", 
-                                value=hoy + datetime.timedelta(days=2),
-                                min_value=hoy + datetime.timedelta(days=1))
-        
-        # Proyección de citas
+        fecha_1 = st.date_input("Sesión 1 (Inicio):", value=hoy + datetime.timedelta(days=2), min_value=hoy + datetime.timedelta(days=1))
         f2, f3, f4 = [fecha_1 + datetime.timedelta(days=d) for d in [10, 20, 30]]
-        
-        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-        col_c1.metric("Cita 1", fecha_1.strftime('%d/%m'))
-        col_c2.metric("Cita 2", f2.strftime('%d/%m'))
-        col_c3.metric("Cita 3", f3.strftime('%d/%m'))
-        col_c4.metric("Cita 4", f4.strftime('%d/%m'))
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Inicio", fecha_1.strftime('%d/%m'))
+        c2.metric("S2", f2.strftime('%d/%m'))
+        c3.metric("S3", f3.strftime('%d/%m'))
+        c4.metric("S4", f4.strftime('%d/%m'))
+        # --- FIN INSERCIÓN ---
 
-        st.markdown("---")
-        
-        # MÉTODOS DE PAGO (Copia fiel de tus datos bancarios)
         tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT"])
         with tab_ve:
             st.info(f"**Pago Móvil:** Mercantil | V-15.214.337 | 04262272765 | Monto: **{total_bs:,.2f} Bs.**")
@@ -223,14 +196,9 @@ elif menu == "🏢 Área Administrativa":
         with tab_usdt:
             st.success("**USDT (BEP20):** 0xE30516Af847E0a7E343917e0C204E1e974754dBa | 80.00 USDT")
             
-        # BOTÓN FINAL: WhatsApp Inteligente
-        mensaje_wa = (
-            f"Hola Fundador, completé mi diagnóstico con Nexo.\n\n"
-            f"📍 *Diagnóstico:* {diagnostico[:100]}...\n"
-            f"📅 *Propuesta Inicio:* {fecha_1.strftime('%d/%m/%Y')}\n"
-            f"💳 *Inversión:* 80 USD"
-        )
-        wa_link = f"https://wa.me/584262272765?text={urllib.parse.quote(mensaje_wa)}"
+        # Mensaje de WhatsApp mejorado con los datos de la cita
+        msj_wa = f"Hola Fundador, completé mi diagnóstico con Nexo.\n\n📍 Diagnóstico: {diagnostico[:100]}...\n📅 Inicio: {fecha_1.strftime('%d/%m/%Y')}\n💳 Monto: 80 USD"
+        wa_link = f"https://wa.me/584262272765?text={urllib.parse.quote(msj_wa)}"
         
         st.markdown(f'<a href="{wa_link}" class="btn-whatsapp">✅ AGENDAR Y ENVIAR COMPROBANTE</a>', unsafe_allow_html=True)
     else:
