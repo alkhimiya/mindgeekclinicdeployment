@@ -8,7 +8,7 @@ import urllib.parse
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# --- BLOQUE DE ESTILO (Copia fiel de tu versión app.py) ---
+# --- BLOQUE DE ESTILO (Copia fiel de tu versión blindada) ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
@@ -53,7 +53,7 @@ with st.sidebar:
     st.write("---")
     st.info("Sistema de Salud Mental: **Mind Geek Clinic**")
 
-# 4. FUNCIONES GLOBALES (Tus cálculos originales)
+# 4. FUNCIONES GLOBALES (Tus cálculos de alta precisión)
 def calcular_finanzas_globales():
     monto_usd = 80.00
     tasa_ve_bcv_eur = 60.15  
@@ -82,9 +82,9 @@ tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
 # 5. LÓGICA DE MÓDULOS
 
-# --- MÓDULO: INICIO (Restaurado a tu versión original fielmente) ---
+# --- MÓDULO: INICIO (Copia Fiel con 🧠) ---
 if menu == "🏠 Inicio":
-    st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic 🧠</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("""
@@ -93,7 +93,7 @@ if menu == "🏠 Inicio":
     """)
     st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
-# --- MÓDULO: CONSULTA MÉDICA (Copia fiel de tu Nexo) ---
+# --- MÓDULO: CONSULTA MÉDICA (Nexo intacto) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Mind Geek Clinic")
@@ -123,7 +123,7 @@ elif menu == "🩺 Consulta Médica Gratis":
             except:
                 st.error("Error de comunicación biológica.")
 
-# --- MÓDULO: ÁREA ADMINISTRATIVA (Tu base + Expansión de Citas) ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (Tu base + Módulo de Citas) ---
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Registro y Formalización")
     if st.session_state.get('orden_lista'):
@@ -135,22 +135,29 @@ elif menu == "🏢 Área Administrativa":
             </div>
         """, unsafe_allow_html=True)
 
-        # Adición modular de citas
+        # NUEVO MÓDULO DE CITAS
         st.subheader("📅 Plan de Tratamiento (4 Sesiones)")
+        st.write("Seleccione su fecha de inicio para proyectar el cronograma biológico.")
         hoy = datetime.date.today()
         fecha_1 = st.date_input("Sesión 1 (Inicio):", value=hoy + datetime.timedelta(days=2), min_value=hoy + datetime.timedelta(days=1))
+        
+        # Proyección de sesiones (Regla de 10 días promedio)
         f2, f3, f4 = [fecha_1 + datetime.timedelta(days=d) for d in [10, 20, 30]]
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Inicio", fecha_1.strftime('%d/%m'))
-        c2.metric("S2", f2.strftime('%d/%m'))
-        c3.metric("S3", f3.strftime('%d/%m'))
-        c4.metric("S4", f4.strftime('%d/%m'))
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("Sesión 1", fecha_1.strftime('%d/%m'))
+        col_c2.metric("Sesión 2", f2.strftime('%d/%m'))
+        col_c3.metric("Sesión 3", f3.strftime('%d/%m'))
+        col_c4.metric("Sesión 4", f4.strftime('%d/%m'))
 
+        st.markdown("---")
+
+        # Métodos de Pago Originales
         tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT"])
         with tab_ve: st.info(f"**Pago Móvil:** Mercantil | V-15.214.337 | 04262272765 | **{total_bs:,.2f} Bs.**")
         with tab_co: st.warning(f"**Bancolombia / Nequi:** Consultar | **{total_cop:,.2f} COP**")
         with tab_usdt: st.success(f"**USDT (BEP20):** 0xE30516Af847E0a7E343917e0C204E1e974754dBa | **80.00 USDT**")
             
+        # WhatsApp Inteligente
         mensaje_wa = f"Hola Fundador, completé mi diagnóstico.\n\n📍 *Diagnóstico:* {diagnostico[:100]}...\n📅 *Inicio:* {fecha_1.strftime('%d/%m/%Y')}\n💳 *Monto:* 80 USD"
         wa_link = f"https://wa.me/584262272765?text={urllib.parse.quote(mensaje_wa)}"
         st.markdown(f'<a href="{wa_link}" class="btn-whatsapp">✅ AGENDAR Y ENVIAR COMPROBANTE</a>', unsafe_allow_html=True)
