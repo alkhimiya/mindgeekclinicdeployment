@@ -198,7 +198,7 @@ elif menu == "🏢 Área Administrativa":
             
         # Mensaje de WhatsApp mejorado con los datos de la cita
         msj_wa = f"Hola Fundador, completé mi diagnóstico con Nexo.\n\n📍 Diagnóstico: {diagnostico[:100]}...\n📅 Inicio: {fecha_1.strftime('%d/%m/%Y')}\n💳 Monto: 80 USD"
-        wa_link = f"https://wa.me/584262272765?text={urllib.parse.quote(msj_wa)}"
+        wa_link = f"https://wa.me/584262272065?text={urllib.parse.quote(msj_wa)}"
         
         st.markdown(f'<a href="{wa_link}" class="btn-whatsapp">✅ AGENDAR Y ENVIAR COMPROBANTE</a>', unsafe_allow_html=True)
     else:
