@@ -8,7 +8,7 @@ import urllib.parse
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
 
-# --- BLOQUE DE ESTILO (Copia fiel de tu diseño blindado) ---
+# --- BLOQUE DE ESTILO (Copia fiel de tu versión app.py) ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #1E3A8A; color: white; }
@@ -53,7 +53,7 @@ with st.sidebar:
     st.write("---")
     st.info("Sistema de Salud Mental: **Mind Geek Clinic**")
 
-# 4. FUNCIONES GLOBALES (Tus cálculos de alta precisión intactos)
+# 4. FUNCIONES GLOBALES (Tus cálculos originales)
 def calcular_finanzas_globales():
     monto_usd = 80.00
     tasa_ve_bcv_eur = 60.15  
@@ -82,13 +82,18 @@ tasa_ve, tasa_co, total_bs, total_cop = calcular_finanzas_globales()
 
 # 5. LÓGICA DE MÓDULOS
 
+# --- MÓDULO: INICIO (Restaurado a tu versión original fielmente) ---
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("#### **La Frontera de la Nueva Medicina**")
-    st.info("Inicie su protocolo de evaluación con **Nexo**.")
+    st.markdown("""
+    #### **La Frontera de la Nueva Medicina**
+    Bienvenidos a la intersección donde la computación avanzada se encuentra con la inteligencia del alma. 
+    """)
+    st.info("Inicie su protocolo de evaluación con **Nexo** en el menú lateral.")
 
+# --- MÓDULO: CONSULTA MÉDICA (Copia fiel de tu Nexo) ---
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis - Mind Geek Clinic")
@@ -105,12 +110,7 @@ elif menu == "🩺 Consulta Médica Gratis":
             try:
                 u_turns = len([m for m in st.session_state.messages if m["role"] == "user"])
                 chat_completion = client.chat.completions.create(
-                    messages=[{"role": "system", "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
-                        Tu perfil es el de un Consultor de Élite, experto en las 5 Leyes Biológicas (NMG) y Transgeneracional.
-                        PROTOCOLO DE CONSULTA: 1. INDAGACIÓN PROFUNDA. 2. RASTREO MULTIDIMENSIONAL. 3. PANORAMA GENERAL Y ESPECÍFICO.
-                        REGLAS DE IDENTIDAD: 'Guante Blanco', Español neutro, Validación por Resultados.
-                        TRANSICIÓN ADMINISTRATIVA: Cerca del turno 5 invita al 'Área Administrativa'.
-                        IMPORTANTE: Al concluir añade CLAVE_ORDEN: [Resumen Clínico]."""}] + st.session_state.messages,
+                    messages=[{"role": "system", "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. Tu perfil es el de un Consultor de Élite, experto en las 5 Leyes Biológicas (NMG) y Transgeneracional. PROTOCOLO DE CONSULTA: 1. INDAGACIÓN PROFUNDA. 2. RASTREO MULTIDIMENSIONAL. 3. PANORAMA GENERAL Y ESPECÍFICO. REGLAS DE IDENTIDAD: 'Guante Blanco', Español neutro, Validación por Resultados. TRANSICIÓN ADMINISTRATIVA: Cerca del turno 5 invita al 'Área Administrativa'. IMPORTANTE: Al concluir añade CLAVE_ORDEN: [Resumen Clínico]."""}] + st.session_state.messages,
                     model="llama-3.3-70b-versatile",
                     temperature=0.6,
                 )
@@ -123,13 +123,11 @@ elif menu == "🩺 Consulta Médica Gratis":
             except:
                 st.error("Error de comunicación biológica.")
 
-# --- 6. MÓDULO ADMINISTRATIVO (Copia Fiel + Expansión de Citas) ---
+# --- MÓDULO: ÁREA ADMINISTRATIVA (Tu base + Expansión de Citas) ---
 elif menu == "🏢 Área Administrativa":
-    st.title("🏢 Formalización de Ingreso")
+    st.title("🏢 Registro y Formalización")
     if st.session_state.get('orden_lista'):
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando Programa Biológico...')
-        
-        # El expediente se mantiene igual que en tu versión satisfactoria
         st.markdown(f"""
             <div class="expediente-container">
                 <h3 style="color: #FFD700; margin-top: 0;">📋 EXPEDIENTE DE DIAGNÓSTICO</h3>
@@ -137,14 +135,10 @@ elif menu == "🏢 Área Administrativa":
             </div>
         """, unsafe_allow_html=True)
 
-        # ADICIÓN: Motor de Citas Beta
+        # Adición modular de citas
         st.subheader("📅 Plan de Tratamiento (4 Sesiones)")
-        st.write("Las sesiones se programan automáticamente con la pausa biológica necesaria.")
-        
         hoy = datetime.date.today()
-        fecha_1 = st.date_input("Fecha sugerida Sesión 1:", value=hoy + datetime.timedelta(days=2), min_value=hoy + datetime.timedelta(days=1))
-        
-        # Proyección informativa
+        fecha_1 = st.date_input("Sesión 1 (Inicio):", value=hoy + datetime.timedelta(days=2), min_value=hoy + datetime.timedelta(days=1))
         f2, f3, f4 = [fecha_1 + datetime.timedelta(days=d) for d in [10, 20, 30]]
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Inicio", fecha_1.strftime('%d/%m'))
@@ -152,18 +146,13 @@ elif menu == "🏢 Área Administrativa":
         c3.metric("S3", f3.strftime('%d/%m'))
         c4.metric("S4", f4.strftime('%d/%m'))
 
-        st.markdown("---")
-
-        # Tus tablas de pago intactas
         tab_ve, tab_co, tab_usdt = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "💎 USDT"])
         with tab_ve: st.info(f"**Pago Móvil:** Mercantil | V-15.214.337 | 04262272765 | **{total_bs:,.2f} Bs.**")
         with tab_co: st.warning(f"**Bancolombia / Nequi:** Consultar | **{total_cop:,.2f} COP**")
         with tab_usdt: st.success(f"**USDT (BEP20):** 0xE30516Af847E0a7E343917e0C204E1e974754dBa | **80.00 USDT**")
             
-        # El WhatsApp inteligente que hablamos
         mensaje_wa = f"Hola Fundador, completé mi diagnóstico.\n\n📍 *Diagnóstico:* {diagnostico[:100]}...\n📅 *Inicio:* {fecha_1.strftime('%d/%m/%Y')}\n💳 *Monto:* 80 USD"
         wa_link = f"https://wa.me/584262272765?text={urllib.parse.quote(mensaje_wa)}"
         st.markdown(f'<a href="{wa_link}" class="btn-whatsapp">✅ AGENDAR Y ENVIAR COMPROBANTE</a>', unsafe_allow_html=True)
     else:
         st.warning("⚠️ Protocolo no concluido. Regrese a la consulta con Nexo.")
-        
