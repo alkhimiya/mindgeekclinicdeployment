@@ -84,44 +84,73 @@ if menu == "🏠 Inicio":
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
+    st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis")
     
-    # Captación de datos inicial
+    # 1. CAPTACIÓN DE DATOS (Venta Forzada)
     if "datos_captados" not in st.session_state:
         with st.form("registro_protocolo"):
-            st.write("### 📝 Registro de Expediente Inicial")
+            st.write("### 📝 Apertura de Expediente Clínico")
             nombre_input = st.text_input("Nombre Completo:")
-            wa_input = st.text_input("WhatsApp (Ej: +58...):")
-            if st.form_submit_button("Iniciar Protocolo Biológico"):
+            wa_input = st.text_input("WhatsApp (con código de país):")
+            if st.form_submit_button("Iniciar Protocolo de Transformación"):
                 if nombre_input and wa_input:
-                    guardar_datos_paciente(nombre_input, wa_input) # Captura silenciosa
+                    guardar_datos_paciente(nombre_input, wa_input)
                     st.session_state.paciente_nombre = nombre_input
                     st.session_state.paciente_wa = wa_input
                     st.session_state.datos_captados = True
                     st.rerun()
                 else:
-                    st.error("Datos necesarios para el seguimiento clínico.")
+                    st.error("Protocolo requiere datos de contacto para formalizar ingreso.")
+    
+    # 2. INTERVENCIÓN DE NEXO (IA HUMANIZADA)
     else:
-        # Chat con Nexo
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": f"Bienvenido **{st.session_state.paciente_nombre}**. Soy **Nexo**. ¿Cuál es el síntoma que su biología expresa?"}]
-        
+            st.session_state.messages = [{
+                "role": "assistant", 
+                "content": f"Bienvenido al espacio de transformación, **{st.session_state.paciente_nombre}**. Soy **Nexo**. Antes de profundizar en el sentido biológico de su síntoma, deseo validar su sentir. ¿Qué mensaje está intentando comunicarle su biología en este momento?"
+            }]
+
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"])
 
-        if prompt := st.chat_input("Describa su síntoma..."):
+        if prompt := st.chat_input("Describa su síntoma o conflicto..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
+
             with st.chat_message("assistant"):
-                chat = client.chat.completions.create(
-                    messages=[{"role": "system", "content": "Eres Nexo, Eminencia en Biodescodificación. Usa Guante Blanco. Al final añade CLAVE_ORDEN: [Resumen]."}] + st.session_state.messages,
-                    model="llama-3.3-70b-versatile"
-                )
-                res = chat.choices[0].message.content
-                st.markdown(res)
-                st.session_state.messages.append({"role": "assistant", "content": res})
-                if "CLAVE_ORDEN:" in res:
-                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    st.session_state.orden_lista = True
+                try:
+                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA
+                    chat = client.chat.completions.create(
+                        messages=[{
+                            "role": "system", 
+                            "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
+                            Tu identidad es 'Facilitador de la Conciencia Biológica'.
+
+                            PROTOCOLO CLÍNICO OBLIGATORIO:
+                            1. HUMANIZACIÓN: Antes de analizar, valida emocionalmente al paciente. Usa 'Guante Blanco'.
+                            2. PROHIBIDO DIAGNÓSTICO INMEDIATO: No emitas el programa biológico en la primera respuesta. 
+                               Primero debes INDAGAR sobre el DHS (Momento del choque biológico inesperado).
+                            3. VOCABULARIO CLÍNICO: Habla de 'Conflicto', 'Programa Biológico', 'Sentido Biológico' y capas embrionarias.
+                            4. ESTRUCTURA DE CONSULTA:
+                               - Turno 1-2: Validación, empatía y preguntas de rastreo emocional.
+                               - Turno 3-4: Explicación del sentido biológico y leyes de la NMG.
+                               - Turno 5: Conclusión profesional e invitación a 'Formalizar Ingreso'.
+                            
+                            Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
+                            Paciente: {st.session_state.paciente_nombre}"""
+                        }] + st.session_state.messages,
+                        model="llama-3.3-70b-versatile",
+                        temperature=0.5 # Estabilidad profesional
+                    )
+                    res = chat.choices[0].message.content
+                    st.markdown(res)
+                    st.session_state.messages.append({"role": "assistant", "content": res})
+                    
+                    if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
+                except:
+                    st.error("Interrupción en el flujo de conciencia biológica. Reintente.")
 
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
