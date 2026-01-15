@@ -205,7 +205,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                 temperature=0.7,
             )
             
-            # 2. Captura de la Consciencia Biológica
+           # 2. Captura de la Consciencia Biológica
             res = chat.choices[0].message.content
             st.markdown(res)
             st.session_state.messages.append({"role": "assistant", "content": res})
@@ -225,6 +225,7 @@ elif menu == "🩺 Consulta Médica Gratis":
 
         except Exception as e:
             # Cierre del Protocolo en caso de Inversión técnica
+            # Este bloque ahora está perfectamente alineado con el 'try' superior
             st.sidebar.error(f"Error en la Intervención Clínica: {e}")
                     # ----------------------------------------------------------------
 
