@@ -50,3 +50,6 @@ sounddevice>=0.4.0
 qrcode>=7.4.2
 Pillow>=10.0.0
 toml>=0.10.0
+# --- INTEGRACIÓN GOOGLE SHEETS (NUEVO PARA PERSISTENCIA) ---
+gspread>=5.10.0
+google-auth>=2.22.0
