@@ -32,14 +32,47 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- FUNCIÓN DE RESPALDO DE LEADS (Venta Forzada) ---
-def guardar_datos_paciente(nombre, whatsapp):
-    archivo = "leads_clinica.csv"
-    nuevo_registro = pd.DataFrame([[datetime.datetime.now().strftime("%d/%m/%Y %H:%M"), nombre, whatsapp]], 
-                                   columns=["Fecha", "Nombre", "WhatsApp"])
-    if not os.path.isfile(archivo):
-        nuevo_registro.to_csv(archivo, index=False)
+import gspread
+from google.oauth2.service_account import Credentials
+
+import gspread
+from google.oauth2.service_account import Credentials
+import datetime
+import pandas as pd
+import os
+
+def guardar_datos_paciente(nombre, whatsapp, diagnostico="Pendiente de consulta"):
+    fecha = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    # 1. RESPALDO LOCAL (CSV)
+    archivo_local = "leads_clinica.csv"
+    nuevo_registro = pd.DataFrame([[fecha, nombre, whatsapp, diagnostico]], 
+                                   columns=["Fecha", "Nombre", "WhatsApp", "Diagnóstico"])
+    if not os.path.isfile(archivo_local):
+        nuevo_registro.to_csv(archivo_local, index=False)
     else:
-        nuevo_registro.to_csv(archivo, mode='a', header=False, index=False)
+        nuevo_registro.to_csv(archivo_local, mode='a', header=False, index=False)
+
+    # 2. CONEXIÓN A GOOGLE SHEETS (Persistencia Real)
+    try:
+        # IMPORTANTE: Hemos expandido el scope para incluir 'drive' y evitar errores de búsqueda
+        scope = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        # Cargamos credenciales desde los Secrets de Streamlit (los que ya pegaste)
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+        client_gs = gspread.authorize(creds)
+        
+        # Abrimos la hoja que compartiste con el "Guante Blanco"
+        sheet = client_gs.open("DB_MindGeekClinic").sheet1
+        sheet.append_row([fecha, nombre, whatsapp, diagnostico])
+        
+    except Exception as e:
+        # Si falla la nube, el CSV local ya nos salvó el dato. 
+        # Mostramos el error en la barra lateral solo para tu control como Fundador.
+        st.sidebar.warning(f"Nota: Registro guardado localmente. (Error: {str(e)})")
 
 # 2. CONEXIÓN IA (Usando tus secretos configurados)
 try:
@@ -136,7 +169,7 @@ elif menu == "🩺 Consulta Médica Gratis":
         if "messages" not in st.session_state:
             st.session_state.messages = [{
                 "role": "assistant", 
-                "content": f"Bienvenido al espacio de transformación, **{st.session_state.paciente_nombre}**. Soy **Nexo**. Antes de profundizar en el sentido biológico de su síntoma, deseo validar su sentir. ¿Qué mensaje está intentando comunicarle su biología en este momento?"
+                "content": f"Bienvenido al espacio de transformación, **{st.session_state.paciente_nombre}**. Soy **Nexo**. Antes de profundizar en el sentido biológico de su síntoma, deseo validar su sentir. ¿Qué está padeciendo actualmente?"
             }]
 
         for m in st.session_state.messages:
@@ -176,10 +209,20 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     
                     if "CLAVE_ORDEN:" in res:
-                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                        st.session_state.orden_lista = True
-                except:
-                    st.error("Interrupción en el flujo de conciencia biológica. Reintente.")
+                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                    st.session_state.orden_lista = True
+                    
+                    # --- INTERVENCIÓN CLÍNICA: Guardado Automático del Diagnóstico ---
+                    guardar_datos_paciente(
+                        st.session_state.paciente_nombre, 
+                        st.session_state.paciente_wa, 
+                        st.session_state.diagnostico_nexo
+                    )
+                    # ----------------------------------------------------------------
+
+            except Exception as e:
+                # El except se mantiene al final para capturar cualquier error
+                st.error(f"Interrupción en el flujo de conciencia biológica. Reintente.")
 
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
