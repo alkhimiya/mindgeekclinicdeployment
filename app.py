@@ -204,22 +204,23 @@ elif menu == "🩺 Consulta Médica Gratis":
                         temperature=0.5 # Estabilidad profesional
                     )
                     res = chat.choices[0].message.content
-                    st.markdown(res)
-                    st.session_state.messages.append({"role": "assistant", "content": res})
-                    
+        st.markdown(res)
+        st.session_state.messages.append({"role": "assistant", "content": res})
+
+        # Esta parte DEBE estar alineada con el st.markdown de arriba
         if "CLAVE_ORDEN:" in res:
-                    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                    st.session_state.orden_lista = True
-                    
-                    # --- INTERVENCIÓN CLÍNICA: Guardado Automático del Diagnóstico ---
-                    guardar_datos_paciente(
-                        st.session_state.paciente_nombre, 
-                        st.session_state.paciente_wa, 
-                        st.session_state.diagnostico_nexo
-                    )
+            st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+            st.session_state.orden_lista = True
+
+            # --- INTERVENCIÓN CLÍNICA: Guardado Automático ---
+            guardar_datos_paciente(
+                st.session_state.paciente_nombre,
+                st.session_state.paciente_wa,
+                st.session_state.diagnostico_nexo
+            )
                     # ----------------------------------------------------------------
 
-            except Exception as e:
+    except Exception as e:
                 # El except se mantiene al final para capturar cualquier error
                 st.error(f"Interrupción en el flujo de conciencia biológica. Reintente.")
 
