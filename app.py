@@ -163,7 +163,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                 else:
                     st.error("Protocolo requiere datos de contacto para formalizar ingreso.")
     
-    # 2. INTERVENCIÓN DE NEXO (IA HUMANIZADA)
+  # 2. INTERVENCIÓN DE NEXO (IA HUMANIZADA)
     else:
         if "messages" not in st.session_state:
             st.session_state.messages = [{
@@ -172,18 +172,19 @@ elif menu == "🩺 Consulta Médica Gratis":
             }]
 
         for m in st.session_state.messages:
-            with st.chat_message(m["role"]): st.markdown(m["content"])
+            with st.chat_message(m["role"]): 
+                st.markdown(m["content"])
 
         if prompt := st.chat_input("Describa su síntoma o conflicto..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"): st.markdown(prompt)
+            with st.chat_message("user"): 
+                st.markdown(prompt)
 
             with st.chat_message("assistant"):
                 try:
-                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA
+                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA (Integrado y cerrado correctamente)
                     chat = client.chat.completions.create(
-                        
-                    )
+                        model="llama3-70b-8192",
                         messages=[{
                             "role": "system", 
                             "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
@@ -202,40 +203,28 @@ elif menu == "🩺 Consulta Médica Gratis":
                             Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
                             Paciente: {st.session_state.paciente_nombre}"""
                         }] + st.session_state.messages,
-               try:
-                   chat = client.chat.completions.create(
-                        model="llama3-70b-8192",
-                        messages=st.session_state.messages,
-                        temperature=0.7,
-            )
-            
-           # 2. Captura de la Consciencia Biológica
-            res = chat.choices[0].message.content
-            st.markdown(res)
-            st.session_state.messages.append({"role": "assistant", "content": res})
+                        temperature=0.7
+                    )
+                    
+                    # Captura de la Consciencia Biológica
+                    res = chat.choices[0].message.content
+                    st.markdown(res)
+                    st.session_state.messages.append({"role": "assistant", "content": res})
 
-            # 3. Validación por Resultados (Detección de Diagnóstico)
-            if "CLAVE_ORDEN:" in res:
-                # Extraemos el diagnóstico para la base de datos
-                st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                st.session_state.orden_lista = True
+                    # Validación por Resultados (Detección de Diagnóstico)
+                    if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
 
-                # Formalizar Ingreso en Google Sheets y CSV
-                guardar_datos_paciente(
-                    st.session_state.paciente_nombre,
-                    st.session_state.paciente_wa,
-                    st.session_state.diagnostico_nexo
-                )
+                        # Formalizar Ingreso en Google Sheets
+                        guardar_datos_paciente(
+                            st.session_state.paciente_nombre,
+                            st.session_state.paciente_wa,
+                            st.session_state.diagnostico_nexo
+                        )
 
-        except Exception as e:
-            # Cierre del Protocolo en caso de Inversión técnica
-            # Este bloque ahora está perfectamente alineado con el 'try' superior
-            st.sidebar.error(f"Error en la Intervención Clínica: {e}")
-                    # ----------------------------------------------------------------
-
-    except Exception as e:
-                # El except se mantiene al final para capturar cualquier error
-                st.error(f"Interrupción en el flujo de conciencia biológica. Reintente.")
+                except Exception as e:
+                    st.sidebar.error(f"Error en la Intervención Clínica: {e}")
 
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
