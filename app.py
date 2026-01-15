@@ -200,9 +200,11 @@ elif menu == "🩺 Consulta Médica Gratis":
                             Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
                             Paciente: {st.session_state.paciente_nombre}"""
                         }] + st.session_state.messages,
+               try:
+                   chat = client.chat.completions.create(
                         model="llama3-70b-8192",
-                messages=st.session_state.messages,
-                temperature=0.7,
+                        messages=st.session_state.messages,
+                        temperature=0.7,
             )
             
            # 2. Captura de la Consciencia Biológica
