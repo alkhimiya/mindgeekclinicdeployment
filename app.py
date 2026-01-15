@@ -200,24 +200,32 @@ elif menu == "🩺 Consulta Médica Gratis":
                             Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
                             Paciente: {st.session_state.paciente_nombre}"""
                         }] + st.session_state.messages,
-                        model="llama-3.3-70b-versatile",
-                        temperature=0.5 # Estabilidad profesional
-                    )
-                    res = chat.choices[0].message.content
-        st.markdown(res)
-        st.session_state.messages.append({"role": "assistant", "content": res})
-
-        # Esta parte DEBE estar alineada con el st.markdown de arriba
-        if "CLAVE_ORDEN:" in res:
-            st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-            st.session_state.orden_lista = True
-
-            # --- INTERVENCIÓN CLÍNICA: Guardado Automático ---
-            guardar_datos_paciente(
-                st.session_state.paciente_nombre,
-                st.session_state.paciente_wa,
-                st.session_state.diagnostico_nexo
+                        model="llama3-70b-8192",
+                messages=st.session_state.messages,
+                temperature=0.7,
             )
+            
+            # 2. Captura de la Consciencia Biológica
+            res = chat.choices[0].message.content
+            st.markdown(res)
+            st.session_state.messages.append({"role": "assistant", "content": res})
+
+            # 3. Validación por Resultados (Detección de Diagnóstico)
+            if "CLAVE_ORDEN:" in res:
+                # Extraemos el diagnóstico para la base de datos
+                st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                st.session_state.orden_lista = True
+
+                # Formalizar Ingreso en Google Sheets y CSV
+                guardar_datos_paciente(
+                    st.session_state.paciente_nombre,
+                    st.session_state.paciente_wa,
+                    st.session_state.diagnostico_nexo
+                )
+
+        except Exception as e:
+            # Cierre del Protocolo en caso de Inversión técnica
+            st.sidebar.error(f"Error en la Intervención Clínica: {e}")
                     # ----------------------------------------------------------------
 
     except Exception as e:
