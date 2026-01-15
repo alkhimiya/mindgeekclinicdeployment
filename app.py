@@ -5,6 +5,8 @@ import requests
 import datetime
 import urllib.parse
 import pandas as pd  # Necesario para la base de datos de prospectos
+import gspread
+from google.oauth2.service_account import Credentials
 
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
@@ -32,9 +34,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- FUNCIÓN DE RESPALDO DE LEADS (Venta Forzada) ---
-import gspread
-from google.oauth2.service_account import Credentials
-
 import gspread
 from google.oauth2.service_account import Credentials
 import datetime
