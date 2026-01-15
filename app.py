@@ -76,11 +76,40 @@ with st.sidebar:
         st.success(f"Paciente: {st.session_state.paciente_nombre}")
 
 # 5. LÓGICA DE MÓDULOS
-
+# --- MÓDULO: INICIO (Presentación Institucional) ---
 if menu == "🏠 Inicio":
     st.markdown('<h1 class="titulo-principal">Bienvenidos a <br>Mind Geek Clinic 🧠</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitulo-vanguardia">La vanguardia en salud mental</p>', unsafe_allow_html=True)
-    st.info("Inicie su protocolo de evaluación en el menú lateral.")
+    st.write("---")
+
+    # Presentación de la Identidad Mind Geek
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown("""
+        ### El Manifiesto de nuestra Biología Consciente
+        **Mind Geek Clinic** no es una aplicación; es un **Protocolo de Intervención Biológica** materializado en líneas de código. Representamos el puente entre la precisión algorítmica y la profundidad del alma humana. 
+        
+        Nuestras líneas de código han sido programadas para actuar como un **Facilitador de la Conciencia**, integrando los pilares de la **Nueva Medicina Germánica**, la **Biodescodificación** y la **Hipnosis Clínica**. 
+        
+        #### ¿Por qué nuestra utilidad es disruptiva?
+        * **Decodificación en Tiempo Real:** Algoritmos diseñados para rastrear el origen del conflicto biológico (DHS).
+        * **Arquitectura de Guante Blanco:** Una interfaz pensada para validar la experiencia humana antes que el diagnóstico.
+        * **Evolución Constante:** Al igual que la biología se adapta, nuestro sistema evoluciona para ofrecer respuestas precisas a los programas especiales de la naturaleza.
+        """)
+    
+    with col2:
+        st.image("https://cdn-icons-png.flaticon.com/512/6213/6213731.png", use_container_width=True)
+        st.info("💡 **Dato Clínico:** Todo síntoma es un programa con sentido biológico, no un error del cuerpo.")
+
+    st.markdown("---")
+    
+    # Llamado a la acción profesional
+    st.warning("""
+    **Aviso a los Consultantes:** Este entorno es una herramienta de acompañamiento profesional. 
+    Para iniciar su proceso, seleccione el módulo **🩺 Consulta Médica Gratis** en el panel lateral. 
+    Su expediente será formalizado de manera confidencial.
+    """)
 
 elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
