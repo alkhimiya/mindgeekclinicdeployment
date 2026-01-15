@@ -184,6 +184,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                 try:
                     # PROMPTING DE ALTA JERARQUÍA CLÍNICA (Integrado y cerrado correctamente)
                     chat = client.chat.completions.create(
+                        )
                         model="llama3-70b-8192",
                         messages=[{
                             }]
