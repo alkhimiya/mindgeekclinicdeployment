@@ -186,7 +186,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                     chat = client.chat.completions.create(
                         model="llama3-70b-8192",
                         messages=[{
-                            }
+                            }]
                             "role": "system", 
                             "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
                             Tu identidad es 'Facilitador de la Conciencia Biológica'.
