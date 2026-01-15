@@ -202,9 +202,15 @@ elif menu == "🩺 Consulta Médica Gratis":
                             
                             Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
                             Paciente: {st.session_state.paciente_nombre}"""
-                        }] + st.session_state.messages,
-                        temperature=0.7
-                    )
+                      # --- REINTEGRACIÓN DEL MODELO (Línea 205 en adelante) ---
+        chat = client.chat.completions.create(
+            model="llama-3.1-70b-versatile", # <--- AGREGAR ESTA LÍNEA
+            messages=[{
+                "role": "system", 
+                "content": f"""Eres Nexo, la Eminencia en Biodescodificación..."""
+            }] + st.session_state.messages,
+            temperature=0.7
+        )
                     
                     # Captura de la Consciencia Biológica
                     res = chat.choices[0].message.content
