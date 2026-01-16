@@ -186,7 +186,6 @@ elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
     
     # Acceso Protegido para el Fundador
-
     with st.expander("🔐 PANEL DE SEGUIMIENTO (EXCLUSIVO FUNDADOR)"):
         pwd = st.text_input("Clave Maestra:", type="password")
         if pwd == st.secrets["app"]["admin_password"]:
@@ -202,17 +201,28 @@ elif menu == "🏢 Área Administrativa":
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando...')
         st.markdown(f'<div class="expediente-container"><h3>📋 EXPEDIENTE</h3><p class="expediente-texto">{diagnostico}</p></div>', unsafe_allow_html=True)
         
-        # Descuentos y Pagos
-
+        # --- BLOQUE DE PAGOS RESTAURADO ---
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
         codigo = st.text_input("Código:").upper()
 
         desc = 0.20 if codigo == "NEXO20" else 0.10 if codigo == "BIENVENIDA10" else 0.0
         f_bs, f_cop, f_usd = total_bs*(1-desc), total_cop*(1-desc), 80.0*(1-desc)
-        tabs = st.tabs(["VENEZUELA", "COLOMBIA", "USDT"])
-        tabs[0].info(f"Monto: **{f_bs:,.2f} Bs.**")
-        tabs[1].warning(f"Monto: **{f_cop:,.2f} COP**")
-        tabs[2].success(f"Monto: **{f_usd:.2f} USDT**")
+        
+        tabs = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "🪙 USDT"])
+        
+        with tabs[0]:
+            st.info(f"Monto: **{f_bs:,.2f} Bs.**")
+            st.markdown("""**PAGO MÓVIL:** Banco: **Mercantil** Teléfono: `04262272065`  
+            Cédula: `15214347`""")
+        
+        with tabs[1]:
+            st.warning(f"Monto: **{f_cop:,.2f} COP**")
+            st.markdown("""**TRANSFERENCIA:** Banco: **Bancolombia** Cuenta Ahorros: `64296841216`  
+            Titular: **Luis Ernesto Gonzalez**""")
+        
+        with tabs[2]:
+            st.success(f"Monto: **{f_usd:.2f} USDT**")
+            st.markdown("""**BILLETERA BINANCE:** Red: **BEP20 / ERC20** Dirección: `0xE30516Af847E0a7E343917e0C204E1e974754dBa`""")
             
         msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
-        st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR</a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR CONSULTA</a>', unsafe_allow_html=True)
