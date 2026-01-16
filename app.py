@@ -205,7 +205,21 @@ elif menu == "🏢 Área Administrativa":
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
         codigo = st.text_input("Código:").upper()
 
-        desc = 0.20 if codigo == "NEXO20" else 0.10 if codigo == "BIENVENIDA10" else 0.0
+        st.subheader("🎟️ ¿Posee un Código de Descuento?")
+        codigo = st.text_input("Código:").upper()
+
+        # lógica jerárquica de descuentos
+        if codigo == "MAX75":
+            desc = 0.75
+        elif codigo == "GEEK50":
+            desc = 0.50
+        elif codigo == "NEXO20":
+            desc = 0.20
+        elif codigo == "BIENVENIDA10":
+            desc = 0.10
+        else:
+            desc = 0.0
+
         f_bs, f_cop, f_usd = total_bs*(1-desc), total_cop*(1-desc), 80.0*(1-desc)
         
         tabs = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "🪙 USDT"])
