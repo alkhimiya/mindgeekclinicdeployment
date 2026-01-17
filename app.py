@@ -184,8 +184,6 @@ elif menu == "🩺 Consulta Médica Gratis":
                 except:
                     st.error("Interrupción en el flujo de conciencia biológica. Reintente.")
                     
-                    }]
-
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
     
