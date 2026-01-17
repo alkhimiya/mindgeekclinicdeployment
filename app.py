@@ -201,14 +201,11 @@ elif menu == "🏢 Área Administrativa":
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando...')
         st.markdown(f'<div class="expediente-container"><h3>📋 EXPEDIENTE</h3><p class="expediente-texto">{diagnostico}</p></div>', unsafe_allow_html=True)
         
-        # --- BLOQUE DE PAGOS RESTAURADO ---
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
-        codigo = st.text_input("Código:").upper()
+        # Usamos una clave única (key) para evitar duplicidad
+        codigo = st.text_input("Ingrese su código:", key="input_descuento").upper()
 
-        st.subheader("🎟️ ¿Posee un Código de Descuento?")
-        codigo = st.text_input("Código:").upper()
-
-        # lógica jerárquica de descuentos
+        # Protocolo de Bonos Actualizado (Exacto y sin errores)
         if codigo == "MAX75":
             desc = 0.75
         elif codigo == "GEEK50":
@@ -226,17 +223,15 @@ elif menu == "🏢 Área Administrativa":
         
         with tabs[0]:
             st.info(f"Monto: **{f_bs:,.2f} Bs.**")
-            st.markdown("""**PAGO MÓVIL:** Banco: **Mercantil** Teléfono: `04262272065`  
-            Cédula: `15214347`""")
+            st.markdown(f"**PAGO MÓVIL:** Banco: **Mercantil** Teléfono: `04262272065` Cédula: `15214347`")
         
         with tabs[1]:
             st.warning(f"Monto: **{f_cop:,.2f} COP**")
-            st.markdown("""**TRANSFERENCIA:** Banco: **Bancolombia** Cuenta Ahorros: `64296841216`  
-            Titular: **Luis Ernesto Gonzalez**""")
+            st.markdown(f"**TRANSFERENCIA:** Banco: **Bancolombia** Cuenta Ahorros: `64296841216` Titular: **Luis Ernesto Gonzalez**")
         
         with tabs[2]:
             st.success(f"Monto: **{f_usd:.2f} USDT**")
-            st.markdown("""**BILLETERA BINANCE:** Red: **BEP20 / ERC20** Dirección: `0xE30516Af847E0a7E343917e0C204E1e974754dBa`""")
+            st.markdown(f"**BILLETERA BINANCE:** Red: **BEP20 / ERC20** Dirección: `0xE30516Af847E0a7E343917e0C204E1e974754dBa`")
             
         msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
         st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR CONSULTA</a>', unsafe_allow_html=True)
