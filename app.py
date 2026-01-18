@@ -250,21 +250,83 @@ elif menu == "🏢 Área Administrativa":
         elif pwd != "": st.error("Acceso Denegado.")
 
     if st.session_state.get('orden_lista'):
-        diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando...')
-        st.markdown(f'<div class="expediente-container"><h3>📋 EXPEDIENTE</h3><p class="expediente-texto">{diagnostico}</p></div>', unsafe_allow_html=True)
+        # 1. Llamada automática a las tasas del mercado
+        tasa_ves, tasa_cop = obtener_tasas_automaticas()
         
-        # Descuentos y Pagos
-
+        # 2. SECCIÓN DE DESCUENTOS (BECAS DE TRANSFORMACIÓN)
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
-        codigo = st.text_input("Código:").upper()
+        codigo = st.text_input("Ingrese su código:", key="input_descuento").upper()
 
-        desc = 0.20 if codigo == "NEXO20" else 0.10 if codigo == "BIENVENIDA10" else 0.0
-        f_bs, f_cop, f_usd = total_bs*(1-desc), total_cop*(1-desc), 80.0*(1-desc)
-        tabs = st.tabs(["VENEZUELA", "COLOMBIA", "USDT"])
-        tabs[0].info(f"Monto: **{f_bs:,.2f} Bs.**")
-        tabs[1].warning(f"Monto: **{f_cop:,.2f} COP**")
-        tabs[2].success(f"Monto: **{f_usd:.2f} USDT**")
-            
-        msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
-        st.markdown(f'<a href="https://wa.me/573042803622?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR</a>', unsafe_allow_html=True)
+        desc = 0.0
+        if codigo == "MAX75": desc = 0.75
+        elif codigo == "GEEK50": desc = 0.50
+        elif codigo == "NEXO20": desc = 0.20
+        elif codigo == "BIENVENIDA10": desc = 0.10
+        elif codigo != "": st.error("Código no válido o expirado.")
 
+        # 3. AGENDAMIENTO CON LÓGICA BIOLÓGICA (8 a 15 días)
+        st.markdown("---")
+        st.subheader("📅 Cronograma de Protocolo (4 Sesiones)")
+        st.info("Intervalo Clínico: Mínimo 8 días / Máximo 15 días entre intervenciones.")
+        
+        col_f, col_h = st.columns(2)
+        with col_f:
+            fecha_inicio = st.date_input("Fecha 1ª Sesión:", min_value=datetime.date.today() + datetime.timedelta(days=1))
+        with col_h:
+            horario = st.selectbox("Turno Preferencial:", ["Mañana (9:00 AM)", "Tarde (2:00 PM)", "Noche (6:00 PM)"])
+
+        # Cálculo automático: Sugerimos 10 días (punto de equilibrio biológico)
+        f2 = fecha_inicio + datetime.timedelta(days=10)
+        f3 = f2 + datetime.timedelta(days=10)
+        f4 = f3 + datetime.timedelta(days=10)
+
+        st.write(f"**Propuesta de Seguimiento Automático:**")
+        st.caption(f"📅 Sesión 2: {f2} | Sesión 3: {f3} | Sesión 4: {f4}")
+
+        # 4. CÁLCULOS FINANCIEROS (Automatización de Tasas)
+        valor_base_usd = 80.0
+        f_usd = valor_base_usd * (1 - desc)
+        f_bs = (valor_base_usd * tasa_ves) * (1 - desc)
+        f_cop = (valor_base_usd * tasa_cop) * (1 - desc)
+
+        # 5. INTERFAZ DE PAGOS Y DATOS BANCARIOS (Formalización)
+        st.markdown("---")
+        st.write(f"### 💳 Formalización del Ingreso ({datetime.date.today()})")
+        if desc > 0: st.success(f"✅ Bono aplicado con éxito: -{int(desc*100)}%")
+
+        tabs = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "🪙 USDT / BINANCE"])
+        
+        with tabs[0]:
+            st.info(f"Monto Total: **{f_bs:,.2f} Bs.**")
+            st.markdown("**DATOS PAGO MÓVIL MERCANTIL:**")
+            st.code("""Banco: Mercantil (0105)\nTeléfono: 04262272065\nCédula: V-15214347""", language=None)
+            st.caption(f"Tasa Referencial: {tasa_ves} Bs.")
+        
+        with tabs[1]:
+            st.warning(f"Monto Total: **{f_cop:,.2f} COP**")
+            st.markdown("**DATOS BANCOLOMBIA:**")
+            st.code("""Ahorros: 64296841216\nTitular: Luis Ernesto Gonzalez""", language=None)
+            st.caption(f"Tasa Referencial: {tasa_cop} COP")
+        
+        with tabs[2]:
+            st.success(f"Monto Total: **{f_usd:.2f} USDT**")
+            st.markdown("**BILLETERA BINANCE (Red BEP20):**")
+            st.code("0xE30516Af847E0a7E343917e0C204E1e974754dBa", language=None)
+            st.caption("Verifique usar únicamente la red Binance Smart Chain (BEP20).")
+
+        # 6. BOTÓN DE CIERRE Y NOTIFICACIÓN CLÍNICA
+        diagnostico = st.session_state.get('diagnostico_nexo', 'Conflicto Biológico Analizado')
+        paciente = st.session_state.get('paciente_nombre', 'Paciente en Proceso')
+        
+        msj = (f"FORMALIZACIÓN: {paciente}\n"
+               f"Diagnóstico: {diagnostico[:50]}...\n"
+               f"Fecha Inicio: {fecha_inicio} ({horario})\n"
+               f"Monto Final: {f_usd} USD\n"
+               f"Cronograma: {fecha_inicio} / {f2} / {f3} / {f4}")
+        
+        st.markdown(f'''
+            <a href="https://wa.me/573042803622?text={urllib.parse.quote(msj)}" 
+               style="text-decoration: none; display: block; text-align: center; background-color: #25D366; color: white; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 18px;">
+               🚀 CONFIRMAR CRONOGRAMA Y ENVIAR COMPROBANTE
+            </a>
+        ''', unsafe_allow_html=True)
