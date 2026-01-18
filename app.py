@@ -158,7 +158,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                 try:
                     from groq import Groq
                     # Aseguramos la creación del cliente con la llave de Streamlit
-                    client_interno = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                    client_nexo = Groq(api_key=st.secrets["groq"]["api_key"])
 
                     # LLAMADA A NEXO CON SUS 14 REGLAS INTACTAS
                     chat = client_interno.chat.completions.create(
