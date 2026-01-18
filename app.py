@@ -218,7 +218,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                     """)
                     
                     # Llamada a la acción hacia su número
-                    link_wa = "https://wa.me/58424803622?text=Hola,%20solicito%20asistencia%20directa%20para%20mi%20Protocolo%20de%20Transformación."
+                    link_wa = "https://wa.me/573042803622?text=Hola,%20solicito%20asistencia%20directa%20para%20mi%20Protocolo%20de%20Transformación."
                     st.link_button("Contactar Especialista en WhatsApp", link_wa, type="primary")
                     
 elif menu == "🏢 Área Administrativa":
