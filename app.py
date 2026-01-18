@@ -194,7 +194,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     
-        try:
+                try:
                     chat = client.chat.completions.create(
                         messages=[{
                             "role": "system", 
