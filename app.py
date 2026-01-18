@@ -208,9 +208,18 @@ elif menu == "🩺 Consulta Médica Gratis":
                         st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
                         st.session_state.orden_lista = True
                         st.success("Expediente finalizado. Área Administrativa habilitada.")
-
-                except Exception as e:
-                    st.error(f"Interrupción en el flujo: {str(e)}")
+                        
+                except Exception:
+                    st.warning("⚠️ Mensaje del Facilitador de Conciencia:")
+                    st.write("""
+                    En este momento nuestra área de consulta se encuentra ocupada de pacientes que están 
+                    consultando y biodescodificando sus programas biológicos y estados emocionales. 
+                    Te ofrezco contactar un profesional humano directamente a través de WhatsApp.
+                    """)
+                    
+                    # Llamada a la acción hacia su número
+                    link_wa = "https://wa.me/58424803622?text=Hola,%20solicito%20asistencia%20directa%20para%20mi%20Protocolo%20de%20Transformación."
+                    st.link_button("Contactar Especialista en WhatsApp", link_wa, type="primary")
                     
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
