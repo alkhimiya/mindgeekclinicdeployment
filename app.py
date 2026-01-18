@@ -194,10 +194,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     
-         if "CLAVE_ORDEN:" in res:
-    st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-    st.session_state.orden_lista = True
-    st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
+        res = chat.choices[0].message.content
+                    st.session_state.messages.append({"role": "assistant", "content": res})
+                    
+                    # El bloque 'if' debe estar alineado exactamente con 'res' y 'st.session_state'
+                    if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
+                        st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
+                    
+                    st.rerun()
                     
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
