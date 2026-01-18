@@ -5,6 +5,10 @@ import requests
 import datetime
 import urllib.parse
 import pandas as pd  # Necesario para la base de datos de prospectos
+if 'orden_lista' not in st.session_state:
+    st.session_state.orden_lista = False
+if 'diagnostico_nexo' not in st.session_state:
+    st.session_state.diagnostico_nexo = ""
 
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="MIND GEEK CLINIC", layout="wide", page_icon="🧠")
@@ -148,6 +152,7 @@ elif menu == "🩺 Consulta Médica Gratis":
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             with st.chat_message("assistant"):
+                res = ""
                 try:
                     # PROMPTING DE ALTA JERARQUÍA CLÍNICA
                     chat = client.chat.completions.create(
