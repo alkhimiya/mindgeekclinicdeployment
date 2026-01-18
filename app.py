@@ -184,7 +184,8 @@ elif menu == "🩺 Consulta Médica Gratis":
                             13. ESTRATEGIA DE MADUREZ: No cierres sin conexión emocional.
                             14. INSTRUCCIÓN DE CIERRE (CONSECUENCIA EMOCIONAL):
                                - DIÁLOGO DE CIERRE: "Usted ha identificado la raíz. Para desprogramar este impacto en su tejido biológico, el protocolo de hipnoterapia de élite en el Área Administrativa es el siguiente paso natural. Su expediente de alta complejidad ha sido enviado. Diríjase ahora al módulo 🏢 Área Administrativa en el menú lateral para formalizar su ingreso y acceder a su protocolo de 4 sesiones de hipnoterapia de élite."
-
+                            Al finalizar el protocolo completo, añade: CLAVE_ORDEN: [Resumen Clínico Profesional].
+                            
                             Paciente: {st.session_state.paciente_nombre}"""
                         }] + st.session_state.messages,
                         model="llama-3.3-70b-versatile",
