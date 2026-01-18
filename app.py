@@ -205,7 +205,6 @@ elif menu == "🩺 Consulta Médica Gratis":
 
                 except Exception as e:
                     st.error(f"Error en la Intervención Clínica: {e}")
-
                     # EL PUENTE AL ÁREA ADMINISTRATIVA
                     if "CLAVE_ORDEN:" in res:
                         st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
