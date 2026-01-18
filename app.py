@@ -194,12 +194,12 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     
-                try:
+               try:
                     # PROMPTING DE ALTA JERARQUÍA CLÍNICA
                     chat = client.chat.completions.create(
                         messages=[{
                             "role": "system", 
-                            "content": f"""Eres Nexo, la Eminencia en Biodescodificación...""" # Tu prompt de Nexo
+                            "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC...""" 
                         }] + st.session_state.messages,
                         model="llama-3.3-70b-versatile",
                         temperature=0.4
@@ -217,7 +217,6 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.rerun()
 
                 except Exception as e:
-                    # ESTA LÍNEA ES LA QUE CIERRA EL TRY Y ELIMINA EL ERROR
                     st.error(f"Error en la Intervención Clínica: {e}")
                     
 elif menu == "🏢 Área Administrativa":
