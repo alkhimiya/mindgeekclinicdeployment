@@ -119,7 +119,7 @@ elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis") 
 
-    # 1. CAPTACIÓN DE DATOS (Venta Forzada) - Mantenido Intacto
+    # 1. CAPTACIÓN DE DATOS (Mantenido Exactamente Igual)
     if "datos_captados" not in st.session_state:
         with st.form("registro_protocolo"):
             st.write("### 📝 Apertura de Expediente Clínico")
@@ -135,7 +135,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                 else:
                     st.error("Protocolo requiere datos de contacto para formalizar ingreso.")    
 
-    # 2. INTERVENCIÓN DE NEXO (IA HUMANIZADA)
+    # 2. INTERVENCIÓN DE NEXO
     else:
         if "messages" not in st.session_state:
             st.session_state.messages = [{
@@ -151,15 +151,17 @@ elif menu == "🩺 Consulta Médica Gratis":
             with st.chat_message("user"): st.markdown(prompt)
             
             with st.chat_message("assistant"):
-                # --- CORRECCIÓN TÉCNICA CRÍTICA ---
-                res = "" # Inicializamos para evitar NameError
+                # --- SOLUCIÓN AL ERROR DE RESPUESTA ---
+                res = "" # Inicialización para evitar NameError
+                placeholder = st.empty() # Espacio reservado para la respuesta
+                
                 try:
                     from groq import Groq
-                    # Aseguramos que el cliente use la API Key de sus Secrets
-                    client_nexo = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                    # Aseguramos la creación del cliente con la llave de Streamlit
+                    client_interno = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA (SU BLOQUE ORIGINAL)
-                    chat = client_nexo.chat.completions.create(
+                    # LLAMADA A NEXO CON SUS 14 REGLAS INTACTAS
+                    chat = client_interno.chat.completions.create(
                         messages=[{
                             "role": "system", 
                             "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
@@ -202,26 +204,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                     )
                     
                     res = chat.choices[0].message.content
-                    st.markdown(res)
+                    placeholder.markdown(res) # Aquí es donde Nexo finalmente habla
                     st.session_state.messages.append({"role": "assistant", "content": res})
 
-                    # ACTIVACIÓN AUTOMÁTICA DEL ÁREA ADMINISTRATIVA
+                    # LOGICA PARA ACTIVAR LA ORDEN DE 80 USD
                     if "CLAVE_ORDEN:" in res:
                         st.session_state.orden_lista = True
                         st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[1]
 
                 except Exception as e:
-                    st.error(f"Error de conexión biológica: {e}")
-                    # --- EL PUENTE AL ÁREA ADMINISTRATIVA ---
-                    if "CLAVE_ORDEN:" in res:
-                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                        st.session_state.orden_lista = True
-                        st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
-                    
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Error en la Intervención Clínica: {e}")
+                    placeholder.error(f"Fallo en la conexión clínica: {e}")
                     
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
