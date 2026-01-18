@@ -212,39 +212,63 @@ elif menu == "🏢 Área Administrativa":
 
     if st.session_state.get('orden_lista'):
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando...')
-        st.markdown(f'<div class="expediente-container"><h3>📋 EXPEDIENTE</h3><p class="expediente-texto">{diagnostico}</p></div>', unsafe_allow_html=True)
         
+        # Estética de Expediente
+        st.markdown(f'''
+            <div style="background-color: #f0f2f6; padding: 20px; border-left: 5px solid #0e1117; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="margin-top:0;">📋 EXPEDIENTE DE ALTA COMPLEJIDAD</h3>
+                <p style="font-style: italic; color: #31333F;">{diagnostico}</p>
+            </div>
+        ''', unsafe_allow_html=True)
+
+        st.info("🎯 **SU PROTOCOLO INCLUYE:** 4 Sesiones de Hipnoterapia Clínica + Plan de Desprogramación Biológica.")
+
+        # --- SECCIÓN DE AGENDAMIENTO ---
+        st.subheader("📅 Propuesta de Inicio de Protocolo")
+        col1, col2 = st.columns(2)
+        with col1:
+            fecha_deseada = st.date_input("Seleccione Fecha tentativa:", min_value=datetime.date.today())
+        with col2:
+            horario = st.selectbox("Turno Preferencial:", ["Mañana (9:00 AM - 12:00 PM)", "Tarde (2:00 PM - 5:00 PM)", "Noche (6:00 PM - 8:00 PM)"])
+
+        # --- SECCIÓN DE PAGOS ---
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
-        # Usamos una clave única (key) para evitar duplicidad
         codigo = st.text_input("Ingrese su código:", key="input_descuento").upper()
 
-        # Protocolo de Bonos Actualizado (Exacto y sin errores)
-        if codigo == "MAX75":
-            desc = 0.75
-        elif codigo == "GEEK50":
-            desc = 0.50
-        elif codigo == "NEXO20":
-            desc = 0.20
-        elif codigo == "BIENVENIDA10":
-            desc = 0.10
-        else:
-            desc = 0.0
+        # Lógica de Bonos
+        desc = 0.0
+        if codigo == "MAX75": desc = 0.75
+        elif codigo == "GEEK50": desc = 0.50
+        elif codigo == "NEXO20": desc = 0.20
+        elif codigo == "BIENVENIDA10": desc = 0.10
 
         f_bs, f_cop, f_usd = total_bs*(1-desc), total_cop*(1-desc), 80.0*(1-desc)
         
-        tabs = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "🪙 USDT"])
+        st.write("### 💳 Métodos de Formalización")
+        tabs = st.tabs(["🇻🇪 VENEZUELA", "🇨🇴 COLOMBIA", "🪙 USDT / INTERNACIONAL"])
         
         with tabs[0]:
-            st.info(f"Monto: **{f_bs:,.2f} Bs.**")
-            st.markdown(f"**PAGO MÓVIL:** Banco: **Mercantil** Teléfono: `04262272065` Cédula: `15214347`")
+            st.markdown(f"**Monto Total:** <span style='font-size: 20px; color: green;'>{f_bs:,.2f} Bs.</span>", unsafe_allow_html=True)
+            st.code(f"PAGO MÓVIL: Mercantil | 04262272065 | V-15214347", language=None)
         
         with tabs[1]:
-            st.warning(f"Monto: **{f_cop:,.2f} COP**")
-            st.markdown(f"**TRANSFERENCIA:** Banco: **Bancolombia** Cuenta Ahorros: `64296841216` Titular: **Luis Ernesto Gonzalez**")
+            st.markdown(f"**Monto Total:** <span style='font-size: 20px; color: green;'>{f_cop:,.2f} COP</span>", unsafe_allow_html=True)
+            st.code(f"Bancolombia | Ahorros: 64296841216 | Luis Ernesto Gonzalez", language=None)
         
         with tabs[2]:
-            st.success(f"Monto: **{f_usd:.2f} USDT**")
-            st.markdown(f"**BILLETERA BINANCE:** Red: **BEP20 / ERC20** Dirección: `0xE30516Af847E0a7E343917e0C204E1e974754dBa`")
-            
-        msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
-        st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR CONSULTA</a>', unsafe_allow_html=True)
+            st.markdown(f"**Monto Total:** <span style='font-size: 20px; color: green;'>{f_usd:.2f} USDT</span>", unsafe_allow_html=True)
+            st.code(f"Binance (BEP20): 0xE30516Af847E0a7E343917e0C204E1e974754dBa", language=None)
+
+        # --- BOTÓN DE CIERRE ---
+        msj = (f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\n"
+               f"Diagnóstico: {diagnostico[:50]}...\n"
+               f"Fecha: {fecha_deseada} | Turno: {horario}\n"
+               f"Monto Final: {f_usd} USD")
+        
+        st.markdown(f'''
+            <a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" 
+               style="text-decoration: none; display: block; text-align: center; background-color: #25D366; color: white; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 18px;">
+               🚀 ENVIAR COMPROBANTE Y CONFIRMAR CITA
+            </a>
+        ''', unsafe_allow_html=True)
+        st.caption("Al hacer clic, se enviará su expediente y preferencia de horario a Coordinación Clínica.")
