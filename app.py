@@ -194,12 +194,12 @@ elif menu == "🩺 Consulta Médica Gratis":
                     st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     
-               try:
+              try:
                     # PROMPTING DE ALTA JERARQUÍA CLÍNICA
                     chat = client.chat.completions.create(
                         messages=[{
                             "role": "system", 
-                            "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC...""" 
+                            "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC..."""
                         }] + st.session_state.messages,
                         model="llama-3.3-70b-versatile",
                         temperature=0.4
@@ -207,6 +207,28 @@ elif menu == "🩺 Consulta Médica Gratis":
                     
                     res = chat.choices[0].message.content
                     st.session_state.messages.append({"role": "assistant", "content": res})
+
+                    # EL PUENTE AL ÁREA ADMINISTRATIVA
+                    if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
+                        st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
+                    
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error en la Intervención Clínica: {e}")
+
+                    # EL PUENTE AL ÁREA ADMINISTRATIVA
+                    if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
+                        st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
+                    
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error en la Intervención Clínica: {e}")
 
                     # --- EL PUENTE AL ÁREA ADMINISTRATIVA ---
                     if "CLAVE_ORDEN:" in res:
