@@ -119,7 +119,7 @@ elif menu == "🩺 Consulta Médica Gratis":
     st.header("🩺 Encuentro de Decodificación Biológica")
     st.caption("Protocolo Clínico: Medicina Germánica + Biodescodificación + Hipnosis") 
 
-    # 1. CAPTACIÓN DE DATOS (Mantenemos su lógica intacta)
+    # 1. CAPTACIÓN DE DATOS (Venta Forzada) - Mantenido Intacto
     if "datos_captados" not in st.session_state:
         with st.form("registro_protocolo"):
             st.write("### 📝 Apertura de Expediente Clínico")
@@ -145,20 +145,20 @@ elif menu == "🩺 Consulta Médica Gratis":
 
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"])
-            
+
         if prompt := st.chat_input("Describa su síntoma o conflicto..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
             with st.chat_message("assistant"):
-                # CORRECCIÓN TÉCNICA: Inicializamos el espacio y el cliente localmente
-                res_area = st.empty() 
+                # --- CORRECCIÓN TÉCNICA CRÍTICA ---
+                res = "" # Inicializamos para evitar NameError
                 try:
                     from groq import Groq
-                    # Aseguramos que el cliente use su clave secreta
+                    # Aseguramos que el cliente use la API Key de sus Secrets
                     client_nexo = Groq(api_key=st.secrets["GROQ_API_KEY"])
-                    
-                    # LLAMADA CON SU PROMPT ORIGINAL INTACTO
+
+                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA (SU BLOQUE ORIGINAL)
                     chat = client_nexo.chat.completions.create(
                         messages=[{
                             "role": "system", 
@@ -202,37 +202,16 @@ elif menu == "🩺 Consulta Médica Gratis":
                     )
                     
                     res = chat.choices[0].message.content
-                    res_area.markdown(res)
+                    st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
 
-                    # LOGRÓ ADICIONAL: Activar el Área Administrativa si Nexo da la orden
+                    # ACTIVACIÓN AUTOMÁTICA DEL ÁREA ADMINISTRATIVA
                     if "CLAVE_ORDEN:" in res:
                         st.session_state.orden_lista = True
                         st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[1]
 
                 except Exception as e:
-                    st.error("Error de conexión biológica. Por favor, refresque la página.")
-                    # --- EL PUENTE AL ÁREA ADMINISTRATIVA ---
-                    if "CLAVE_ORDEN:" in res:
-                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                        st.session_state.orden_lista = True
-                        st.success("✅ Protocolo Finalizado. Diríjase al Área Administrativa.")
-                    
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Error en la Intervención Clínica: {e}")
-                    # EL PUENTE AL ÁREA ADMINISTRATIVA
-                    if "CLAVE_ORDEN:" in res:
-                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
-                        st.session_state.orden_lista = True
-                        st.success("✅ Protocolo de Decodificación Finalizado. Diríjase al Área Administrativa.")
-                    
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Error en la Intervención Clínica: {e}")
-
+                    st.error(f"Error de conexión biológica: {e}")
                     # --- EL PUENTE AL ÁREA ADMINISTRATIVA ---
                     if "CLAVE_ORDEN:" in res:
                         st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
