@@ -266,5 +266,5 @@ elif menu == "🏢 Área Administrativa":
         tabs[2].success(f"Monto: **{f_usd:.2f} USDT**")
             
         msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
-        st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR</a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="https://wa.me/573042803622?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR</a>', unsafe_allow_html=True)
 
