@@ -135,33 +135,25 @@ elif menu == "🩺 Consulta Médica Gratis":
                 else:
                     st.error("Protocolo requiere datos de contacto para formalizar ingreso.")    
 
-    # 2. INTERVENCIÓN DE NEXO
+   # 2. INTERVENCIÓN DE NEXO (IA HUMANIZADA)
+
     else:
         if "messages" not in st.session_state:
             st.session_state.messages = [{
                 "role": "assistant", 
                 "content": f"Bienvenido al espacio de transformación, **{st.session_state.paciente_nombre}**. Soy **Nexo**. Antes de profundizar en el sentido biológico de su síntoma, deseo validar su sentir. ¿Qué mensaje está intentando comunicarle su biología en este momento?"
+
             }]
 
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.markdown(m["content"])
-
         if prompt := st.chat_input("Describa su síntoma o conflicto..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
-            
             with st.chat_message("assistant"):
-                # --- SOLUCIÓN AL ERROR DE RESPUESTA ---
-                res = "" # Inicialización para evitar NameError
-                placeholder = st.empty() # Espacio reservado para la respuesta
-                
                 try:
-                    from groq import Groq
-                    # Aseguramos la creación del cliente con la llave de Streamlit
-                    client_nexo = Groq(api_key=st.secrets["groq"]["api_key"])
-
-                    # LLAMADA A NEXO CON SUS 14 REGLAS INTACTAS
-                    chat = client_interno.chat.completions.create(
+                    # PROMPTING DE ALTA JERARQUÍA CLÍNICA
+                    chat = client.chat.completions.create(
                         messages=[{
                             "role": "system", 
                             "content": f"""Eres Nexo, la Eminencia en Biodescodificación de MIND GEEK CLINIC. 
@@ -189,7 +181,7 @@ elif menu == "🩺 Consulta Médica Gratis":
                             10. ESTRUCTURA DE CONSULTA:
                                - FASE DE RASTREO: Preguntas de rastreo emocional.
                                - FASE DE CONCIENCIA: Explicación Psíque-Cerebro-Órgano.
-                               - FASE DE CIERRE: Al detectar madurez, emite la CLAVE_ORDEN: [Resumen clínico con Capa y Conflicto].                   
+                               - FASE DE CIERRE: Al detectar madurez, emite la CLAVE_ORDEN: [Resumen clínico con Capa y Conflicto].              
                             11. PESO CIENTÍFICO: incluye 'FUNDAMENTO BIOLÓGICO'.
                             12. ANTI-RETÓRICA: Usa lenguaje clínico directo.
                             13. ESTRATEGIA DE MADUREZ: No cierres sin conexión emocional.
@@ -204,16 +196,9 @@ elif menu == "🩺 Consulta Médica Gratis":
                     )
                     
                     res = chat.choices[0].message.content
-                    placeholder.markdown(res) # Aquí es donde Nexo finalmente habla
+                    st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
 
-                    # LOGICA PARA ACTIVAR LA ORDEN DE 80 USD
-                    if "CLAVE_ORDEN:" in res:
-                        st.session_state.orden_lista = True
-                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[1]
-
-                except Exception as e:
-                    placeholder.error(f"Fallo en la conexión clínica: {e}")
                     
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
