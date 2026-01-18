@@ -198,7 +198,11 @@ elif menu == "🩺 Consulta Médica Gratis":
                     res = chat.choices[0].message.content
                     st.markdown(res)
                     st.session_state.messages.append({"role": "assistant", "content": res})
-
+                     if "CLAVE_ORDEN:" in res:
+                        st.session_state.diagnostico_nexo = res.split("CLAVE_ORDEN:")[-1].strip()
+                        st.session_state.orden_lista = True
+                except:
+                    st.error("Interrupción en el flujo de conciencia biológica. Reintente.")
                     
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
