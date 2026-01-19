@@ -224,7 +224,8 @@ elif menu == "🩺 Consulta Médica Gratis":
 elif menu == "🏢 Área Administrativa":
     st.title("🏢 Gestión Administrativa")
     
-    # 1. ACCESO PROTEGIDO (EXCLUSIVO FUNDADOR)
+    # Acceso Protegido para el Fundador
+
     with st.expander("🔐 PANEL DE SEGUIMIENTO (EXCLUSIVO FUNDADOR)"):
         pwd = st.text_input("Clave Maestra:", type="password")
         if pwd == st.secrets["app"]["admin_password"]:
@@ -233,61 +234,24 @@ elif menu == "🏢 Área Administrativa":
                 st.write("### 📋 Prospectos Registrados")
                 st.dataframe(df)
                 st.download_button("Descargar Base de Datos", df.to_csv(index=False), "leads.csv")
-            else: 
-                st.info("No hay registros aún.")
-        elif pwd != "": 
-            st.error("Acceso Denegado.")
+            else: st.info("No hay registros aún.")
+        elif pwd != "": st.error("Acceso Denegado.")
 
-    # 2. PROCESAMIENTO DE ORDEN Y PAGOS
     if st.session_state.get('orden_lista'):
         diagnostico = st.session_state.get('diagnostico_nexo', 'Analizando...')
         st.markdown(f'<div class="expediente-container"><h3>📋 EXPEDIENTE</h3><p class="expediente-texto">{diagnostico}</p></div>', unsafe_allow_html=True)
         
+        # Descuentos y Pagos
+
         st.subheader("🎟️ ¿Posee un Código de Descuento?")
         codigo = st.text_input("Código:").upper()
 
-        # Cálculo de Descuentos
         desc = 0.20 if codigo == "NEXO20" else 0.10 if codigo == "BIENVENIDA10" else 0.0
-        
-        # --- CORRECCIÓN CLÍNICA: Sincronización con Tasas BCV y TRM ---
-        # Definimos las variables base para evitar el NameError
-        monto_base_usd = 80.0
-        f_usd = monto_base_usd * (1 - desc)
-        
-        # Usamos las tasas globales obtenidas al inicio del script
-        f_bs = f_usd * tasa_ves
-        f_cop = f_usd * tasa_cop
-
-        # Visualización Profesional por Pestañas
-        tabs = st.tabs(["🇻🇪 VENEZUELA (BCV)", "🇨🇴 COLOMBIA (TRM)", "🪙 USDT"])
-        
-        with tabs[0]:
-            st.info(f"Tasa BCV: **{tasa_ves:.2f} Bs.**")
-            st.metric("Total a Transferir", f"{f_bs:,.2f} Bs.")
-            st.caption("Referencia oficial del Banco Central de Venezuela.")
-
-        with tabs[1]:
-            st.warning(f"Tasa TRM: **{tasa_cop:,.2f} COP**")
-            st.metric("Total a Transferir", f"{f_cop:,.2f} COP")
-
-        with tabs[2]:
-            st.success(f"Monto Total: **{f_usd:.2f} USDT**")
-            st.caption("Red Tron (TRC20) o Binance Pay.")
-
-        # 3. FORMALIZACIÓN DE INGRESO (WhatsApp)
-        import urllib.parse
-        msj = f"FORMALIZACIÓN: {st.session_state.get('paciente_nombre', 'Paciente')}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD ({f_bs:,.2f} Bs.)"
-        
-        # Enlace corregido con el número proporcionado
-        link_final = f"https://wa.me/584262272765?text={urllib.parse.quote(msj)}"
-        
-        st.markdown(f"""
-            <a href="{link_final}" target="_blank" style="text-decoration:none;">
-                <div style="background-color:#25D366; color:white; padding:15px; border-radius:10px; text-align:center; font-weight:bold; font-size:20px;">
-                    ✅ AGENDAR SESIONES Y ENVIAR COMPROBANTE
-                </div>
-            </a>
-        """, unsafe_allow_html=True)
-
-    else:
-        st.warning("⚠️ No se ha detectado una orden activa. Complete su consulta en el módulo '🩺 Consulta Médica' para proceder.")
+        f_bs, f_cop, f_usd = total_bs*(1-desc), total_cop*(1-desc), 80.0*(1-desc)
+        tabs = st.tabs(["VENEZUELA", "COLOMBIA", "USDT"])
+        tabs[0].info(f"Monto: **{f_bs:,.2f} Bs.**")
+        tabs[1].warning(f"Monto: **{f_cop:,.2f} COP**")
+        tabs[2].success(f"Monto: **{f_usd:.2f} USDT**")
+            
+        msj = f"FORMALIZACIÓN: {st.session_state.paciente_nombre}\nDiagnóstico: {diagnostico[:100]}...\nMonto: {f_usd} USD"
+        st.markdown(f'<a href="https://wa.me/584262272765?text={urllib.parse.quote(msj)}" class="btn-whatsapp">✅ AGENDAR</a>', unsafe_allow_html=True)
